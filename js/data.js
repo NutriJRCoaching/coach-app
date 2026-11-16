@@ -55,15 +55,23 @@ export function prevSession(sessions, s) {
 export const refSet = (prev, exId, j) => prev?.exercises?.find((e) => e.exId === exId)?.sets?.[j] || null;
 
 // Crea una sesión nueva a partir de la rutina
+// Ejercicios unilaterales: cada serie se anota por lado (izquierdo y derecho)
+export const isUniName = (n) => /\buni(lateral)?\b/i.test(n || "");
+export const splitSides = (arr, blank) => arr.flatMap((x) => [{ ...x, side: "I" }, { ...(blank ? blank() : x), side: "D" }]);
+export const setLabel = (ex, j) => (ex.sides ? `Serie ${Math.floor(j / 2) + 1} ${ex.sets[j]?.side === "D" || j % 2 ? "derecha" : "izquierda"}` : `Serie ${j + 1}`);
+const blankSet = () => ({ w: "", r: "", rir: "", note: "", done: false });
 export function newSession(client, routine, date = ymd()) {
   return {
     id: uid(), routineId: routine.id, routineName: routine.name, date, weekKey: weekInfo(client, date).key,
     startedAt: Date.now(), status: "curso",
-    exercises: routine.exercises.map((e) => ({
-      exId: e.id, name: e.name, video: e.video || "", inc: e.inc || 2.5, rest: e.rest || null, notes: e.notes || "",
-      target: e.sets || [], alts: e.alts || [], changed: !!e.changed,
-      sets: (e.sets || []).map(() => ({ w: "", r: "", rir: "", note: "", done: false })), tech: ""
-    }))
+    exercises: routine.exercises.map((e) => {
+      const sides = e.uni ?? isUniName(e.name), tg = e.sets || [];
+      return {
+        exId: e.id, name: e.name, video: e.video || "", inc: e.inc || 2.5, rest: e.rest || null, notes: e.notes || "",
+        target: sides ? splitSides(tg) : tg, alts: e.alts || [], changed: !!e.changed, sides,
+        sets: sides ? splitSides(tg.map(blankSet), blankSet) : tg.map(blankSet), tech: ""
+      };
+    })
   };
 }
 
@@ -93,11 +101,11 @@ export function suggest(ex, j) {
     let a = v.a;
     if (a === "mant" && heavier && s.tech !== "peor") a = "sube";
     const txt = { sube: "sube el peso (salto mínimo)", mant: "mantén el peso", baja: "baja el peso" }[a];
-    return { a, last: false, text: `Serie ${j + 2}: ${txt}`, why: v.why };
+    return { a, last: false, text: `${setLabel(ex, j + 1)}: ${txt}`, why: v.why };
   }
   const per = ex.sets.map((_, k) => setVerdict(ex, k));
   const words = { sube: "sube (salto mínimo)", mant: "mantén", baja: "baja" };
-  const items = per.map((x, k) => (x ? `Serie ${k + 1}: ${words[x.a]}` : null)).filter(Boolean);
+  const items = per.map((x, k) => (x ? `${setLabel(ex, k)}: ${words[x.a]}` : null)).filter(Boolean);
   const worst = per.some((x) => x?.a === "baja") ? "baja" : per.some((x) => x?.a === "sube") ? "sube" : "mant";
   const tech = ex.sets.some((x) => x.tech === "peor");
   return { a: worst, last: true, text: "Próxima semana", items, why: tech ? "Alguna serie salió con peor técnica: no subas peso ahí hasta afirmarla." : "" };

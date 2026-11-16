@@ -4,7 +4,7 @@ import { db } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, chips, beep, notify, confirmBox, $, $$ } from "./ui.js";
 import { LS, esc, ymd, fmtDate, weekInfo, r1, num, embedUrl, uid, pad, parseYmd, D3, compressImage } from "./util.js";
-import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest } from "./data.js";
+import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest, splitSides } from "./data.js";
 import { I } from "./icons.js";
 
 const P = () => "clients/" + S.cid;
@@ -65,9 +65,9 @@ export async function sessionView(id) {
   return `<header class="ch sess"><a href="#entreno" class="icon-btn">${I.back}</a><h2>${esc(s.routineName)}</h2><span class="row"><span class="clock" id="clock">${timeSince(s.startedAt)}</span><button class="btn tiny primary" data-a="finishAsk">Terminar</button></span></header>
   <div class="extabs">${s.exercises.map((e, k) => { const done = e.sets.length && e.sets.every((x) => x.done); return `<button class="${k === i ? "on" : ""} ${done ? "done" : ""} ${e.extra ? "extra" : ""} ${e.changed ? "chg" : ""}" data-a="exGo" data-i="${k}">${k + 1}</button>`; }).join("")}</div>
   <div class="card ex ${ex.extra ? "extra" : ""}">
-    <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra</span>' : ""}</h3></div>
+    <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra</span>' : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
     <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
-    ${ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy</small><div>${ex.target.map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div></div>` : `<div class="goal"><small>Series libres</small></div>`}
+    ${ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div></div>` : `<div class="goal"><small>Series libres</small></div>`}
     <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span><span>Técnica</span></div>
     ${ex.sets.map((st, j) => setRow(ex, i, j)).join("")}</div>
     <div class="row gap"><button class="btn tiny" data-a="addSet">${I.plus} Serie</button>${ex.sets.length > (ex.target.length || 0) ? `<button class="btn tiny ghost" data-a="delSet">Quitar serie</button>` : ""}<span class="grow"></span><span class="muted small">Técnica vs. semana pasada</span></div>
@@ -80,7 +80,7 @@ export async function sessionView(id) {
 }
 function setRow(ex, i, j) {
   const st = ex.sets[j], ref = refSet(prev, ex.exId, j), t = ex.target[j] || {};
-  return `<div class="set ${st.done ? "done" : ""}" id="set-${i}-${j}"><span class="sn"><b>${j + 1}</b></span>
+  return `<div class="set ${st.done ? "done" : ""} ${ex.sides && j % 2 ? "sideD" : ""} ${ex.sides && !(j % 2) && j ? "sideI" : ""}" id="set-${i}-${j}"><span class="sn">${ex.sides ? `<b>${Math.floor(j / 2) + 1}</b><small class="side ${j % 2 ? "d" : "i"}">${j % 2 ? "Der" : "Izq"}</small>` : `<b>${j + 1}</b>`}</span>
   <input type="number" inputmode="decimal" step="0.5" value="${st.w}" placeholder="${ref?.w ?? ""}" data-a-change="setVal" data-j="${j}" data-k="w">
   <input type="number" inputmode="numeric" value="${st.r}" placeholder="${ref?.r ?? (parseInt(t.reps) || "")}" data-a-change="setVal" data-j="${j}" data-k="r">
   <button class="rirb ${st.rir === "" ? "" : "rir" + st.rir}" data-a="rirPick" data-j="${j}">${st.rir === "" ? "–" : st.rir}</button>
@@ -135,8 +135,17 @@ act("setDone", (el) => {
   if (!st.done && st.w === "" && st.r === "") { const ref = refSet(prev, ex.exId, j); if (!ref) return toast("Anota peso y repeticiones"); st.w = ref.w; st.r = ref.r; }
   st.done = !st.done; save(); refresh();
 });
-act("addSet", () => { const ex = cur(); const l = ex.sets[ex.sets.length - 1] || {}; ex.sets.push({ w: l.w ?? "", r: "", rir: "", note: "", tech: "", done: false }); save(); refresh(); });
-act("delSet", () => { cur().sets.pop(); save(); refresh(); });
+act("addSet", () => {
+  const ex = cur(), l = ex.sets[ex.sets.length - 1] || {}, mk = (side) => ({ w: l.w ?? "", r: "", rir: "", note: "", tech: "", done: false, ...(side ? { side } : {}) });
+  if (ex.sides) ex.sets.push(mk("I"), mk("D")); else ex.sets.push(mk()); save(); refresh();
+});
+act("delSet", () => { const ex = cur(); ex.sets.splice(-(ex.sides ? 2 : 1)); save(); refresh(); });
+act("toggleSides", () => {
+  const ex = cur(), blank = () => ({ w: "", r: "", rir: "", note: "", tech: "", done: false });
+  if (ex.sides) { ex.sets = ex.sets.filter((_, k) => k % 2 === 0).map(({ side, ...x }) => x); ex.target = ex.target.filter((_, k) => k % 2 === 0).map(({ side, ...x }) => x); ex.sides = false; toast("Series sin separar por lado"); }
+  else { ex.sets = splitSides(ex.sets, () => ({ ...blank(), w: "" })); ex.target = splitSides(ex.target); ex.sides = true; toast("Ahora anotas izquierda y derecha"); }
+  save(); refresh();
+});
 act("setNote", (el) => {
   const j = +el.dataset.j, ref = refSet(prev, cur().exId, j);
   sheet(`Nota · serie ${j + 1}`, `${ref?.note ? `<div class="note">Semana pasada: ${esc(ref.note)}</div>` : ""}<textarea id="sNt" rows="3" placeholder="Ej: primera serie muy liviana">${esc(cur().sets[j].note || "")}</textarea><button class="btn primary big" data-a="setNoteSave" data-j="${j}">Guardar</button>`);
