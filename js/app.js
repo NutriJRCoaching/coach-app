@@ -33,14 +33,14 @@ function loginView(msg = "") {
   root.className = "login";
   if (DEMO) {
     root.innerHTML = `<div class="login-box">
-      <img class="logo-img" src="icons/logo.png" alt="Team JR"><p class="muted">Modo demo: los datos se guardan solo en este navegador.</p>
+      <img class="logo-img" src="icons/logo.png" alt="IMA"><p class="muted">Modo demo: los datos se guardan solo en este navegador.</p>
       <button class="btn primary big" data-a="demoIn" data-uid="cli-demo">Entrar como cliente (celular)</button>
       <button class="btn big" data-a="demoIn" data-uid="coach-demo">Entrar como coach (escritorio)</button>
       <button class="btn ghost small" data-a="demoReset">Reiniciar datos de ejemplo</button><p class="ver">v${CONFIG.appVersion}</p></div>`;
     return;
   }
   root.innerHTML = `<form class="login-box" id="loginF">
-    <img class="logo-img" src="icons/logo.png" alt="Team JR">
+    <img class="logo-img" src="icons/logo.png" alt="IMA">
     ${msg ? `<p class="err">${esc(msg)}</p>` : ""}
     <label>Correo<input name="email" type="email" autocomplete="username email" required value="${esc(LS.get("lastEmail") || "")}"></label>
     <label>Contraseña<input name="pass" type="password" autocomplete="current-password" required minlength="6"></label>
@@ -69,7 +69,7 @@ async function enterClient() {
   const id = S.user.uid;
   let c = await db.get("clients/" + id);
   if (!c) { c = { name: "Joaquín Rojas", email: S.user.email || "", startDate: ymd(), kcal: 2400, cho: 280, fat: 70, prot: 160, steps: 9000, water: 2800, sleep: 8, phase: "Mantención", schedule: {} }; await db.set("clients/" + id, c); }
-  // Primera vez: carga su rutina inicial (Team JR) y el calendario semanal
+  // Primera vez: carga su rutina inicial (IMA) y el calendario semanal
   if (!c.seeded && !(await db.list(`clients/${id}/routines`)).length) {
     const { jrRoutines } = await import("./seed-jr.js");
     const { routines, schedule, lib } = jrRoutines();

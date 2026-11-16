@@ -395,7 +395,7 @@ async function sessionImage(s) {
     y += h + 24;
   });
   if (s.comment) { g.fillStyle = "#a1a1aa"; g.font = F(500, 26); g.fillText("💬 " + s.comment.slice(0, 70) + (s.comment.length > 70 ? "…" : ""), P, y + 40); y += 100; }
-  g.fillStyle = "#55555c"; g.font = F(600, 22); g.fillText("Team JR · Coach Online", P, H - 36);
+  g.fillStyle = "#55555c"; g.font = F(600, 22); g.fillText("IMA · Inteligencia Muscular Aplicada", P, H - 36);
   return new Promise((res) => c.toBlob(res, "image/png"));
 }
 act("shareImg", async () => {
