@@ -234,3 +234,17 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .otherday { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 6px 14px 4px; padding: 10px 12px; border-radius: 12px;
   background: color-mix(in srgb, var(--y) 18%, var(--surf)); border: 1px solid var(--y); font-size: 13px; cursor: pointer; user-select: none; }
 .otherday > b { color: var(--y); white-space: nowrap; }
+
+/* Objetivo del ejercicio, destacado */
+.goal { margin: 10px 0 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--acc); background: color-mix(in srgb, var(--acc) 12%, var(--surf)); text-align: center; }
+.goal small { display: block; color: var(--acc); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; margin-bottom: 4px; }
+.goal div { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 18px; font-size: 14.5px; }
+.goal span b { margin-right: 6px; color: var(--acc); }
+.sh, .set { grid-template-columns: 34px 1fr 64px 44px 78px !important; }
+.techb { font-size: 12px !important; font-weight: 700; white-space: nowrap; width: auto !important; padding: 0 6px; }
+.techgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .techgrid .techb { height: 48px; font-size: 15px !important; }
+.sug span.why { opacity: .8; font-style: italic; }
+.sug span { display: block; }
+.restpick { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 12px; } .restpick b { font-size: 40px; font-variant-numeric: tabular-nums; }
+.tiplist { margin: 4px 0 0 18px; padding: 0; display: grid; gap: 6px; font-size: 14px; line-height: 1.4; }
+.cmain:has(.sessbar) { padding-bottom: 190px; }

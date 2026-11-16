@@ -71,29 +71,36 @@ export function newSession(client, routine, date = ymd()) {
 export function range(s) { const m = String(s ?? "").match(/(\d+)\s*[-–a]\s*(\d+)/); if (m) return { lo: +m[1], hi: +m[2] }; const n = parseInt(s); return isNaN(n) ? null : { lo: n, hi: n }; }
 
 // Sugerencia para la siguiente serie. La técnica va antes que el peso.
-export function suggest(ex, j) {
+// Qué hacer con una serie según cómo salió (técnica primero, después reps/RIR)
+export function setVerdict(ex, j) {
   const s = ex.sets[j]; if (!s || s.w === "" || s.r === "") return null;
   const t = ex.target[j] || ex.target[ex.target.length - 1] || {};
-  const nt = ex.target[j + 1] || t;
   const rg = range(t.reps), tr = t.rir === "" || t.rir == null ? 1 : +t.rir;
-  const w = +s.w, r = +s.r, rir = s.rir === "" ? null : s.rir;
-  let a;
-  if (ex.tech === "peor") a = "baja";
-  else if (rir === "F" || (rg && r < rg.lo - 1)) a = "baja";
-  else if (rg && r >= rg.hi && rir != null && +rir > tr) a = "sube";
-  else if (rg && r > rg.hi + 1) a = "sube";
-  else a = "mant";
-  const inc = +ex.inc || 2.5;
-  const nrg = range(nt.reps) || rg || { lo: r, hi: r };
-  const ntr = nt.rir === "" || nt.rir == null ? 1 : +nt.rir;
-  const est = e1rm(w, r, rir) / (1 + ((nrg.lo + nrg.hi) / 2 + ntr) / 30);
-  const rnd = (x) => Math.max(0, Math.round(x / inc) * inc);
-  let nw = w;
-  if (a === "sube") nw = Math.max(rnd(est), w + inc);
-  if (a === "baja") nw = Math.min(rnd(est), w - inc);
-  const label = { sube: "Súbele", mant: "Mantén", baja: "Bájale" }[a];
-  const why = ex.tech === "peor" && a === "baja" ? " · la técnica va antes que el peso" : "";
-  return { a, label, w: Math.max(0, Math.round(nw * 10) / 10), why, last: j >= ex.sets.length - 1 };
+  const r = +s.r, rir = s.rir === "" ? null : s.rir;
+  if (s.tech === "peor") return { a: "mant", why: "la técnica empeoró: primero afírmala" };
+  if (rir === "F" || (rg && r < rg.lo)) return { a: "baja", why: rir === "F" ? "llegaste al fallo" : "no alcanzaste las reps" };
+  if (rg && ((r >= rg.hi && rir != null && +rir > tr) || r > rg.hi)) return { a: "sube", why: "te sobró margen" };
+  return { a: "mant", why: "" };
+}
+// Mensaje bajo el ejercicio: durante la sesión habla de la serie siguiente;
+// al completar la última, resume qué hacer la próxima semana serie por serie.
+export function suggest(ex, j) {
+  const v = setVerdict(ex, j); if (!v) return null;
+  const last = j >= ex.sets.length - 1;
+  if (!last) {
+    const t = ex.target[j] || {}, nt = ex.target[j + 1] || t, s = ex.sets[j];
+    const heavier = range(nt.reps) && range(t.reps) && range(nt.reps).hi < range(t.reps).lo; // la siguiente pide menos reps
+    let a = v.a;
+    if (a === "mant" && heavier && s.tech !== "peor") a = "sube";
+    const txt = { sube: "sube el peso (salto mínimo)", mant: "mantén el peso", baja: "baja el peso" }[a];
+    return { a, last: false, text: `Serie ${j + 2}: ${txt}`, why: v.why };
+  }
+  const per = ex.sets.map((_, k) => setVerdict(ex, k));
+  const words = { sube: "sube (salto mínimo)", mant: "mantén", baja: "baja" };
+  const items = per.map((x, k) => (x ? `Serie ${k + 1}: ${words[x.a]}` : null)).filter(Boolean);
+  const worst = per.some((x) => x?.a === "baja") ? "baja" : per.some((x) => x?.a === "sube") ? "sube" : "mant";
+  const tech = ex.sets.some((x) => x.tech === "peor");
+  return { a: worst, last: true, text: "Próxima semana", items, why: tech ? "Alguna serie salió con peor técnica: no subas peso ahí hasta afirmarla." : "" };
 }
 
 export const MEASURE_ZONES = [

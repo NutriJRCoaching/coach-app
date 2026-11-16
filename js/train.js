@@ -3,7 +3,7 @@ import { CONFIG } from "./config.js";
 import { db } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, chips, beep, notify, confirmBox, $, $$ } from "./ui.js";
-import { esc, ymd, fmtDate, weekInfo, r1, num, embedUrl, uid, pad, parseYmd, D3, compressImage } from "./util.js";
+import { LS, esc, ymd, fmtDate, weekInfo, r1, num, embedUrl, uid, pad, parseYmd, D3, compressImage } from "./util.js";
 import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest } from "./data.js";
 import { I } from "./icons.js";
 
@@ -12,6 +12,7 @@ const head = (t, back, right = "") => `<header class="ch">${back ? `<a href="#${
 const STATUS = { hecho: "Hecho", hoy: "Hoy", atrasado: "Atrasado", proximo: "Próximo" };
 const TECH = { "": "–", peor: "↓", igual: "=", mejor: "↑" };
 const TECH_NEXT = { "": "igual", igual: "mejor", mejor: "peor", peor: "" };
+const TECH_L = { "": "Técnica", peor: "↓ Peor", igual: "= Igual", mejor: "↑ Mejor" };
 const planTxt = (t) => `${esc(t.reps || "–")} reps${t.rir !== "" && t.rir != null ? ` @RIR ${t.rir}` : ""}`;
 
 // ================================================================ TU SEMANA
@@ -66,25 +67,24 @@ export async function sessionView(id) {
   <div class="card ex ${ex.extra ? "extra" : ""}">
     <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra</span>' : ""}</h3></div>
     <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
-    ${ex.target.length ? `<div class="plan-line">${ex.target.map((t, j) => `<span>Serie ${j + 1}: <b>${planTxt(t)}</b></span>`).join("")}</div>` : `<div class="plan-line"><span>Series libres</span></div>`}
-    <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span><span>Téc.</span><span></span></div>
+    ${ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy</small><div>${ex.target.map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div></div>` : `<div class="goal"><small>Series libres</small></div>`}
+    <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span><span>Técnica</span></div>
     ${ex.sets.map((st, j) => setRow(ex, i, j)).join("")}</div>
-    <div class="row gap"><button class="btn tiny" data-a="addSet">${I.plus} Serie</button>${ex.sets.length > (ex.target.length || 0) ? `<button class="btn tiny ghost" data-a="delSet">Quitar serie</button>` : ""}<span class="grow"></span><span class="muted small">Téc.: ↓ peor · = igual · ↑ mejor</span></div>
+    <div class="row gap"><button class="btn tiny" data-a="addSet">${I.plus} Serie</button>${ex.sets.length > (ex.target.length || 0) ? `<button class="btn tiny ghost" data-a="delSet">Quitar serie</button>` : ""}<span class="grow"></span><span class="muted small">Técnica vs. semana pasada</span></div>
     <div id="sug-${i}">${sugHtml(ex)}</div>
   </div>
   <div class="row gap pad-x"><button class="btn ghost small grow" data-a="addExtra">${I.plus} Ejercicio extra</button><button class="btn ghost small grow" data-a="sessComment">${I.note} Comentario${s.comment ? " ●" : ""}</button></div>
   <div class="sessbar"><button class="btn" data-a="exGo" data-i="${i - 1}" ${i === 0 ? "disabled" : ""}>${I.back} Anterior</button>
-    <button class="rest-btn ${S.rest ? "running" : ""}" data-a="${S.rest ? "restStop" : "restStart"}">${I.timer}<span id="restT">${S.rest ? fmtRest() : "Descanso " + fmtSec(ex.rest || S.client.rest || CONFIG.defaultRest)}</span></button>
+    <button class="rest-btn ${S.rest ? "running" : ""}" data-a="${S.rest ? "restStop" : "restStart"}">${I.timer}<span id="restT">${S.rest ? fmtRest() : "Descanso " + fmtSec(restSec())}</span></button>
     <button class="btn" data-a="exGo" data-i="${i + 1}" ${i >= s.exercises.length - 1 ? "disabled" : ""}>Siguiente ${I.chev}</button></div>`;
 }
 function setRow(ex, i, j) {
   const st = ex.sets[j], ref = refSet(prev, ex.exId, j), t = ex.target[j] || {};
-  return `<div class="set ${st.done ? "done" : ""}" id="set-${i}-${j}"><span class="sn"><b>${j + 1}</b><small>${t.reps ? esc(t.reps) + (t.rir !== "" && t.rir != null ? "@" + t.rir : "") : ""}</small></span>
+  return `<div class="set ${st.done ? "done" : ""}" id="set-${i}-${j}"><span class="sn"><b>${j + 1}</b></span>
   <input type="number" inputmode="decimal" step="0.5" value="${st.w}" placeholder="${ref?.w ?? ""}" data-a-change="setVal" data-j="${j}" data-k="w">
   <input type="number" inputmode="numeric" value="${st.r}" placeholder="${ref?.r ?? (parseInt(t.reps) || "")}" data-a-change="setVal" data-j="${j}" data-k="r">
   <button class="rirb ${st.rir === "" ? "" : "rir" + st.rir}" data-a="rirPick" data-j="${j}">${st.rir === "" ? "–" : st.rir}</button>
-  <button class="techb ${st.tech || ""}" data-a="techSet" data-j="${j}" title="Técnica vs semana pasada">${TECH[st.tech || ""]}</button>
-  <button class="chk" data-a="setDone" data-j="${j}">${st.done ? I.check : ""}</button>
+  <button class="techb ${st.tech || ""}" data-a="techPick" data-j="${j}">${TECH_L[st.tech || ""]}</button>
   <div class="setinfo" id="si-${i}-${j}">${setInfo(ex, j)}</div></div>`;
 }
 function setInfo(ex, j) {
@@ -104,8 +104,9 @@ function sugHtml(ex) {
   let last = null; ex.sets.forEach((s, j) => { if (s.w !== "" && s.r !== "") last = j; });
   if (last == null) return "";
   const sg = suggest(ex, last); if (!sg) return "";
-  const verb = { sube: `Súbele a ${sg.w} kg`, mant: `Mantén ${sg.w} kg`, baja: `Bájale a ${sg.w} kg` }[sg.a];
-  return `<div class="sug ${sg.a}"><b>${sg.last ? "Próxima semana" : "Siguiente serie"}: ${verb}</b>${sg.why ? `<span>${sg.why.replace(" · ", "")}</span>` : ""}</div>`;
+  return sg.last
+    ? `<div class="sug ${sg.a}"><b>${sg.text}</b>${sg.items.map((x) => `<span>${x}</span>`).join("")}${sg.why ? `<span class="why">${sg.why}</span>` : ""}</div>`
+    : `<div class="sug ${sg.a}"><b>${sg.text}</b>${sg.why ? `<span class="why">${sg.why}</span>` : ""}</div>`;
 }
 const cur = () => S.session.exercises[S.exIdx || 0];
 function updateSet(j) {
@@ -114,7 +115,12 @@ function updateSet(j) {
   const sg = $(`#sug-${i}`); if (sg) sg.innerHTML = sugHtml(ex);
 }
 act("exGo", (el) => { const n = +el.dataset.i; if (n < 0 || n >= S.session.exercises.length) return; S.exIdx = n; refresh(); });
-act("setVal", (el) => { const j = +el.dataset.j, st = cur().sets[j]; st[el.dataset.k] = el.value === "" ? "" : +el.value; save(); updateSet(j); });
+act("setVal", (el) => { const j = +el.dataset.j, st = cur().sets[j]; st[el.dataset.k] = el.value === "" ? "" : +el.value; st.done = st.w !== "" && st.r !== ""; $(`#set-${S.exIdx || 0}-${j}`)?.classList.toggle("done", st.done); save(); updateSet(j); });
+act("techPick", (el) => {
+  const j = +el.dataset.j;
+  sheet("Técnica · serie " + (j + 1), `<p class="muted small">¿Cómo estuvo tu técnica comparada con la semana pasada?</p><div class="techgrid">${[["mejor", "↑ Mejor"], ["igual", "= Igual"], ["peor", "↓ Peor"], ["", "Sin marcar"]].map(([v, l]) => `<button class="techb ${v}" data-a="techSet2" data-j="${j}" data-v="${v}">${l}</button>`).join("")}</div>`);
+});
+act("techSet2", (el) => { cur().sets[+el.dataset.j].tech = el.dataset.v; save(); closeSheet(); refresh(); });
 act("rirPick", (el) => {
   const j = +el.dataset.j;
   sheet("RIR de la serie " + (j + 1), `<p class="muted small">Repeticiones que te quedaban en reserva. F = llegaste al fallo.</p><div class="rirgrid">${["", "F", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => `<button class="rirb ${v === "" ? "" : "rir" + v}" data-a="rirSet" data-j="${j}" data-v="${v}">${v === "" ? "–" : v}</button>`).join("")}</div>`);
@@ -140,12 +146,15 @@ act("setNoteSave", (el) => { cur().sets[+el.dataset.j].note = $("#sNt").value; s
 // Tips de ejecución: video, indicaciones, configuración y reemplazos en un solo lugar
 act("tips", async () => {
   const ex = cur(), n = (await db.get(`${P()}/exnotes/${ex.exId}`)) || {}, e = embedUrl(ex.video);
-  sheet(ex.name, `${e ? `<div class="video"><iframe src="${e}" allowfullscreen></iframe></div>` : ex.video ? `<a class="btn primary block" target="_blank" href="${esc(ex.video)}">${I.play} Ver video</a>` : `<p class="muted small">Tu coach aún no carga el video de este ejercicio.</p>`}
-  ${ex.notes ? `<div class="card-t mt">Indicaciones de tu coach</div><div class="pre">${esc(ex.notes)}</div>` : ""}
-  <div class="card-t mt">${I.gear}Tu configuración</div><p class="muted small">Altura del asiento, apoyos, agarre, distancia a la polea… Queda guardado para la próxima vez.</p>
+  const tips = String(ex.notes || "").split(/\n|•|·/).map((x) => x.replace(/^[-*\d.)\s]+/, "").trim()).filter(Boolean);
+  sheet(ex.name, `<div class="card-t">${I.gear}Tu configuración</div><p class="muted small">Altura del asiento, apoyos, agarre, distancia a la polea… Queda guardado para la próxima vez.</p>
   <textarea id="suT" rows="2" placeholder="Ej: asiento 3, respaldo 5, a 10 cm de la polea">${esc(n.text || "")}</textarea>
   <div class="thumbs">${(n.photos || []).map((p, k) => `<img src="${p}" data-a="setupPhotoDel" data-k="${k}">`).join("")}<label class="padd">＋<input type="file" accept="image/*" hidden data-a-change="setupPhoto"></label></div>
   <button class="btn primary block mt" data-a="setupSave">Guardar configuración</button>
+  <div class="card-t mt">${I.play}Ejecución</div>
+  ${e ? `<div class="video"><iframe src="${e}" allowfullscreen></iframe></div>` : ex.video ? `<a class="btn primary block" target="_blank" href="${esc(ex.video)}">${I.play} Ver video</a>` : `<p class="muted small">Tu coach aún no carga el video de este ejercicio.</p>`}
+  <div class="card-t mt">Tips de ejecución</div>
+  ${tips.length ? `<ul class="tiplist">${tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : `<p class="muted small">Tu coach aún no carga los tips de este ejercicio.</p>`}
   ${ex.alts?.length ? `<div class="card-t mt">${I.swap}Reemplazos de emergencia</div><p class="muted small">Si la máquina está ocupada o no está disponible (mismo patrón de movimiento):</p>
   ${ex.alts.map((a, k) => `<div class="li row between"><b>${esc(a.name)}</b><span class="row gap">${a.video ? `<a class="btn tiny" target="_blank" href="${esc(a.video)}">Video</a>` : ""}<button class="btn tiny primary" data-a="useAlt" data-k="${k}">Usar</button></span></div>`).join("")}` : ""}`);
 });
@@ -174,15 +183,35 @@ act("addExtraOk", () => {
 act("sessComment", () => sheet("Comentario de la sesión", `<textarea id="cmT" rows="3" placeholder="Ej: tuve que cambiar el orden de los ejercicios porque…">${esc(S.session.comment || "")}</textarea><button class="btn primary big" data-a="sessCommentOk">Guardar</button>`));
 act("sessCommentOk", () => { S.session.comment = $("#cmT").value; save(); closeSheet(); refresh(); });
 act("finishAsk", () => {
-  const pend = S.session.exercises.filter((e) => e.sets.some((s) => !s.done)).length;
-  sheet("¿Quieres terminar tu sesión?", `${pend ? `<p class="warn">Hay ${pend} ejercicio(s) con series sin marcar.</p>` : ""}<div class="row gap"><button class="btn grow" data-a="closeSheet">Seguir</button><button class="btn primary grow" data-a="finishOk">Terminar entrenamiento</button></div>`);
+  const pend = S.session.exercises.filter((e) => e.sets.some((s) => s.w === "" || s.r === "")).length;
+  sheet("¿Quieres terminar tu sesión?", `${pend ? `<p class="warn">Hay ${pend} ejercicio(s) con series sin anotar.</p>` : ""}<div class="row gap"><button class="btn grow" data-a="closeSheet">Seguir</button><button class="btn primary grow" data-a="finishOk">Terminar entrenamiento</button></div>
+  <div class="row gap mt"><button class="btn ghost grow" data-a="sessReset">Reiniciar desde cero</button><button class="btn ghost grow red" data-a="sessDiscard">Descartar sesión</button></div>`);
+});
+act("sessReset", async () => {
+  if (!(await confirmBox("Se borran todas las series anotadas y el reloj parte de cero. ¿Reiniciar?", "Reiniciar"))) return;
+  S.session.exercises.forEach((e) => { e.sets = e.target.length ? e.target.map(() => ({ w: "", r: "", rir: "", note: "", tech: "", done: false })) : [{ w: "", r: "", rir: "", note: "", tech: "", done: false }]; });
+  S.session.exercises = S.session.exercises.filter((e) => !e.extra); S.session.startedAt = Date.now(); S.exIdx = 0; S.rest = null;
+  save(); closeSheet(); toast("Sesión reiniciada"); refresh();
+});
+act("sessDiscard", async () => {
+  if (!(await confirmBox("La sesión se elimina por completo y no queda registrada. ¿Descartar?", "Descartar"))) return;
+  await db.del(`${P()}/sessions/${S.session.id}`); S.session = null; S.rest = null; closeSheet();
+  document.getElementById("app")?.classList.remove("in-session"); toast("Sesión descartada"); go("entreno");
 });
 act("finishOk", () => { closeSheet(); S.session.endedAt = Date.now(); save(); S.rest = null; document.getElementById("app")?.classList.remove("in-session"); go("encuesta/" + S.session.id); });
 
 // ---------- Temporizador de descanso (se inicia a mano)
 const fmtSec = (s) => `${Math.floor(s / 60)}:${pad(s % 60)}`;
 const fmtRest = () => fmtSec(Math.max(0, Math.ceil((S.rest.end - Date.now()) / 1000)));
-act("restStart", () => { const sec = cur()?.rest || S.client.rest || CONFIG.defaultRest; S.rest = { end: Date.now() + sec * 1000, fired: false }; refresh(); });
+const restSec = () => { const v = +LS.get("restSec"); return v > 0 ? v : cur()?.rest || S.client.rest || CONFIG.defaultRest; };
+act("restStart", () => {
+  sheet("Descanso", `<div class="restpick"><button class="btn" data-a="restPickAdj" data-n="-15">−15 s</button><b id="rpT">${fmtSec(restSec())}</b><button class="btn" data-a="restPickAdj" data-n="15">+15 s</button></div>
+  <div class="chips">${[60, 90, 120, 150, 180, 240].map((x) => `<button class="chip" data-a="restPickSet" data-n="${x}">${fmtSec(x)}</button>`).join("")}</div>
+  <button class="btn primary big" data-a="restGo">Iniciar descanso</button>`);
+});
+act("restPickAdj", (el) => { const v = Math.max(15, restSec() + +el.dataset.n); LS.set("restSec", v); $("#rpT").textContent = fmtSec(v); });
+act("restPickSet", (el) => { LS.set("restSec", +el.dataset.n); $("#rpT").textContent = fmtSec(+el.dataset.n); });
+act("restGo", () => { S.rest = { end: Date.now() + restSec() * 1000, fired: false }; closeSheet(); refresh(); });
 act("restStop", () => { S.rest = null; refresh(); });
 act("restAdj", (el) => { if (S.rest) S.rest.end += +el.dataset.n * 1000; });
 export function restBar() {
