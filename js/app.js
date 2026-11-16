@@ -153,23 +153,35 @@ addEventListener("hashchange", render);
 
 // ---------------------------------------------------------- ACTUALIZACIONES
 function registerSW() {
-  let updating = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => { if (updating) location.reload(); });
-  const ask = (w) => {
+  let reg = null, updating = false;
+  const reload = () => location.reload();
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (updating) reload(); });
+  const update = async () => {
+    if (updating) return; updating = true;
+    try { sessionStorage.setItem("justUpdated", "1"); } catch {}
+    const btn = document.querySelector("#upd button"); if (btn) btn.textContent = "Actualizando…";
+    try { (reg?.waiting || reg?.installing)?.postMessage("skip"); } catch {}
+    // Respaldo: si en 1,5 s no se activó, se reinstala desde cero (la app siempre baja el código nuevo con conexión)
+    setTimeout(async () => { try { await reg?.unregister(); } catch {} reload(); }, 1500);
+  };
+  const ask = () => {
+    try { if (sessionStorage.getItem("justUpdated")) return; } catch {}
     if (document.getElementById("upd")) return;
     const d = document.createElement("div");
     d.id = "upd"; d.className = "upd";
     d.innerHTML = `<span><b>Nueva versión disponible</b><small>Toca para actualizar la app</small></span><button class="btn small">Actualizar</button>`;
-    d.querySelector("button").onclick = () => { updating = true; d.querySelector("button").textContent = "Actualizando…"; w.postMessage("skip"); setTimeout(() => location.reload(), 4000); };
+    d.addEventListener("click", update);
     document.body.appendChild(d);
   };
-  navigator.serviceWorker.register("sw.js").then((reg) => {
-    if (reg.waiting && navigator.serviceWorker.controller) ask(reg.waiting);
-    reg.addEventListener("updatefound", () => {
-      const w = reg.installing;
-      w?.addEventListener("statechange", () => { if (w.state === "installed" && navigator.serviceWorker.controller) ask(w); });
+  try { setTimeout(() => sessionStorage.removeItem("justUpdated"), 10000); } catch {}
+  navigator.serviceWorker.register("sw.js").then((r) => {
+    reg = r;
+    if (r.waiting && navigator.serviceWorker.controller) ask();
+    r.addEventListener("updatefound", () => {
+      const w = r.installing;
+      w?.addEventListener("statechange", () => { if (w.state === "installed" && navigator.serviceWorker.controller) ask(); });
     });
-    const check = () => reg.update().catch(() => {});
+    const check = () => r.update().catch(() => {});
     document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
     setInterval(check, 15 * 60 * 1000);
   }).catch(() => {});
