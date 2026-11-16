@@ -8,17 +8,17 @@
 
 export const CONFIG = {
   firebase: {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+    apiKey: "AIzaSyCC6h_z9xIFvjgfKNY1sAu1J83tP6EAX6k",
+    authDomain: "jr-coach.firebaseapp.com",
+    projectId: "jr-coach",
+    storageBucket: "jr-coach.firebasestorage.app",
+    messagingSenderId: "568231927832",
+    appId: "1:568231927832:web:0a27e2436de5b95047636d"
   },
 
-  // Tu correo de coach (el mismo con el que te registras en la app).
-  // Debe coincidir con el que pongas en firestore.rules.
-  coachEmail: "TU_CORREO@gmail.com",
+  // Huella (SHA-256) de tu correo de coach: así tu correo no queda visible en el código público.
+  // Tu correo real va solo en las reglas de Firestore (en la consola de Firebase).
+  coachEmailHash: "2026e8ae5bb7e4a8ba9ae033186e04cf2080a3d7b1bad99e7071aeabe09ddbfa",
 
   // Tu WhatsApp con código de país, sin + ni espacios (ej: 56912345678).
   // Se usa en el botón "Compartir con tu coach".

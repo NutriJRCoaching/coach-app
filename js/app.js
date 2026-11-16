@@ -5,6 +5,8 @@ import { db, DEMO } from "./db.js";
 import { S, setRefresher, refresh, go } from "./state.js";
 import { act, toast, $ } from "./ui.js";
 import { esc, ymd } from "./util.js";
+const sha = async (t) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+const isCoachEmail = async (email) => !!email && (await sha(email.trim().toLowerCase())) === CONFIG.coachEmailHash;
 import { clientView, clientTabs } from "./client.js";
 import { coachView } from "./coach.js";
 
@@ -57,7 +59,7 @@ act("forgot", async () => {
 });
 act("coachSignup", async () => {
   const email = $("#loginF [name=email]").value.trim(), pass = $("#loginF [name=pass]").value;
-  if (email.toLowerCase() !== CONFIG.coachEmail.toLowerCase()) return toast("Ese correo no es el del coach (revisa config.js)");
+  if (!(await isCoachEmail(email))) return toast("Ese correo no es el del coach");
   if (pass.length < 6) return toast("La contraseña debe tener al menos 6 caracteres");
   try { await db.signUp(email, pass); } catch (e) { toast("No se pudo crear: " + e.code); }
 });
@@ -78,7 +80,7 @@ act("asCoach", () => { S.viewAs = null; location.hash = "coach"; });
 async function onUser(u) {
   S.user = u;
   if (!u) { S.role = null; return loginView(); }
-  const isCoach = DEMO ? u.uid === "coach-demo" : u.email?.toLowerCase() === CONFIG.coachEmail.toLowerCase();
+  const isCoach = DEMO ? u.uid === "coach-demo" : await isCoachEmail(u.email);
   S.role = isCoach ? "coach" : "client";
   if (isCoach) { db.set("users/" + u.uid, { role: "coach", email: u.email, name: "Coach" }); }
   else {
