@@ -71,6 +71,7 @@ const local = {
     const uid = "cli-" + Math.random().toString(36).slice(2, 8);
     this.set("users/" + uid, { role: "client", email, name }); return uid;
   },
+  whenSynced() { return Promise.resolve(); },
   async resetData() { if (this.idb) this.idb.transaction("docs", "readwrite").objectStore("docs").clear(); try { localStorage.removeItem("demo-uid"); } catch {} }
 };
 
@@ -131,6 +132,7 @@ const fire = {
     const ref = isCol ? collection(this.db, path) : doc(this.db, path);
     return onSnapshot(ref, (s) => cb(isCol ? s.docs.map((d) => ({ id: d.id, ...d.data() })) : s.exists() ? s.data() : null), (e) => console.error(e));
   },
+  whenSynced() { return this.m.waitForPendingWrites(this.db); },
   onAuth(cb) { this.m.onAuthStateChanged(this.auth, (u) => { this.user = u; cb(u); }); },
   async signIn(email, pass) { await this.m.signInWithEmailAndPassword(this.auth, email, pass); },
   async signUp(email, pass) { await this.m.createUserWithEmailAndPassword(this.auth, email, pass); },

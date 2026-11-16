@@ -20,6 +20,7 @@ export function clientTabs() {
 export async function clientView() {
   const [r, a] = S.route;
   S.client = applyStage(S.raw || {}, S.date); // objetivos de la etapa vigente
+  if (["inicio", "comida", "agua", "peso", "sueno", undefined, ""].includes(r)) S.rtNames = Object.fromEntries((await getRoutines(S.cid)).map((x) => [x.id, x.name]));
   const views = { inicio: home, comida: food, agua: waterView, entreno: trainView, sesion: () => sessionView(a), encuesta: () => surveyView(a), resumen: () => summaryView(a),
     progreso: progress, timeline: timelineView, peso: weightView, sueno: sleepView, fotos: photosView, medidas: measuresView,
     mas: more, plan: planView, checkin: checkinView, guias: guidesView, equipo: equipView, info: infoView, ajustes: settingsView };
@@ -28,10 +29,18 @@ export async function clientView() {
 
 const head = (title, back, right = "") => `<header class="ch">${back ? `<a href="#${back}" class="icon-btn">${I.back}</a>` : "<span></span>"}<h2>${esc(title)}</h2><span class="right">${right}</span></header>`;
 
+// Qué toca cada día (debajo del número): rutina abreviada o descanso
+function dayTag(dow) {
+  const rid = (S.client?.schedule || {})[dow];
+  if (!rid) return `<i class="dtag rest">Desc.</i>`;
+  const n = S.rtNames?.[rid] || "";
+  const short = (n.match(/\(([^)]+)\)/) || [])[1] || n.split(" ")[0].slice(0, 4) || "Entr.";
+  return `<i class="dtag">${esc(short)}</i>`;
+}
 // Tira de días de la semana del cliente
 function dayStrip() {
   const w = weekInfo(S.client, S.date), today = ymd();
-  return `<div class="strip"><button class="icon-btn" data-a="shiftDay" data-n="-7">${I.back}</button>${w.days.map((d) => { const dt = parseYmd(d); return `<button class="sd ${d === S.date ? "on" : ""} ${d === today ? "today" : ""}" data-a="pickDay" data-d="${d}"><small>${D1[dt.getDay()]}</small>${dt.getDate()}</button>`; }).join("")}<button class="icon-btn" data-a="shiftDay" data-n="7">${I.chev}</button></div>
+  return `<div class="strip"><button class="icon-btn" data-a="shiftDay" data-n="-7">${I.back}</button>${w.days.map((d) => { const dt = parseYmd(d); return `<button class="sd ${d === S.date ? "on" : ""} ${d === today ? "today" : ""}" data-a="pickDay" data-d="${d}"><small>${D1[dt.getDay()]}</small>${dt.getDate()}${dayTag(dt.getDay())}</button>`; }).join("")}<button class="icon-btn" data-a="shiftDay" data-n="7">${I.chev}</button></div>
   ${S.date !== today
     ? `<div class="otherday" data-a="pickDay" data-d="${today}"><span>Estás registrando el <b>${fmtDate(S.date, true)}</b>${S.date > today ? " (futuro)" : ""}</span><b>Volver a hoy</b></div>`
     : `<div class="strip-sub"><span>${fmtDate(S.date, true)} · Semana ${w.n}</span></div>`}`;
@@ -583,6 +592,8 @@ async function settingsView() {
     ${row("Agua", "Si vas atrasado con tu meta", `<select data-a-change="remSet" data-k="water.every" class="tm">${[1, 2, 3].map((h) => `<option value="${h}" ${+r.water.every === h ? "selected" : ""}>cada ${h} h</option>`).join("")}</select>${sw("water.on", r.water.on)}`)}
     ${row("Comidas", "Si a esa hora no has registrado esa comida", sw("meals.on", r.meals.on))}
     ${r.meals.on ? `<div class="remmeals">${Object.entries(r.meals.times).map(([m, t]) => `<span>${m}${tm("meals.times." + m, t)}</span>`).join("")}</div>` : ""}
+    ${row("Pasos / caminata", "Si vas bajo tu meta de pasos", sw("steps.on", r.steps.on))}
+    ${r.steps.on ? `<div class="remmeals">${r.steps.times.map((t, k) => `<span>${k ? "Tarde" : "Mediodía"}${tm("steps.times." + k, t)}</span>`).join("")}</div>` : ""}
     ${row("Peso", "En ayunas", `${tm("weight.at", r.weight.at)}${sw("weight.on", r.weight.on)}`)}
     ${row("Entrenamiento", "Los días que te toca", `${tm("train.at", r.train.at)}${sw("train.on", r.train.on)}`)}
     ${row("Check-in semanal", "Al final de tu semana", `${tm("checkin.at", r.checkin.at)}${sw("checkin.on", r.checkin.on)}`)}
@@ -590,7 +601,7 @@ async function settingsView() {
   </div>
   <div class="card"><div class="card-t">Unidades</div><p class="muted small">Kilogramos, litros y centímetros.</p></div>`;
 }
-const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { Desayuno: "09:30", Almuerzo: "14:30", Once: "18:30", Cena: "21:30" } }, weight: { on: true, at: "08:30" }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
+const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { Desayuno: "09:30", Almuerzo: "14:30", Once: "18:30", Cena: "21:30" } }, weight: { on: true, at: "08:30" }, steps: { on: true, times: ["13:00", "19:00"] }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
 function remCfg() {
   let c = {}; try { c = JSON.parse(LS.get("rem") || "{}"); } catch {}
   const out = JSON.parse(JSON.stringify(REM_DEF));
@@ -623,6 +634,10 @@ export async function checkReminders() {
         const goal = c.water || 2500, done = sum(day.water || [], (x) => x.ml), exp = goal * Math.min(1, (nm - f) / (t - f));
         if (done < exp - 250) once("agua-" + Math.floor((nm - f) / every), "Toma agua 💧", `Llevas ${r1(done / 1000)} de ${r1(goal / 1000)} L`);
       }
+    }
+    if (r.steps.on) {
+      const goal = c.steps || 8000, st = day.steps || 0;
+      r.steps.times.forEach((t, k) => { if (t && nm >= toMin(t) && nm < toMin(t) + 180 && st < goal * (k ? 0.75 : 0.4)) once("pasos-" + k, "Sal a caminar 🚶", `Llevas ${st.toLocaleString("es-CL")} de ${goal.toLocaleString("es-CL")} pasos`); });
     }
     if (r.train.on && nm >= toMin(r.train.at)) {
       const [routines, sessions] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]);

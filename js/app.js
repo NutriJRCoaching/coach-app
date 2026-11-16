@@ -20,10 +20,13 @@ act("theme", (el) => { LS.set("theme", el.dataset.v); applyTheme(); refresh(); }
 // Indicador de conexión
 function netBadge() {
   const b = $("#net"); if (!b) return;
-  b.hidden = navigator.onLine; b.textContent = "Sin conexión · tus registros se guardan y se sincronizan al volver la señal";
+  b.hidden = navigator.onLine; b.textContent = "Estás sin conexión · puedes seguir registrando: tus datos se guardan en el celular y se sincronizan cuando vuelva la señal";
 }
-addEventListener("online", () => { netBadge(); toast("Conexión recuperada · sincronizando"); });
-addEventListener("offline", netBadge);
+addEventListener("online", async () => {
+  netBadge(); toast("Conexión recuperada · sincronizando…");
+  try { await Promise.race([db.whenSynced(), new Promise((_, r) => setTimeout(r, 20000))]); toast("✓ Tus datos se sincronizaron", 3000); } catch {}
+});
+addEventListener("offline", () => { netBadge(); toast("Sin conexión · tus registros quedan guardados", 3000); });
 
 // ---------------------------------------------------------- LOGIN
 function loginView(msg = "") {
@@ -81,6 +84,8 @@ async function enterClient() {
     if (!cur.length) await db.set("library/exercises", { items: lib }, false);
     toast("Tu rutina quedó cargada ✓");
   }
+  // Objetivos pedidos por Joaquín (16-nov-2026): P 120 · C 380 · G 60 · 10.000 pasos
+  if (!c.goals1611) { c = { ...c, prot: 120, cho: 380, fat: 60, kcal: 120 * 4 + 380 * 4 + 60 * 9, steps: 10000, goals1611: true }; db.set("clients/" + id, { prot: 120, cho: 380, fat: 60, kcal: c.kcal, steps: 10000, goals1611: true }); }
   S.viewAs = "client"; S.cid = id; S.raw = c; LS.set("viewAs", "client");
   db.watch("clients/" + id, (x) => { if (x && S.cid === id) S.raw = x; });
   if (!location.hash || location.hash.startsWith("#coach")) location.hash = "inicio";
