@@ -26,8 +26,8 @@ export const CONFIG = {
 
   appName: "Team JR",
   // Clave pública para avisos con la app cerrada (Firebase → Configuración → Cloud Messaging → Certificados web push)
-  vapidKey: "",
-  appVersion: "1.8.0",
+  vapidKey: "BM_EJh8lKa6m4CNrG7l_Z7OIh8eGAr2MwJLrKfq0OrEVEGtAVNvedfJCGx4en_4zGRU-X8VI0s0jI0ORUyKsiJM",
+  appVersion: "1.8.1",
 
   // Tiempos de comida
   meals: ["Desayuno", "Almuerzo", "Once", "Cena", "Colaciones"],
