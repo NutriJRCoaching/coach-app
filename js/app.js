@@ -3,7 +3,7 @@ import { LS } from "./util.js";
 import { CONFIG } from "./config.js";
 import { db, DEMO } from "./db.js";
 import { S, setRefresher, refresh, go } from "./state.js";
-import { act, toast, $ } from "./ui.js";
+import { act, toast, closeSheet, $ } from "./ui.js";
 import { esc, ymd } from "./util.js";
 const sha = async (t) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const isCoachEmail = async (email) => !!email && (await sha(email.trim().toLowerCase())) === CONFIG.coachEmailHash;
@@ -136,7 +136,7 @@ async function render() {
 }
 setRefresher(render);
 db.onStale = () => { if (!document.querySelector(".sheet-bg") && !document.activeElement?.matches?.("input,textarea,select")) render(); };
-addEventListener("hashchange", render);
+addEventListener("hashchange", () => { if (document.querySelector(".sheet-bg")) closeSheet(); render(); });
 
 // ---------------------------------------------------------- BOOT
 (async () => {

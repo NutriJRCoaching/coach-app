@@ -2,7 +2,7 @@
 import { CONFIG } from "./config.js";
 import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
-import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, $, $$ } from "./ui.js";
+import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
 import { getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
@@ -59,7 +59,7 @@ async function home() {
   const inProgress = sessions.find((s) => s.status === "curso");
   const cdays = c.cardio?.days || [];
   const trainTxt = inProgress ? `<small class="muted">Sesión en curso</small><b>${esc(inProgress.routineName)}</b>` : slot && !slot.rest ? `<small class="muted">${slot.status === "hecho" ? "Completado" : date === today ? "Hoy te toca" : "Este día toca"}</small><b>${esc(slot.name)}</b>` : `<small class="muted">Hoy</small><b>Descanso</b>`;
-  return `<header class="topbar"><span></span><div class="brand-c"><img src="icons/logo.png" class="hdr-logo" alt="Team JR"></div><a class="icon-btn" href="#checkin" title="Check-in">${I.bell}</a></header>${dayStrip()}
+  return `<header class="topbar"><span></span><div class="brand-c"><img src="icons/logo.png" class="hdr-logo" alt="Team JR"></div>${bellBtn(pend)}</header>${dayStrip()}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   <div class="grid2">
@@ -83,6 +83,15 @@ async function cardioWeek(w) {
   const days = await getDays(w.first, w.last);
   const out = {}; for (const [d, v] of Object.entries(days)) if ((v.cardio || []).length) out[d] = true; return out;
 }
+function bellBtn(pend) {
+  S.pend = pend;
+  const urgent = pend.filter((p) => p.c === "r" || p.to === "checkin" || p.c === "b").length;
+  return `<button class="icon-btn bell ${urgent ? "ring" : ""}" data-a="bellOpen" title="Pendientes">${I.bell}${pend.length ? `<i class="bdg">${pend.length}</i>` : ""}</button>`;
+}
+act("bellOpen", () => {
+  const pend = S.pend || [];
+  sheet("Pendientes de hoy", pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}" data-a="closeSheet"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : `<p class="muted center">Todo al día ✓</p>`);
+});
 async function pendings(day, plan, w) {
   const out = [], h = new Date().getHours();
   if (!day.weight) out.push({ t: "Registrar tu peso de hoy", to: "peso", c: "y" });
@@ -562,10 +571,72 @@ async function infoView() {
 async function settingsView() {
   const theme = LS.get("theme") || "dark";
   const perm = "Notification" in window ? Notification.permission : "no";
+  const r = remCfg(), on = r.on && perm === "granted";
+  const sw = (k, v) => `<label class="sw"><input type="checkbox" ${v ? "checked" : ""} data-a-change="remSet" data-k="${k}"><i></i></label>`;
+  const tm = (k, v) => `<input type="time" value="${v}" data-a-change="remSet" data-k="${k}" class="tm">`;
+  const row = (t, sub, right) => `<div class="li row between remrow"><span><b>${t}</b>${sub ? `<small class="muted">${sub}</small>` : ""}</span><span class="row gap">${right}</span></div>`;
   return `${head("Ajustes", "mas")}<div class="card"><div class="card-t">Tema</div>${chips("t", [["dark", "Oscuro"], ["light", "Claro"]], theme, "theme")}</div>
-  <div class="card"><div class="card-t">Notificaciones</div><p class="muted small">Para el aviso de fin de descanso${perm === "granted" ? " · activadas ✓" : ""}.</p>${perm !== "granted" && perm !== "no" ? `<button class="btn" data-a="askNotif">Activar notificaciones</button>` : ""}</div>
+  <div class="card"><div class="card-t">${I.bell}Recordatorios</div>
+    ${perm === "no" ? `<p class="muted small">Este navegador no permite notificaciones.</p>` : perm === "denied" ? `<p class="warn small">Bloqueaste las notificaciones. Actívalas en los ajustes de Chrome para esta app.</p>` : ""}
+    ${row("Activar recordatorios", on ? "Activados ✓" : "Te avisa solo si te falta registrar algo", sw("on", on))}
+    ${on ? `
+    ${row("Agua", "Si vas atrasado con tu meta", `<select data-a-change="remSet" data-k="water.every" class="tm">${[1, 2, 3].map((h) => `<option value="${h}" ${+r.water.every === h ? "selected" : ""}>cada ${h} h</option>`).join("")}</select>${sw("water.on", r.water.on)}`)}
+    ${row("Comidas", "Si a esa hora no has registrado esa comida", sw("meals.on", r.meals.on))}
+    ${r.meals.on ? `<div class="remmeals">${Object.entries(r.meals.times).map(([m, t]) => `<span>${m}${tm("meals.times." + m, t)}</span>`).join("")}</div>` : ""}
+    ${row("Peso", "En ayunas", `${tm("weight.at", r.weight.at)}${sw("weight.on", r.weight.on)}`)}
+    ${row("Entrenamiento", "Los días que te toca", `${tm("train.at", r.train.at)}${sw("train.on", r.train.on)}`)}
+    ${row("Check-in semanal", "Al final de tu semana", `${tm("checkin.at", r.checkin.at)}${sw("checkin.on", r.checkin.on)}`)}
+    <p class="muted small mt">La campana de arriba a la derecha se mueve cuando tienes algo urgente. Los avisos llegan con la app abierta o recién minimizada; con la app cerrada del todo el celular no la despierta (eso requiere un servidor de notificaciones que veremos más adelante).</p>` : ""}
+  </div>
   <div class="card"><div class="card-t">Unidades</div><p class="muted small">Kilogramos, litros y centímetros.</p></div>`;
 }
+const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { Desayuno: "09:30", Almuerzo: "14:30", Once: "18:30", Cena: "21:30" } }, weight: { on: true, at: "08:30" }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
+function remCfg() {
+  let c = {}; try { c = JSON.parse(LS.get("rem") || "{}"); } catch {}
+  const out = JSON.parse(JSON.stringify(REM_DEF));
+  for (const k of Object.keys(c)) out[k] = typeof c[k] === "object" ? { ...out[k], ...c[k], ...(k === "meals" ? { times: { ...out.meals.times, ...(c.meals.times || {}) } } : {}) } : c[k];
+  return out;
+}
+act("remSet", async (el) => {
+  const c = remCfg(), path = el.dataset.k.split("."), v = el.type === "checkbox" ? el.checked : el.tagName === "SELECT" ? +el.value : el.value;
+  if (path[0] === "on" && v && "Notification" in window && Notification.permission !== "granted") {
+    const p = await Notification.requestPermission(); if (p !== "granted") { toast("Sin permiso no puedo avisarte"); return refresh(); }
+  }
+  let o = c; for (const k of path.slice(0, -1)) o = o[k]; o[path[path.length - 1]] = v;
+  LS.set("rem", JSON.stringify(c)); if (path[0] === "on" || path[1] === "on") refresh();
+  checkReminders();
+});
+const toMin = (t) => { const [h, m] = String(t || "0:0").split(":").map(Number); return h * 60 + (m || 0); };
+// Revisa qué falta registrar y avisa una sola vez por recordatorio
+export async function checkReminders() {
+  try {
+    const r = remCfg();
+    if (!r.on || !S.cid || !("Notification" in window) || Notification.permission !== "granted") return;
+    const today = ymd(), now = new Date(), nm = now.getHours() * 60 + now.getMinutes(), c = S.client || S.raw || {};
+    const once = (id, title, body) => { const k = `rs:${id}:${today}`; if (LS.get(k)) return; LS.set(k, "1"); if (document.hidden) notify(title, body); else toast(title); };
+    const day = await getDay(today);
+    if (r.weight.on && nm >= toMin(r.weight.at) && !day.weight) once("peso", "Registra tu peso", "En ayunas, antes de comer 🙌");
+    if (r.meals.on) for (const [m, t] of Object.entries(r.meals.times)) if (t && nm >= toMin(t) && nm < toMin(t) + 180 && !(day.meals?.[m] || []).length) once("m-" + m, `¿Ya registraste tu ${m.toLowerCase()}?`, "Anótala ahora que la tienes fresca");
+    if (r.water.on) {
+      const f = toMin(r.water.from), t = toMin(r.water.to), every = (+r.water.every || 2) * 60;
+      if (nm >= f + every && nm <= t) {
+        const goal = c.water || 2500, done = sum(day.water || [], (x) => x.ml), exp = goal * Math.min(1, (nm - f) / (t - f));
+        if (done < exp - 250) once("agua-" + Math.floor((nm - f) / every), "Toma agua 💧", `Llevas ${r1(done / 1000)} de ${r1(goal / 1000)} L`);
+      }
+    }
+    if (r.train.on && nm >= toMin(r.train.at)) {
+      const [routines, sessions] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]);
+      const hoy = weekPlan(c, routines, sessions, today).slots.find((x) => x.date === today && x.status === "hoy");
+      if (hoy) once("ent", `Hoy te toca ${hoy.name} 💪`, "Cuando termines, registra tu sesión");
+    }
+    if (r.checkin.on && nm >= toMin(r.checkin.at)) {
+      const w = weekInfo(c, today);
+      if (today >= addDays(w.last, -1) && !(await db.get(P() + "/checkins/" + w.key))) once("chk-" + w.key, "Completa tu check-in semanal", "Así tu coach puede ajustar tu plan");
+    }
+  } catch (e) { console.error(e); }
+}
+setInterval(checkReminders, 60 * 1000);
+document.addEventListener("visibilitychange", () => setTimeout(checkReminders, 1500));
 act("askNotif", async () => { await Notification.requestPermission(); refresh(); });
 
 // ================================================================ TIMELINE (como la hoja Timeline)
