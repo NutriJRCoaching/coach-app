@@ -321,8 +321,8 @@ export async function summaryView(id) {
       return `<div class="li row between small"><span>${e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`}: <b>${x.w || "–"} kg × ${x.r || "–"}</b>${x.rir !== "" ? " RIR " + x.rir : ""}${x.tech ? ` <span class="badge tech-${x.tech}">Téc. ${x.tech}</span>` : ""}${(() => { const pg = setProgress(x, ref); return pg ? `<br><span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</span><span>${ref ? `<span class="muted">${ref.w}×${ref.r}</span> ${dw ? `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw}kg</span>` : ""} ${dr ? `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr}r</span>` : ""}` : ""}</span></div>`; }).join("")}</div>`; }).join("")}
   ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} series con progreso</b><small class="muted">vs la semana pasada · cuenta subir peso, más reps, o mismas reps con más reserva (si la técnica no empeoró)</small></div>` : ""}
   ${s.comment ? `<div class="card note">${esc(s.comment)}</div>` : ""}
-  <div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Le llega directo a su panel.</p>
-    ${audio?.data ? `<audio controls src="${audio.data}"></audio><div class="row gap"><button class="btn grow" data-a="audioRec">Grabar de nuevo</button><button class="btn ghost grow" data-a="audioShare">Enviar por WhatsApp</button></div>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>
+  <div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
+    ${audio?.data ? `<audio controls src="${audio.data}"></audio><button class="btn primary big" data-a="audioShare">Enviar audio por WhatsApp</button><button class="btn ghost block" data-a="audioRec">Grabar de nuevo</button>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>
   <div class="pad-x"><button class="btn primary big" data-a="shareImg">Compartir con tu coach (imagen)</button><button class="btn block" data-a="shareCoach">Enviar como texto</button><a class="btn block" href="#entreno">Volver</a></div>`;
 }
 // ---------- Audio de retroalimentación (se guarda para el coach; máx. 3 min)
@@ -339,8 +339,12 @@ act("audioRec", async () => {
     const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
     if (blob.size > 700000) { toast("El audio es muy largo (máx. ~3 min)"); return refresh(); }
     const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+    // 1) se guarda solo en el panel del coach  2) se abre WhatsApp para mandarlo sí o sí
     await db.set(`${P()}/audios/${S.session.id}`, { data, secs: Math.round((Date.now() - t0) / 1000), at: Date.now(), routine: S.session.routineName, date: S.session.date }, false);
-    S.session.audio = true; save(); toast("Audio guardado · tu coach lo verá en su panel"); refresh();
+    S.session.audio = true; save();
+    const file = new File([blob], `Audio ${S.session.routineName}.webm`, { type: blob.type });
+    try { if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], text: `🎙️ ${S.session.routineName} · ${fmtDate(S.session.date, true)}` }); toast("Audio enviado ✓"); return refresh(); } } catch (e) { if (e.name === "AbortError") { toast("Audio guardado · falta enviarlo por WhatsApp"); return refresh(); } }
+    S.audioPending = true; refresh();
   };
   mr.start(1000); REC = mr;
   const tick = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); const b = btn(); if (b) b.textContent = `■ Detener (${Math.floor(sec / 60)}:${pad(sec % 60)})`; if (sec >= 180) mr.stop(); }, 500);

@@ -76,7 +76,7 @@ async function home() {
     <a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal)}</div></a>
     <a class="card tile" href="#comida"><div class="card-t">${I.macros}Macros</div>
       ${[["C", tot.cho, c.cho, "y"], ["L", tot.fat, c.fat, "b"], ["P", tot.prot, c.prot, "g"]].map(([l, v, g, cl]) => `<div class="mrow"><b>${l}</b>${mini(v, g, cl)}<span>${r0(v)}/${g || "–"}</span></div>`).join("")}</a>
-    <a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div><div class="foot"><button class="btn tiny" data-a="water" data-ml="250">+250</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>
+    <a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div><div class="foot"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>
     <div class="card tile" data-a="stepsEdit"><div class="card-t">${I.steps}Pasos ${done(day.steps, c.steps)}</div><div class="big">${(day.steps || 0).toLocaleString("es-CL")}</div><div class="foot grow">${mini(day.steps || 0, c.steps || 8000, "g")}</div><div class="muted small">Meta ${(c.steps || 8000).toLocaleString("es-CL")}</div></div>
     <a class="card tile" href="#sueno"><div class="card-t">${I.moon}Sueño</div><div class="big" style="color:${sl != null ? sleepColor(sl) : "inherit"}">${sl != null ? fmtH(sl) : "—"}</div><div class="muted small">${day.sleep?.quality ? "Calidad " + day.sleep.quality + "/5" : "Registrar"} · meta ${c.sleep || 8} h</div></a>
     <a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? "Registrado" : "En ayunas"}</div></a>
@@ -160,7 +160,7 @@ async function waterView() {
   return `${head("Agua", "comida")}${dayStrip()}
   <div class="card center"><div class="ring" style="--p:${p}"><div><b>${r1(total / 1000)}</b><small>de ${r1(goal / 1000)} L</small></div></div>
   <div class="muted small">${total >= goal ? "¡Meta cumplida!" : `Te faltan ${r1((goal - total) / 1000)} L`} · Meta fijada por tu coach</div>
-  <div class="row gap center-row"><button class="btn" data-a="water" data-ml="250">+250 ml</button><button class="btn" data-a="water" data-ml="500">+500 ml</button></div>
+  <div class="row gap center-row"><button class="btn" data-a="water" data-ml="200">+200 ml</button><button class="btn" data-a="water" data-ml="500">+500 ml</button></div>
   <div class="row gap center-row"><input id="wC" type="number" inputmode="numeric" placeholder="Otra cantidad (ml)" style="max-width:170px"><button class="btn primary" data-a="water" data-ml="custom">Registrar</button></div></div>
   <div class="card"><div class="card-t">Registros del día</div>${(day.water || []).map((w, i) => `<div class="li row between"><span><b>${w.ml} ml</b> <span class="muted">${w.t}</span></span><button class="icon-btn" data-a="waterDel" data-i="${i}">🗑</button></div>`).join("") || `<div class="muted small">Sin registros</div>`}</div>
   <div class="card stats3"><div><b>${r1((avg(totals.slice(-7)) || 0) / 1000)} L</b><small>Promedio 7 días</small></div><div><b>${totals.filter((t) => t >= goal).length}</b><small>Días en meta (30 d)</small></div><div><b>${totals.length}</b><small>Días registrados</small></div></div>`;
@@ -186,7 +186,7 @@ async function food() {
     ${day.mealNotes?.[m] ? `<div class="note">📝 ${esc(day.mealNotes[m])}</div>` : ""}
     ${ph.length ? `<div class="thumbs">${ph.map((p) => `<img src="${p.data}" data-a="viewPhoto" data-id="${p.id}">`).join("")}</div>` : ""}</div>`;
   }).join("")}
-  <a class="card row between" href="#agua"><span><b>Agua</b> <span class="muted small">${r1(water / 1000)} / ${r1((c.water || 2500) / 1000)} L</span></span><span class="row gap"><button class="btn tiny" data-a="water" data-ml="250">+250</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></span></a>
+  <a class="card row between" href="#agua"><span><b>Agua</b> <span class="muted small">${r1(water / 1000)} / ${r1((c.water || 2500) / 1000)} L</span></span><span class="row gap"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></span></a>
   <a class="btn big block" href="#plan">Ver mi plan de alimentación</a>`;
 }
 
