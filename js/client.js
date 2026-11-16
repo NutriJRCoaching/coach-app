@@ -7,6 +7,7 @@ import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours
 import { getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
+import { pushReady, enablePush, pushOn } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
 
 const P = () => "clients/" + S.cid;
@@ -129,7 +130,19 @@ act("stepsEdit", async () => {
   const b = sheet("Pasos del día", `<p class="muted small">Anótalos desde tu app de pasos o reloj.</p><input id="stepsI" type="number" inputmode="numeric" class="bignum" value="${day.steps || ""}" placeholder="Ej: 10.000"><button class="btn primary big" data-a="stepsSave">Guardar</button>`);
   setTimeout(() => $("#stepsI", b)?.focus(), 250);
 });
-act("stepsSave", async () => { await setDay(S.date, { steps: num($("#stepsI").value) || 0 }); closeSheet(); refresh(); });
+act("stepsSave", async () => {
+  const st = num($("#stepsI").value) || 0; await setDay(S.date, { steps: st }); closeSheet(); refresh();
+  const m = stepsMsg(st, S.client?.steps || 8000); if (m) setTimeout(() => sheet(m.title, `<div class="nightbox"><div class="nb-ic">${m.ic}</div><p>${m.body}</p><button class="btn primary big" data-a="closeSheet">${m.btn}</button></div>`), 350);
+});
+// Cuánto te falta y una caminata sugerida (~100 pasos por minuto)
+export function stepsMsg(st, goal) {
+  if (!goal) return null;
+  const left = goal - st, pct = st / goal, min = Math.max(5, Math.round(left / 100 / 5) * 5), n = (x) => Math.round(x).toLocaleString("es-CL");
+  if (left <= 0) return { ic: "🏆", title: "¡Meta de pasos cumplida!", body: `Llevas ${n(st)} pasos de ${n(goal)}. Excelente trabajo.`, btn: "¡Vamos!" };
+  if (pct < 0.5) return { ic: "🚶", title: "Te falta más de la mitad", body: `Llevas ${n(st)} de ${n(goal)} pasos. ¿Y si hacemos una caminata? Con unos <b>${min} minutos</b> caminando a buen ritmo llegas a tu meta.`, btn: "¡Vamos a caminar!" };
+  if (pct < 0.8) return { ic: "👟", title: "Vas bien, sigue así", body: `Llevas ${n(st)} pasos; te faltan <b>${n(left)}</b>. Una caminata de unos <b>${min} minutos</b> y lo logras.`, btn: "Dale" };
+  return { ic: "💪", title: "¡Ya casi!", body: `Te faltan solo <b>${n(left)}</b> pasos. Unos ${min} minutos más y meta cumplida.`, btn: "Dale" };
+}
 act("cardioAdd", () => {
   const c = S.client.cardio || {};
   sheet("Registrar cardio", `${c.perWeek ? `<div class="note">Tu indicación: ${c.perWeek} veces por semana · ${esc(c.type || "")} · ${c.minutes || ""} min · ${esc(c.intensity || "")}</div>` : ""}<label>Tipo<input id="cT" value="${esc(c.type || "")}" placeholder="Bici, trote, elíptica…"></label><label>Minutos<input id="cM" type="number" inputmode="numeric" value="${c.minutes || ""}"></label>
@@ -644,21 +657,28 @@ async function settingsView() {
     ${row("Agua", "Si vas atrasado con tu meta", `<select data-a-change="remSet" data-k="water.every" class="tm">${[1, 2, 3].map((h) => `<option value="${h}" ${+r.water.every === h ? "selected" : ""}>cada ${h} h</option>`).join("")}</select>${sw("water.on", r.water.on)}`)}
     ${row("Comidas", "Si a esa hora no has registrado esa comida", sw("meals.on", r.meals.on))}
     ${r.meals.on ? `<div class="remmeals">${Object.entries(r.meals.times).map(([m, t]) => `<span>${m}${tm("meals.times." + m, t)}</span>`).join("")}</div>` : ""}
+    ${row("¿Cuántos pasos llevas?", `A mediodía (${minTo(toMin(r.sched.wake) + 360)}) y en la tarde (${minTo(toMin(r.sched.bed) - 240)}): te dice cuánto te falta y te propone una caminata`, sw("steps.checks", r.steps.checks))}
     ${row("Pasos del día", `1 h antes de dormir (${minTo(toMin(r.sched.bed) - 60)}): anota tus pasos y revisa tus pendientes`, sw("steps.on", r.steps.on))}
     ${row("Peso", "En ayunas", `${tm("weight.at", r.weight.at)}${sw("weight.on", r.weight.on)}`)}
     ${row("Entrenamiento", "Los días que te toca", `${tm("train.at", r.train.at)}${sw("train.on", r.train.on)}`)}
     ${row("Check-in semanal", "Al final de tu semana", `${tm("checkin.at", r.checkin.at)}${sw("checkin.on", r.checkin.on)}`)}
-    <p class="muted small mt">La campana de arriba a la derecha se mueve cuando tienes algo urgente. Los avisos llegan con la app abierta o recién minimizada; con la app cerrada del todo el celular no la despierta (eso requiere un servidor de notificaciones que veremos más adelante).</p>` : ""}
+    <div class="li remrow"><span><b>Avisos con la app cerrada</b><small class="muted">${pushOn() ? "Activados en este celular ✓" : pushReady() ? "Te llegan como notificación aunque no abras la app" : "Tu coach aún está terminando de configurarlos"}</small></span>${pushReady() && !pushOn() ? `<button class="btn tiny primary" data-a="pushOn">Activar</button>` : ""}</div>
+    <p class="muted small mt">La campana de arriba a la derecha se mueve cuando tienes algo urgente.</p>` : ""}
   </div>
   <div class="card"><div class="card-t">Unidades</div><p class="muted small">Kilogramos, litros y centímetros.</p></div>`;
 }
-const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { Desayuno: "09:30", Almuerzo: "14:30", Once: "18:30", Cena: "21:30" } }, sched: { wake: "07:00", bed: "23:00" }, weight: { on: true, at: "07:20" }, steps: { on: true }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
+const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { Desayuno: "09:30", Almuerzo: "14:30", Once: "18:30", Cena: "21:30" } }, sched: { wake: "07:00", bed: "23:00" }, weight: { on: true, at: "07:20" }, steps: { on: true, checks: true }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
 function remCfg() {
   let c = {}; try { c = JSON.parse(LS.get("rem") || "{}"); } catch {}
   const out = JSON.parse(JSON.stringify(REM_DEF));
   for (const k of Object.keys(c)) out[k] = typeof c[k] === "object" ? { ...out[k], ...c[k], ...(k === "meals" ? { times: { ...out.meals.times, ...(c.meals.times || {}) } } : {}) } : c[k];
   return out;
 }
+act("pushOn", async () => {
+  try { await enablePush(S.cid); await db.set(`${P()}/settings/reminders`, { ...remCfg(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, at: Date.now() }, false); toast("Listo: te llegarán avisos con la app cerrada"); }
+  catch (e) { toast(e.message === "denied" ? "Activa las notificaciones para esta app en los ajustes del celular" : "No se pudo activar: " + (e.code || e.message)); }
+  refresh();
+});
 act("remSet", async (el) => {
   const c = remCfg(), path = el.dataset.k.split("."), v = el.type === "checkbox" ? el.checked : el.tagName === "SELECT" ? +el.value : el.value;
   if (path[0] === "on" && v && "Notification" in window && Notification.permission !== "granted") {
@@ -687,7 +707,7 @@ export async function checkReminders() {
     const r = remCfg();
     if (!r.on || !S.cid || !("Notification" in window) || Notification.permission !== "granted") return;
     const today = ymd(), now = new Date(), nm = now.getHours() * 60 + now.getMinutes(), c = S.client || S.raw || {};
-    const once = (id, title, body) => { const k = `rs:${id}:${today}`; if (LS.get(k)) return; LS.set(k, "1"); if (document.hidden) notify(title, body); else toast(title); };
+    const once = (id, title, body) => { const k = `rs:${id}:${today}`; if (LS.get(k)) return; LS.set(k, "1"); if (!document.hidden) toast(title); else if (!pushOn()) notify(title, body); };
     const day = await getDay(today);
     if (r.weight.on && nm >= toMin(r.weight.at) && !day.weight) once("peso", "Registra tu peso", "En ayunas, antes de comer 🙌");
     if (r.meals.on) for (const [m, t] of Object.entries(r.meals.times)) if (t && nm >= toMin(t) && nm < toMin(t) + 180 && !(day.meals?.[m] || []).length) once("m-" + m, `¿Ya registraste tu ${m.toLowerCase()}?`, "Anótala ahora que la tienes fresca");
@@ -698,6 +718,9 @@ export async function checkReminders() {
         if (done < exp - 250) once("agua-" + Math.floor((nm - f) / every), "Toma agua 💧", `Llevas ${r1(done / 1000)} de ${r1(goal / 1000)} L`);
       }
     }
+    if (r.steps.checks) [[toMin(r.sched.wake) + 360, 0.4, "medio"], [toMin(r.sched.bed) - 240, 0.75, "tarde"]].forEach(([t, need, id]) => {
+      if (nm >= t && nm < t + 120 && (day.steps || 0) < (c.steps || 8000) * need) once("pasos-" + id, "¿Cuántos pasos llevas? 👟", "Anótalos y te digo cuánto te falta para tu meta");
+    });
     if (r.steps.on) {
       const t = toMin(r.sched.bed) - 60;
       if (nm >= t && nm < t + 240 && !day.steps) {

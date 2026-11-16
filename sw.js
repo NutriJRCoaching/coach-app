@@ -1,9 +1,9 @@
 // Service worker: guarda la app en el celular para que abra sin conexión.
 // Cada vez que publiques cambios, sube el número de versión.
-const VERSION = "v20";
+const VERSION = "v21";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "css/app.css", "icons/icon-192.png", "icons/icon-512.png", "icons/logo.png", "js/seed-jr.js",
   "js/app.js", "js/config.js", "js/db.js", "js/util.js", "js/ui.js", "js/state.js", "js/data.js", "js/foods.js", "js/realfoods.js", "js/icons.js",
-  "js/client.js", "js/train.js", "js/coach.js", "js/demo.js", "js/voice.js"];
+  "js/client.js", "js/train.js", "js/coach.js", "js/demo.js", "js/voice.js", "js/push.js"];
 
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL))); });
 // La versión nueva espera hasta que el usuario toque "Actualizar"
@@ -21,4 +21,16 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); return r; })
     .catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match("index.html"))));
 });
-self.addEventListener("notificationclick", (e) => { e.notification.close(); e.waitUntil(self.clients.matchAll({ type: "window" }).then((cs) => cs[0] ? cs[0].focus() : self.clients.openWindow("./"))); });
+// Avisos que llegan con la app cerrada (Firebase Cloud Messaging)
+self.addEventListener("push", (e) => {
+  let d = {}; try { d = e.data.json(); } catch {}
+  const x = d.data || d.notification || d;
+  e.waitUntil(self.registration.showNotification(x.title || "Team JR", { body: x.body || "", icon: "icons/icon-192.png", badge: "icons/icon-192.png", tag: x.tag || undefined, data: { url: x.url || "./" }, vibrate: [200, 100, 200] }));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || "./", self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => {
+    const c = cs[0]; if (c) { c.focus(); return c.navigate ? c.navigate(url) : null; } return self.clients.openWindow(url);
+  }));
+});

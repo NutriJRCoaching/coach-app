@@ -25,7 +25,9 @@ export const CONFIG = {
   coachWhatsapp: "",
 
   appName: "Team JR",
-  appVersion: "1.7.2",
+  // Clave pública para avisos con la app cerrada (Firebase → Configuración → Cloud Messaging → Certificados web push)
+  vapidKey: "",
+  appVersion: "1.8.0",
 
   // Tiempos de comida
   meals: ["Desayuno", "Almuerzo", "Once", "Cena", "Colaciones"],
