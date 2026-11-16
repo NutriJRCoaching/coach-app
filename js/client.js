@@ -56,7 +56,7 @@ async function home() {
   const inProgress = sessions.find((s) => s.status === "curso");
   const cdays = c.cardio?.days || [];
   const trainTxt = inProgress ? `<small class="muted">Sesión en curso</small><b>${esc(inProgress.routineName)}</b>` : slot && !slot.rest ? `<small class="muted">${slot.status === "hecho" ? "Completado" : date === today ? "Hoy te toca" : "Este día toca"}</small><b>${esc(slot.name)}</b>` : `<small class="muted">Hoy</small><b>Descanso</b>`;
-  return `<header class="topbar"><span></span><div class="brand-c">JR <b>COACH</b></div><a class="icon-btn" href="#checkin" title="Check-in">${I.bell}</a></header>${dayStrip()}
+  return `<header class="topbar"><span></span><div class="brand-c"><img src="icons/logo.png" class="hdr-logo" alt="Team JR"></div><a class="icon-btn" href="#checkin" title="Check-in">${I.bell}</a></header>${dayStrip()}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   <div class="grid2">

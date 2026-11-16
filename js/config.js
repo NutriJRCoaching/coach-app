@@ -24,7 +24,8 @@ export const CONFIG = {
   // Se usa en el botón "Compartir con tu coach".
   coachWhatsapp: "",
 
-  appName: "JR Coach Online",
+  appName: "Team JR",
+  appVersion: "1.1.0",
 
   // Tiempos de comida
   meals: ["Desayuno", "Almuerzo", "Once", "Cena", "Colaciones"],

@@ -30,21 +30,20 @@ function loginView(msg = "") {
   root.className = "login";
   if (DEMO) {
     root.innerHTML = `<div class="login-box">
-      <div class="logo">JR</div><h1>${esc(CONFIG.appName)}</h1>
-      <p class="muted">Modo demo: los datos se guardan solo en este navegador.</p>
+      <img class="logo-img" src="icons/logo.png" alt="Team JR"><p class="muted">Modo demo: los datos se guardan solo en este navegador.</p>
       <button class="btn primary big" data-a="demoIn" data-uid="cli-demo">Entrar como cliente (celular)</button>
       <button class="btn big" data-a="demoIn" data-uid="coach-demo">Entrar como coach (escritorio)</button>
-      <button class="btn ghost small" data-a="demoReset">Reiniciar datos de ejemplo</button></div>`;
+      <button class="btn ghost small" data-a="demoReset">Reiniciar datos de ejemplo</button><p class="ver">v${CONFIG.appVersion}</p></div>`;
     return;
   }
   root.innerHTML = `<form class="login-box" id="loginF">
-    <div class="logo">JR</div><h1>${esc(CONFIG.appName)}</h1>
+    <img class="logo-img" src="icons/logo.png" alt="Team JR">
     ${msg ? `<p class="err">${esc(msg)}</p>` : ""}
     <label>Correo<input name="email" type="email" autocomplete="email" required></label>
     <label>Contraseña<input name="pass" type="password" autocomplete="current-password" required minlength="6"></label>
     <button class="btn primary big">Entrar</button>
     <button type="button" class="btn ghost small" data-a="forgot">Olvidé mi contraseña</button>
-    <button type="button" class="btn ghost small" data-a="coachSignup">Soy el coach y es mi primera vez</button></form>`;
+    <button type="button" class="btn ghost small" data-a="coachSignup">Soy el coach y es mi primera vez</button><p class="ver">v${CONFIG.appVersion}</p></form>`;
   $("#loginF").onsubmit = async (e) => {
     e.preventDefault(); const f = new FormData(e.target);
     try { await db.signIn(f.get("email").trim(), f.get("pass")); }
@@ -70,6 +69,17 @@ act("asClient", async () => {
   const id = S.user.uid;
   let c = await db.get("clients/" + id);
   if (!c) { c = { name: "Joaquín Rojas", email: S.user.email || "", startDate: ymd(), kcal: 2400, cho: 280, fat: 70, prot: 160, steps: 9000, water: 2800, sleep: 8, phase: "Mantención", schedule: {} }; await db.set("clients/" + id, c); }
+  // Primera vez: carga su rutina inicial (Team JR) y el calendario semanal
+  if (!(await db.list(`clients/${id}/routines`)).length) {
+    const { jrRoutines } = await import("./seed-jr.js");
+    const { routines, schedule, lib } = jrRoutines();
+    for (const [rid, r] of Object.entries(routines)) await db.set(`clients/${id}/routines/${rid}`, r);
+    c = { ...c, schedule, rest: c.rest || 180, startDate: c.startDate && c.startDate <= ymd() ? c.startDate : ymd() };
+    await db.set("clients/" + id, { schedule, rest: c.rest, startDate: c.startDate });
+    const cur = (await db.get("library/exercises"))?.items || [];
+    if (!cur.length) await db.set("library/exercises", { items: lib }, false);
+    toast("Tu rutina quedó cargada ✓");
+  }
   S.viewAs = "client"; S.cid = id; S.raw = c;
   db.watch("clients/" + id, (x) => { if (x && S.cid === id) S.raw = x; });
   location.hash = "inicio";
@@ -109,7 +119,7 @@ async function render() {
     } else {
       root.className = "client";
       const main = await clientView();
-      root.innerHTML = `<div id="net" class="net" hidden></div><main class="cmain">${main}</main>${clientTabs()}`;
+      root.innerHTML = `<div id="net" class="net" hidden></div><main class="cmain">${main}<p class="ver">${esc(CONFIG.appName)} · v${CONFIG.appVersion}</p></main>${clientTabs()}`;
     }
     root.dataset.route = location.hash;
     netBadge();

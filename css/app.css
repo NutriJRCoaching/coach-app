@@ -212,3 +212,10 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .train-tile .card-t .ic { width: 18px; height: 18px; }
 .train-tile .tt small { display: block; }
 .tile .card-t { white-space: nowrap; }
+
+.logo-img { width: 112px; height: 112px; border-radius: 26px; display: block; margin: 0 auto 14px; box-shadow: 0 10px 30px rgba(209,38,47,.18); }
+.logo-sm { width: 30px; height: 30px; border-radius: 8px; }
+.hdr-logo { width: 34px; height: 34px; border-radius: 9px; display: block; margin: 0 auto; }
+.ver { text-align: center; font-size: 10.5px; color: var(--dim); margin: 14px 0 6px; letter-spacing: .04em; }
+.stepper-s { gap: 4px; } .stepper-s button { width: 24px; height: 24px; } .stepper-s b { min-width: 16px; font-size: 16px; }
+.sessbar .rest-btn { white-space: nowrap; }

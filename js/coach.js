@@ -19,7 +19,7 @@ export async function coachView() {
   if (sec === "c" && cid) main = await clientPanel(cid, tab || "resumen");
   else if (sec === "lib") main = await library();
   else main = await overview(clients);
-  return `<aside class="side"><div class="brand"><span class="logo sm">JR</span>${esc(CONFIG.appName)}</div>
+  return `<aside class="side"><div class="brand"><img src="icons/logo.png" class="logo-sm" alt="">${esc(CONFIG.appName)}</div>
   <a href="#coach" class="${!sec ? "on" : ""}">Clientes</a>
   ${clients.map((c) => `<a href="#coach/c/${c.id}/${tab || "resumen"}" class="sub ${cid === c.id ? "on" : ""}">${esc(c.name || "Sin nombre")}</a>`).join("")}
   <a href="#coach/lib" class="${sec === "lib" ? "on" : ""}">Biblioteca</a>
@@ -27,7 +27,7 @@ export async function coachView() {
   <button class="btn small" data-a="newClient">＋ Nuevo cliente</button>
   <div class="grow"></div>
   <button class="btn ghost small" data-a="theme" data-v="${(LS.get("theme") || "dark") === "dark" ? "light" : "dark"}">Tema ${(LS.get("theme") || "dark") === "dark" ? "claro" : "oscuro"}</button>
-  <button class="btn ghost small" data-a="logout">Cerrar sesión</button>${DEMO ? `<small class="muted">MODO DEMO</small>` : ""}</aside>
+  <button class="btn ghost small" data-a="logout">Cerrar sesión</button>${DEMO ? `<small class="muted">MODO DEMO</small>` : ""}<p class="ver">v${CONFIG.appVersion}</p></aside>
   <section class="cpanel">${main}</section>`;
 }
 
