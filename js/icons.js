@@ -1,0 +1,31 @@
+// Íconos simples en SVG (trazo), estilo línea
+const s = (d, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ic" ${extra}>${d}</svg>`;
+export const I = {
+  home: s('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>'),
+  food: s('<path d="M12 7c-2-3-7-2-7 3 0 5 4 11 7 11s7-6 7-11c0-5-5-6-7-3z"/><path d="M12 7c0-2 1-4 3-4"/>'),
+  dumbbell: s('<path d="M6 7v10M3 9v6M18 7v10M21 9v6M6 12h12"/>'),
+  chart: s('<path d="M4 19V5M4 19h16"/><path d="m7 15 4-4 3 3 5-6"/>'),
+  menu: s('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+  fire: s('<path d="M12 3s5 4 5 9a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 2 2c0-4 2-8 2-8z"/>'),
+  macros: s('<circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/>'),
+  scale: s('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9a4 4 0 0 1 6 0l-3 3"/>'),
+  steps: s('<path d="M8 3c2 0 3 2 3 5s-1 5-3 5-3-2-3-5 1-5 3-5zM16 9c2 0 3 2 3 5s-1 5-3 5-3-2-3-5 1-5 3-5zM6 16h4M14 22h4"/>'),
+  drop: s('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
+  moon: s('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
+  heart: s('<path d="M3 12h4l2-4 3 8 2-4h7"/>'),
+  gut: s('<path d="M8 4c-3 0-4 3-2 5s6 1 7 4-2 6-5 6"/><path d="M16 4c2 0 3 2 2 4"/>'),
+  play: s('<path d="M7 4v16l13-8z"/>', 'fill="currentColor"'),
+  timer: s('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>'),
+  check: s('<path d="m5 12 5 5 9-10"/>'),
+  chev: s('<path d="m9 6 6 6-6 6"/>'),
+  chevDown: s('<path d="m6 9 6 6 6-6"/>'),
+  back: s('<path d="m15 6-6 6 6 6"/>'),
+  plus: s('<path d="M12 5v14M5 12h14"/>'),
+  bell: s('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
+  info: s('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'),
+  swap: s('<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>'),
+  gear: s('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'),
+  note: s('<path d="M5 4h10l4 4v12H5z"/><path d="M9 12h6M9 16h4"/>'),
+  camera: s('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+  run: s('<circle cx="14" cy="4" r="2"/><path d="m6 21 3-6 3 2 1 4M9 15l1-5 4 1 2 3 3 1M10 10 7 11l-2 3"/>')
+};

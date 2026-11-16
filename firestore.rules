@@ -1,0 +1,30 @@
+rules_version = '2';
+// Reglas de seguridad: cada cliente solo ve y edita lo suyo; el coach ve todo.
+// IMPORTANTE: reemplaza TU_CORREO@gmail.com por tu correo de coach (el mismo de js/config.js).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isCoach() { return request.auth != null && request.auth.token.email == 'TU_CORREO@gmail.com'; }
+    function isOwner(cid) { return request.auth != null && request.auth.uid == cid; }
+
+    match /users/{uid} {
+      allow read: if isCoach() || isOwner(uid);
+      allow write: if isCoach();
+    }
+    match /library/{doc} {
+      allow read: if request.auth != null;
+      allow write: if isCoach();
+    }
+    match /clients/{cid} {
+      allow read: if isCoach() || isOwner(cid);
+      allow write: if isCoach();
+      // Rutinas y retroalimentaciones: solo el coach las edita
+      match /routines/{id} { allow read: if isCoach() || isOwner(cid); allow write: if isCoach(); }
+      match /feedbacks/{id} { allow read: if isCoach() || isOwner(cid); allow write: if isCoach(); }
+      // Todo lo demás (días, sesiones, fotos, medidas, check-ins…): cliente y coach
+      match /{sub}/{id} {
+        allow read: if isCoach() || isOwner(cid);
+        allow write: if isCoach() || (isOwner(cid) && !(sub in ['routines', 'feedbacks']));
+      }
+    }
+  }
+}
