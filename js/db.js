@@ -83,8 +83,9 @@ const fire = {
     this.m = { ...a, ...f, ...au };
     this.app = a.initializeApp(CONFIG.firebase);
     this.db = f.initializeFirestore(this.app, { localCache: f.persistentLocalCache({ tabManager: f.persistentMultipleTabManager() }) });
-    this.auth = au.getAuth(this.app);
-    await au.setPersistence(this.auth, au.indexedDBLocalPersistence);
+    // La sesión queda guardada en el celular (IndexedDB y, de respaldo, localStorage)
+    this.auth = au.initializeAuth(this.app, { persistence: [au.indexedDBLocalPersistence, au.browserLocalPersistence] });
+    try { navigator.storage?.persist?.(); } catch {} // pide al navegador no borrar los datos guardados
   },
   // Lectura rápida y segura:
   // - Si este celular ya descargó ese dato alguna vez, lo muestra al instante desde su copia
@@ -134,7 +135,10 @@ const fire = {
   },
   whenSynced() { return this.m.waitForPendingWrites(this.db); },
   onAuth(cb) { this.m.onAuthStateChanged(this.auth, (u) => { this.user = u; cb(u); }); },
-  async signIn(email, pass) { await this.m.signInWithEmailAndPassword(this.auth, email, pass); },
+  async signIn(email, pass, keep = true) {
+    await this.m.setPersistence(this.auth, keep ? this.m.indexedDBLocalPersistence : this.m.browserSessionPersistence);
+    await this.m.signInWithEmailAndPassword(this.auth, email, pass);
+  },
   async signUp(email, pass) { await this.m.createUserWithEmailAndPassword(this.auth, email, pass); },
   async resetPass(email) { await this.m.sendPasswordResetEmail(this.auth, email); },
   async signOut() { await this.m.signOut(this.auth); },

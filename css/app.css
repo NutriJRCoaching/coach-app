@@ -271,3 +271,18 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .sd .dtag { font-style: normal; font-size: 9px; font-weight: 800; color: var(--acc); line-height: 1.2; margin-top: 1px; letter-spacing: .02em; }
 .sd .dtag.rest { color: var(--acc); opacity: .7; font-weight: 600; }
 .sd.on .dtag { color: #fff; opacity: 1; }
+
+.chkrow { display: flex !important; flex-direction: row !important; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.chkrow input { width: 18px !important; height: 18px; accent-color: var(--acc); margin: 0; }
+
+/* Registro por voz */
+.voice { display: grid; gap: 10px; }
+.micbtn { justify-self: center; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--acc); color: #fff; font-size: 34px; cursor: pointer; box-shadow: 0 8px 26px color-mix(in srgb, var(--acc) 45%, transparent); margin-top: 6px; }
+.micbtn.rec { animation: pulse 1.2s ease-in-out infinite; font-size: 26px; }
+.micbtn:disabled { opacity: .4; }
+.vitem { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: grid; gap: 6px; margin-top: 8px; } .vitem.miss { border-style: dashed; }
+.vitem select { min-width: 0; }
+.vg { display: flex; align-items: center; gap: 4px; width: 92px; flex: none; } .vg input { text-align: center; font-weight: 700; }
+/* Cantidad con medida elegida */
+.qtyrow { display: flex; align-items: flex-end; gap: 8px; margin-top: 10px; } .qtyrow .btn { height: 46px; min-width: 46px; font-size: 20px; }
+.qtyrow label span { font-size: 12px; color: var(--muted); } .qtyrow input { text-align: center; font-size: 20px; font-weight: 800; }

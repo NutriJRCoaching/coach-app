@@ -7,6 +7,7 @@ import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours
 import { getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
+import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
 
 const P = () => "clients/" + S.cid;
 
@@ -226,7 +227,7 @@ act("delPhoto", async (el) => { if (!(await confirmBox("¿Eliminar foto?"))) ret
 let FS = { meal: "", tab: "buscar", q: "", sel: null, results: [] };
 act("addFood", (el) => { FS = { meal: el.dataset.m, tab: "buscar", q: "", sel: null, results: [] }; openFoodSheet(); });
 async function openFoodSheet() {
-  const tabs = [["buscar", "Buscar"], ["rapido", "Añadir rápido"], ["fav", "Favoritos"], ["recetas", "Recetas"], ["supl", "Suplementos"], ["crear", "Crear"]];
+  const tabs = [["voz", "🎤 Por voz"], ["buscar", "Buscar"], ["rapido", "Añadir rápido"], ["fav", "Favoritos"], ["recetas", "Recetas"], ["supl", "Suplementos"], ["crear", "Crear"]];
   const b = sheet(FS.meal, `<div class="seg scroll">${tabs.map(([k, l]) => `<button class="${FS.tab === k ? "on" : ""}" data-a="foodTab" data-t="${k}">${l}</button>`).join("")}</div><div id="fsb"></div>`);
   await renderFoodTab();
 }
@@ -235,7 +236,9 @@ async function renderFoodTab() {
   const box = $("#fsb"); if (!box) return;
   if (FS.sel) return (box.innerHTML = foodDetail(FS.sel), syncFood());
   const custom = await db.list(P() + "/foods");
-  if (FS.tab === "buscar") {
+  if (FS.tab === "voz") {
+    box.innerHTML = voiceTab(); if (FS.vitems?.length) drawVoice();
+  } else if (FS.tab === "buscar") {
     box.innerHTML = `<div class="row gap"><input id="fq" placeholder="Buscar alimento…" value="${esc(FS.q)}" data-a-input="foodSearch" autocomplete="off"><button class="btn" data-a="scan" title="Escanear código">▥</button></div>
     <div id="fres"></div><button class="btn ghost small block" data-a="offSearch">Buscar en Open Food Facts (productos envasados)</button>`;
     $("#fq").focus(); showResults(custom);
@@ -274,25 +277,73 @@ async function showResults(custom) {
   box.innerHTML = FS.results.map(resRow).join("") || (q ? `<p class="muted small pad">Sin resultados en tu base. Prueba “Añadir rápido” o Open Food Facts.</p>` : `<p class="muted small pad">Escribe para buscar en tu base de alimentos.</p>`);
 }
 act("foodSearch", (el) => { FS.q = el.value; showResults(); });
-act("selFood", (el) => { FS.sel = FS.results.find((f) => String(f.id) === el.dataset.id); FS.selG = FS.sel?.medidaG || 100; renderFoodTab(); });
-act("dMed", (el) => { FS.selG = +el.dataset.g; $("#dG").value = FS.selG; if ($("#dP")) $("#dP").value = r1(FS.selG / FS.sel.portion); syncFood(); });
+act("selFood", (el) => { FS.sel = FS.results.find((f) => String(f.id) === el.dataset.id); const mi = medidaInfo(FS.sel); FS.unit = mi ? "med" : "g"; FS.qty = mi ? 1 : 100; FS.selG = mi ? Math.round(mi.each) : 100; renderFoodTab(); });
+const unitOpts = (f) => { const mi = medidaInfo(f); return [["g", "Gramos", 1], ...(mi ? [["med", mi.label, mi.each]] : []), ...(f.portion ? [["por", "Porción de intercambio", f.portion]] : [])]; };
 function foodDetail(f) {
-  return `<button class="btn ghost small" data-a="foodBack">‹ Volver</button><h3>${esc(f.name)}</h3><div class="muted small">${esc(f.brand || "")}${f.cat ? `Grupo: ${esc(f.cat)}${f.portion ? ` · 1 porción de intercambio ≈ ${f.portion} g` : ""}` : ""}</div>
-  <div class="muted small">Aporte real por 100 g: ${r0(f.kcal)} kcal · CHO ${r1(f.cho)} · Lípidos ${r1(f.fat)} · Proteína ${r1(f.prot)}</div>
-  <div class="chips">${f.medidaG ? `<button class="chip" data-a="dMed" data-g="${f.medidaG}">${esc(f.medida)} (${f.medidaG} g)</button>` : ""}${[50, 100, 150, 200].map((g) => `<button class="chip" data-a="dMed" data-g="${g}">${g} g</button>`).join("")}</div>
-  <div class="row gap"><label class="grow">Gramos<input id="dG" type="number" inputmode="decimal" value="${FS.selG}" data-a-input="dSync" data-k="g"></label>${f.portion ? `<label class="grow">Porciones<input id="dP" type="number" inputmode="decimal" value="${r1(FS.selG / f.portion)}" data-a-input="dSync" data-k="p"></label>` : ""}</div>
+  const opts = unitOpts(f), u = opts.find((o) => o[0] === FS.unit) || opts[0];
+  return `<button class="btn ghost small" data-a="foodBack">‹ Volver</button><h3>${esc(f.name)}</h3><div class="muted small">${esc(f.brand || "")}${f.cat ? `Grupo: ${esc(f.cat)}` : ""} · por 100 g: ${r0(f.kcal)} kcal · C ${r1(f.cho)} · L ${r1(f.fat)} · P ${r1(f.prot)}</div>
+  <div class="card-t mt">¿Cómo lo vas a registrar?</div>
+  <div class="seg">${opts.map(([k, l]) => `<button class="${u[0] === k ? "on" : ""}" data-a="dUnit" data-u="${k}">${esc(l)}</button>`).join("")}</div>
+  <div class="qtyrow"><button class="btn" data-a="dStep" data-n="-1">−</button><label class="grow"><span>${u[0] === "g" ? "Gramos" : "Cantidad (" + esc(u[1]) + ")"}</span><input id="dQ" type="number" inputmode="decimal" step="${u[0] === "g" ? 1 : 0.25}" value="${FS.qty}" data-a-input="dSync"></label><button class="btn" data-a="dStep" data-n="1">＋</button></div>
+  <p class="muted small center" id="dEq">${u[0] === "g" ? "" : `≈ ${r0(FS.selG)} g · 1 ${esc(u[1])} ≈ ${r0(u[2])} g`}</p>
   <div id="dMac" class="macros4"></div>
   <div class="row gap"><button class="btn" data-a="favToggle">${f.fav ? "♥" : "♡"}</button><button class="btn primary big grow" data-a="foodAdd">Añadir a ${esc(FS.meal)}</button></div>`;
 }
+function qtyToG() { const o = unitOpts(FS.sel).find((x) => x[0] === FS.unit) || ["g", "", 1]; FS.selG = r1((FS.qty || 0) * o[2]); const e = $("#dEq"); if (e && FS.unit !== "g") e.textContent = `≈ ${r0(FS.selG)} g · 1 ${o[1]} ≈ ${r0(o[2])} g`; syncFood(); }
+act("dUnit", (el) => { FS.unit = el.dataset.u; FS.qty = FS.unit === "g" ? Math.round(FS.selG || 100) : 1; qtyToG(); renderFoodTab(); });
+act("dStep", (el) => { const st = FS.unit === "g" ? 10 : 0.5; FS.qty = Math.max(0, r1((num($("#dQ").value) || 0) + st * +el.dataset.n)); $("#dQ").value = FS.qty; qtyToG(); });
+act("dSync", (el) => { FS.qty = num(el.value) || 0; qtyToG(); });
 function syncFood() {
   const f = FS.sel, m = itemMacros({ ...f, g: FS.selG });
   const el = $("#dMac"); if (el) el.innerHTML = [["Kcal", m.kcal], ["CHO", m.cho], ["Lípidos", m.fat], ["Proteína", m.prot]].map(([l, v]) => `<div><b>${r1(v)}</b><small>${l}</small></div>`).join("");
 }
-act("dSync", (el) => {
-  const v = num(el.value) || 0, f = FS.sel;
-  if (el.dataset.k === "g") { FS.selG = v; if ($("#dP")) $("#dP").value = r1(v / f.portion); }
-  else { FS.selG = r1(v * f.portion); $("#dG").value = FS.selG; }
-  syncFood();
+// ---------- Registro por voz
+function voiceTab() {
+  const ok = speechSupported();
+  return `<div class="voice"><button class="micbtn ${FS.rec ? "rec" : ""}" data-a="${FS.rec ? "voiceStop" : "voiceStart"}" ${ok ? "" : "disabled"}>${FS.rec ? "■" : "🎤"}</button>
+    <p class="muted small center">${FS.rec ? "Te escucho… toca para terminar" : ok ? "Toca el micrófono y di lo que comiste.<br>Ej: “dos plátanos medianos, una mandarina y una cucharada de mantequilla de maní”" : "Tu navegador no permite dictado; escríbelo abajo (también puedes usar el micrófono del teclado)."}</p>
+    <textarea id="vT" rows="3" placeholder="O escríbelo aquí…" data-a-input="voiceText">${esc(FS.vtext || "")}</textarea>
+    <button class="btn block" data-a="voiceParse">Interpretar</button><div id="vRes"></div></div>`;
+}
+act("voiceText", (el) => { FS.vtext = el.value; });
+act("voiceStart", () => {
+  try {
+    FS.rec = listen({
+      onText: (fin, interim) => { FS.vtext = fin; const t = $("#vT"); if (t) t.value = fin + (interim ? (fin ? ", " : "") + interim : ""); },
+      onEnd: () => { FS.rec = null; renderFoodTab(); if (FS.vtext) parseVoice(); },
+      onError: (e) => { FS.rec = null; toast(e === "not-allowed" ? "Activa el permiso de micrófono" : e === "network" ? "El dictado necesita conexión; escríbelo abajo" : "No te escuché bien, intenta de nuevo"); renderFoodTab(); }
+    });
+    renderFoodTab();
+  } catch { toast("No se pudo iniciar el micrófono"); }
+});
+act("voiceStop", () => { FS.rec?.stop(); });
+act("voiceParse", () => { FS.vtext = $("#vT").value; parseVoice(); });
+async function parseVoice() {
+  const custom = (await db.list(P() + "/foods")).filter((f) => f.type !== "receta");
+  const pool = [...custom, ...(await getFoodBase())];
+  FS.vitems = parseMeal(FS.vtext || "", pool);
+  drawVoice();
+}
+function drawVoice() {
+  const box = $("#vRes"); if (!box) return;
+  const it = FS.vitems || [];
+  if (!it.length) return (box.innerHTML = `<p class="muted small center">No reconocí alimentos. Prueba con frases cortas separadas por comas.</p>`);
+  const tot = it.filter((x) => x.f && x.g).reduce((a, x) => { const m = itemMacros({ ...x.f, g: x.g }); return { kcal: a.kcal + m.kcal, prot: a.prot + m.prot }; }, { kcal: 0, prot: 0 });
+  box.innerHTML = `<div class="card-t mt">Revisa y ajusta los gramos</div>${it.map((x, k) => `<div class="vitem ${x.f ? "" : "miss"}">
+    <div class="row between"><small class="muted">“${esc(x.chunk)}” · ${esc(describe(x.p))}</small><button class="icon-btn" data-a="vDel" data-k="${k}">✕</button></div>
+    ${x.f ? `<div class="row gap"><select data-a-change="vPick" data-k="${k}" class="grow">${x.options.map((o, j) => `<option value="${j}" ${o === x.f ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select>
+      <label class="vg"><input type="number" inputmode="decimal" value="${x.g}" data-a-change="vG" data-k="${k}"><span>g</span></label></div>
+      <small class="muted">${r0(itemMacros({ ...x.f, g: x.g }).kcal)} kcal · P ${r1(itemMacros({ ...x.f, g: x.g }).prot)} g</small>` : `<small class="warn">No encontré “${esc(x.p.query)}”. Búscalo en “Buscar” o usa “Añadir rápido”.</small>`}</div>`).join("")}
+  <div class="row between mt"><b>Total ≈ ${r0(tot.kcal)} kcal</b><span class="muted small">Proteína ${r1(tot.prot)} g</span></div>
+  <button class="btn primary big" data-a="vAdd">Añadir todo a ${esc(FS.meal)}</button>`;
+}
+act("vDel", (el) => { FS.vitems.splice(+el.dataset.k, 1); drawVoice(); });
+act("vPick", (el) => { const x = FS.vitems[+el.dataset.k]; x.f = x.options[+el.value]; x.g = estimateGrams(x.p, x.f); drawVoice(); });
+act("vG", (el) => { FS.vitems[+el.dataset.k].g = num(el.value) || 0; drawVoice(); });
+act("vAdd", async () => {
+  const items = (FS.vitems || []).filter((x) => x.f && x.g).map((x) => ({ name: x.f.name, g: x.g, kcal: x.f.kcal, cho: x.f.cho, fat: x.f.fat, prot: x.f.prot, cat: x.f.cat || "", por: x.f.portion || null, fid: x.f.id, est: true, said: describe(x.p) }));
+  if (!items.length) return toast("No hay alimentos para añadir");
+  FS.vitems = []; FS.vtext = ""; await addItems(items);
 });
 act("foodBack", () => { FS.sel = null; openFoodSheet(); });
 act("foodAdd", async () => {

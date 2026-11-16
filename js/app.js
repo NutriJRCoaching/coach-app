@@ -42,14 +42,17 @@ function loginView(msg = "") {
   root.innerHTML = `<form class="login-box" id="loginF">
     <img class="logo-img" src="icons/logo.png" alt="Team JR">
     ${msg ? `<p class="err">${esc(msg)}</p>` : ""}
-    <label>Correo<input name="email" type="email" autocomplete="email" required></label>
+    <label>Correo<input name="email" type="email" autocomplete="username email" required value="${esc(LS.get("lastEmail") || "")}"></label>
     <label>Contraseña<input name="pass" type="password" autocomplete="current-password" required minlength="6"></label>
+    <label class="chkrow"><input type="checkbox" name="keep" ${LS.get("keep") === "0" ? "" : "checked"}> Mantener sesión iniciada</label>
+    <label class="chkrow"><input type="checkbox" name="remember" ${LS.get("lastEmail") !== null || LS.get("rememberEmail") !== "0" ? "checked" : ""}> Recordar mi correo</label>
     <button class="btn primary big">Entrar</button>
-    <button type="button" class="btn ghost small" data-a="forgot">Olvidé mi contraseña</button>
-    <button type="button" class="btn ghost small" data-a="coachSignup">Soy el coach y es mi primera vez</button><p class="ver">v${CONFIG.appVersion}</p></form>`;
+    <button type="button" class="btn ghost small" data-a="forgot">Olvidé mi contraseña</button><p class="ver">v${CONFIG.appVersion}</p></form>`;
   $("#loginF").onsubmit = async (e) => {
-    e.preventDefault(); const f = new FormData(e.target);
-    try { await db.signIn(f.get("email").trim(), f.get("pass")); }
+    e.preventDefault(); const f = new FormData(e.target), email = f.get("email").trim(), keep = !!f.get("keep");
+    LS.set("keep", keep ? "1" : "0");
+    if (f.get("remember")) { LS.set("lastEmail", email); LS.set("rememberEmail", "1"); } else { try { localStorage.removeItem("lastEmail"); } catch {} LS.set("rememberEmail", "0"); }
+    try { await db.signIn(email, f.get("pass"), keep); }
     catch (err) { loginView(navigator.onLine ? "Correo o contraseña incorrectos" : "Necesitas conexión para iniciar sesión la primera vez"); }
   };
 }
@@ -58,12 +61,6 @@ act("demoReset", async () => { await db.resetData(); location.reload(); });
 act("forgot", async () => {
   const email = $("#loginF [name=email]").value.trim(); if (!email) return toast("Escribe tu correo primero");
   try { await db.resetPass(email); toast("Te enviamos un correo para cambiar la contraseña"); } catch { toast("No se pudo enviar el correo"); }
-});
-act("coachSignup", async () => {
-  const email = $("#loginF [name=email]").value.trim(), pass = $("#loginF [name=pass]").value;
-  if (!(await isCoachEmail(email))) return toast("Ese correo no es el del coach");
-  if (pass.length < 6) return toast("La contraseña debe tener al menos 6 caracteres");
-  try { await db.signUp(email, pass); } catch (e) { toast("No se pudo crear: " + e.code); }
 });
 act("logout", async () => { S.viewAs = null; await db.signOut(); location.hash = ""; });
 
