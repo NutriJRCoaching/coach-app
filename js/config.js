@@ -25,7 +25,7 @@ export const CONFIG = {
   coachWhatsapp: "",
 
   appName: "Team JR",
-  appVersion: "1.2.2",
+  appVersion: "1.2.3",
 
   // Tiempos de comida
   meals: ["Desayuno", "Almuerzo", "Once", "Cena", "Colaciones"],
