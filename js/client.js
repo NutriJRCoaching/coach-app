@@ -32,7 +32,9 @@ const head = (title, back, right = "") => `<header class="ch">${back ? `<a href=
 function dayStrip() {
   const w = weekInfo(S.client, S.date), today = ymd();
   return `<div class="strip"><button class="icon-btn" data-a="shiftDay" data-n="-7">${I.back}</button>${w.days.map((d) => { const dt = parseYmd(d); return `<button class="sd ${d === S.date ? "on" : ""} ${d === today ? "today" : ""}" data-a="pickDay" data-d="${d}"><small>${D1[dt.getDay()]}</small>${dt.getDate()}</button>`; }).join("")}<button class="icon-btn" data-a="shiftDay" data-n="7">${I.chev}</button></div>
-  <div class="strip-sub"><span>${fmtDate(S.date, true)} · Semana ${w.n}</span>${S.date !== today ? `<button class="btn tiny" data-a="pickDay" data-d="${today}">Hoy</button>` : ""}</div>`;
+  ${S.date !== today
+    ? `<div class="otherday" data-a="pickDay" data-d="${today}"><span>Estás registrando el <b>${fmtDate(S.date, true)}</b>${S.date > today ? " (futuro)" : ""}</span><b>Volver a hoy</b></div>`
+    : `<div class="strip-sub"><span>${fmtDate(S.date, true)} · Semana ${w.n}</span></div>`}`;
 }
 act("pickDay", (el) => { S.date = el.dataset.d; refresh(); });
 act("shiftDay", (el) => { S.date = addDays(S.date, +el.dataset.n); refresh(); });
