@@ -5,7 +5,7 @@ import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, $, $$ } from "./ui.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
-import { getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN } from "./data.js";
+import { getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN } from "./data.js";
 import { weeksTable } from "./client.js";
 import { GROUPS } from "./foods.js";
 
@@ -129,18 +129,19 @@ async function tlView(c0, w) {
 async function sessionsView(c, w) {
   const all = await getSessions(c.id);
   const list = all.filter((s) => s.weekKey === w.key && s.status === "fin").sort((a, b) => a.startedAt - b.startedAt);
-  const exnotes = await db.list(`clients/${c.id}/exnotes`);
+  const [exnotes, audios] = await Promise.all([db.list(`clients/${c.id}/exnotes`), db.list(`clients/${c.id}/audios`)]);
   if (!list.length) return `<p class="muted">Sin entrenamientos registrados esta semana.</p>`;
   return list.map((s) => {
     const prev = prevSession(all, s), sv = s.survey || {};
     return `<div class="card"><div class="row between"><h3>${esc(s.routineName)} <small class="muted">${fmtDate(s.date, true)} · ${s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) + " min" : ""}</small></h3>
     <div class="row gap small">${sv.intensidad ?? sv.dureza ? `<span class="pill">Intensidad ${sv.intensidad ?? sv.dureza}/10</span>` : ""}${sv.fuerza ? `<span class="pill">Fuerza ${sv.fuerza}/5</span>` : ""}${sv.energia ? `<span class="pill">Energía ${sv.energia}/5</span>` : ""}${sv.doms ? `<span class="pill">DOMS ${sv.doms}/5</span>` : ""}${sv.general ? `<span class="pill">General ${sv.general}/5</span>` : ""}${sv.articular === "si" ? `<span class="badge r">Molestia articular: ${esc(sv.articularDet || "")}</span>` : ""}${sv.orden === "no" ? `<span class="badge y">No siguió el orden</span>` : ""}</div></div>
     ${s.comment ? `<div class="note">💬 ${esc(s.comment)}</div>` : ""}
+    ${audios.find((a) => a.id === s.id)?.data ? `<div class="note">🎙️ Audio del cliente (${audios.find((a) => a.id === s.id).secs || "?"} s)<br><audio controls src="${audios.find((a) => a.id === s.id).data}"></audio></div>` : ""}
     <table class="tbl"><tr><th>Ejercicio</th><th>Serie</th><th>Esta semana</th><th>Semana anterior</th><th>Δ</th><th>Nota</th></tr>
     ${s.exercises.map((e) => e.sets.map((x, j) => { const ref = refSet(prev, e.exId, j); const dw = ref && x.w !== "" && ref.w !== "" ? r1(x.w - ref.w) : null, dr = ref && x.r !== "" && ref.r !== "" ? x.r - ref.r : null;
       return `<tr class="${e.extra ? "extra-row" : ""}">${j === 0 ? `<td rowspan="${e.sets.length}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge extra">Extra</span>' : ""}${e.replaced ? `<br><small class="muted">reemplazó a ${esc(e.replacedFrom)}</small>` : ""}${e.tech ? `<br><span class="badge tech-${e.tech}">Técnica ${e.tech}</span>` : ""}${exnotes.find((n) => n.id === e.exId)?.text ? `<br><small class="muted">⚙ ${esc(exnotes.find((n) => n.id === e.exId).text)}</small>` : ""}</td>` : ""}
       <td>${j + 1}${e.target?.[j] ? `<br><small class="muted">plan ${esc(e.target[j].reps)}${e.target[j].rir !== "" && e.target[j].rir != null ? "@" + e.target[j].rir : ""}</small>` : ""}</td><td><b>${x.w || "–"} × ${x.r || "–"}</b>${x.rir !== "" ? ` RIR ${x.rir}` : ""}${x.tech ? ` <span class="badge tech-${x.tech}">téc. ${x.tech}</span>` : ""}</td><td class="muted">${ref ? `${ref.w}×${ref.r}${ref.rir !== "" ? " RIR " + ref.rir : ""}` : "—"}</td>
-      <td>${dw ? `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw}kg</span> ` : ""}${dr ? `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr}r</span>` : ""}</td><td class="small">${esc(x.note || "")}</td></tr>`; }).join("")).join("")}</table></div>`;
+      <td>${(() => { const pg = setProgress(x, ref); return pg ? `<span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</td><td class="small">${esc(x.note || "")}</td></tr>`; }).join("")).join("")}</table></div>`;
   }).join("");
 }
 

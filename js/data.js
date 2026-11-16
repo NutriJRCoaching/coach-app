@@ -86,13 +86,14 @@ export function setVerdict(ex, j) {
   const rg = range(t.reps), tr = t.rir === "" || t.rir == null ? 1 : +t.rir;
   const r = +s.r, rir = s.rir === "" ? null : s.rir;
   if (s.tech === "peor") return { a: "mant", why: "la técnica empeoró: primero afírmala" };
-  if (rir === "F" || (rg && r < rg.lo)) return { a: "baja", why: rir === "F" ? "llegaste al fallo" : "no alcanzaste las reps" };
+  if (rir === "F" || (rg && r < rg.lo - 1)) return { a: "baja", why: rir === "F" ? "llegaste al fallo" : "te faltaron 2 o más reps" };
   if (rg && ((r >= rg.hi && rir != null && +rir > tr) || r > rg.hi)) return { a: "sube", why: "te sobró margen" };
   return { a: "mant", why: "" };
 }
 // Mensaje bajo el ejercicio: durante la sesión habla de la serie siguiente;
 // al completar la última, resume qué hacer la próxima semana serie por serie.
 export function suggest(ex, j) {
+  if (ex.sides) return suggestSides(ex, j);
   const v = setVerdict(ex, j); if (!v) return null;
   const last = j >= ex.sets.length - 1;
   if (!last) {
@@ -109,6 +110,44 @@ export function suggest(ex, j) {
   const worst = per.some((x) => x?.a === "baja") ? "baja" : per.some((x) => x?.a === "sube") ? "sube" : "mant";
   const tech = ex.sets.some((x) => x.tech === "peor");
   return { a: worst, last: true, text: "Próxima semana", items, why: tech ? "Alguna serie salió con peor técnica: no subas peso ahí hasta afirmarla." : "" };
+}
+// Unilaterales: los dos lados van siempre con el MISMO peso; manda el lado más débil
+const RANK = { baja: 0, mant: 1, sube: 2 };
+const pairVerdict = (ex, p) => {
+  const a = setVerdict(ex, p * 2), b = setVerdict(ex, p * 2 + 1); if (!a || !b) return null;
+  const w = RANK[a.a] <= RANK[b.a] ? a : b;
+  return { a: w.a, why: w.why ? `${RANK[a.a] <= RANK[b.a] ? "lado izquierdo" : "lado derecho"}: ${w.why}` : "" };
+};
+function suggestSides(ex, j) {
+  const pairs = ex.sets.length / 2, p = Math.floor(j / 2);
+  if (j % 2 === 0) return { a: "mant", last: false, text: `Serie ${p + 1} derecha: mismo peso que la izquierda`, why: "en unilaterales ambos lados usan el mismo peso; si un lado cuesta más, descansa un poco más entre lados" };
+  const v = pairVerdict(ex, p); if (!v) return null;
+  if (p < pairs - 1) {
+    const t = ex.target[j] || {}, nt = ex.target[j + 1] || t;
+    const heavier = range(nt.reps) && range(t.reps) && range(nt.reps).hi < range(t.reps).lo;
+    let a = v.a; if (a === "mant" && heavier && !ex.sets.slice(j - 1, j + 1).some((x) => x.tech === "peor")) a = "sube";
+    return { a, last: false, text: `Serie ${p + 2} (ambos lados): ${{ sube: "sube el peso (salto mínimo)", mant: "mantén el peso", baja: "baja el peso" }[a]}`, why: v.why };
+  }
+  const per = [...Array(pairs)].map((_, k) => pairVerdict(ex, k));
+  const words = { sube: "sube (salto mínimo)", mant: "mantén", baja: "baja" };
+  const worst = per.some((x) => x?.a === "baja") ? "baja" : per.some((x) => x?.a === "sube") ? "sube" : "mant";
+  return { a: worst, last: true, text: "Próxima semana (mismo peso en ambos lados)", items: per.map((x, k) => (x ? `Serie ${k + 1}: ${words[x.a]}` : null)).filter(Boolean), why: per.find((x) => x?.why)?.why || "" };
+}
+
+// ¿Hubo progreso en esta serie vs la misma serie de la semana pasada? (siempre que la técnica no empeore)
+const rirN = (v) => (v === "F" ? -1 : v === "" || v == null ? null : +v);
+export function setProgress(x, ref) {
+  if (x.w === "" || x.r === "") return null;
+  if (!ref || ref.w === "" || ref.r === "") return { k: "new", t: "Primera vez" };
+  if (x.tech === "peor") return { k: "bad", t: "Técnica peor" };
+  const dw = Math.round((x.w - ref.w) * 10) / 10, dr = x.r - ref.r, a = rirN(x.rir), b = rirN(ref.rir);
+  if (dw > 0) return { k: "up", t: `Subió ${dw} kg${dr < 0 ? ` (${dr} reps)` : ""}` };
+  if (dw < 0) return { k: dr > 0 ? "same" : "down", t: `Bajó ${-dw} kg${dr > 0 ? ` (+${dr} reps)` : ""}` };
+  if (dr > 0) return { k: "up", t: `+${dr} rep${dr > 1 ? "s" : ""} mismo peso` };
+  if (dr < 0) return { k: "down", t: `${dr} rep${dr < -1 ? "s" : ""} mismo peso` };
+  if (a != null && b != null && a > b) return { k: "up", t: `Mismas reps con más reserva (RIR ${b}→${a})` };
+  if (a != null && b != null && a < b) return { k: "down", t: `Mismas reps, menos reserva (RIR ${b}→${a})` };
+  return { k: "same", t: "Mantuvo" };
 }
 
 export const MEASURE_ZONES = [
