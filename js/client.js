@@ -126,8 +126,8 @@ act("gutNote", async () => {
 act("gutSave", async () => { await setDay(S.date, { gut: $("#gN").value.trim() }); closeSheet(); refresh(); });
 act("stepsEdit", async () => {
   const day = await getDay(S.date);
-  const b = sheet("Pasos del día", `<p class="muted small">Pronto se sincronizarán solos con tu celular. Por ahora anótalos desde tu app de pasos.</p><input id="stepsI" type="number" inputmode="numeric" value="${day.steps || ""}" placeholder="Ej: 9500"><button class="btn primary big" data-a="stepsSave">Guardar</button>`);
-  $("#stepsI", b).focus();
+  const b = sheet("Pasos del día", `<p class="muted small">Anótalos desde tu app de pasos o reloj.</p><input id="stepsI" type="number" inputmode="numeric" class="bignum" value="${day.steps || ""}" placeholder="Ej: 10.000"><button class="btn primary big" data-a="stepsSave">Guardar</button>`);
+  setTimeout(() => $("#stepsI", b)?.focus(), 250);
 });
 act("stepsSave", async () => { await setDay(S.date, { steps: num($("#stepsI").value) || 0 }); closeSheet(); refresh(); });
 act("cardioAdd", () => {
@@ -638,13 +638,13 @@ async function settingsView() {
   return `${head("Ajustes", "mas")}<div class="card"><div class="card-t">Tema</div>${chips("t", [["dark", "Oscuro"], ["light", "Claro"]], theme, "theme")}</div>
   <div class="card"><div class="card-t">${I.bell}Recordatorios</div>
     ${perm === "no" ? `<p class="muted small">Este navegador no permite notificaciones.</p>` : perm === "denied" ? `<p class="warn small">Bloqueaste las notificaciones. Actívalas en los ajustes de Chrome para esta app.</p>` : ""}
+    <div class="sched"><b>Tu horario de todos los días</b><div class="remmeals"><span>Despierto a las${tm("sched.wake", r.sched.wake)}</span><span>Me duermo a las${tm("sched.bed", r.sched.bed)}</span></div></div>
     ${row("Activar recordatorios", on ? "Activados ✓" : "Te avisa solo si te falta registrar algo", sw("on", on))}
     ${on ? `
     ${row("Agua", "Si vas atrasado con tu meta", `<select data-a-change="remSet" data-k="water.every" class="tm">${[1, 2, 3].map((h) => `<option value="${h}" ${+r.water.every === h ? "selected" : ""}>cada ${h} h</option>`).join("")}</select>${sw("water.on", r.water.on)}`)}
     ${row("Comidas", "Si a esa hora no has registrado esa comida", sw("meals.on", r.meals.on))}
     ${r.meals.on ? `<div class="remmeals">${Object.entries(r.meals.times).map(([m, t]) => `<span>${m}${tm("meals.times." + m, t)}</span>`).join("")}</div>` : ""}
-    ${row("Pasos / caminata", "Si vas bajo tu meta de pasos", sw("steps.on", r.steps.on))}
-    ${r.steps.on ? `<div class="remmeals">${r.steps.times.map((t, k) => `<span>${k ? "Tarde" : "Mediodía"}${tm("steps.times." + k, t)}</span>`).join("")}</div>` : ""}
+    ${row("Pasos del día", `1 h antes de dormir (${minTo(toMin(r.sched.bed) - 60)}): anota tus pasos y revisa tus pendientes`, sw("steps.on", r.steps.on))}
     ${row("Peso", "En ayunas", `${tm("weight.at", r.weight.at)}${sw("weight.on", r.weight.on)}`)}
     ${row("Entrenamiento", "Los días que te toca", `${tm("train.at", r.train.at)}${sw("train.on", r.train.on)}`)}
     ${row("Check-in semanal", "Al final de tu semana", `${tm("checkin.at", r.checkin.at)}${sw("checkin.on", r.checkin.on)}`)}
@@ -652,7 +652,7 @@ async function settingsView() {
   </div>
   <div class="card"><div class="card-t">Unidades</div><p class="muted small">Kilogramos, litros y centímetros.</p></div>`;
 }
-const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { Desayuno: "09:30", Almuerzo: "14:30", Once: "18:30", Cena: "21:30" } }, weight: { on: true, at: "08:30" }, steps: { on: true, times: ["13:00", "19:00"] }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
+const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { Desayuno: "09:30", Almuerzo: "14:30", Once: "18:30", Cena: "21:30" } }, sched: { wake: "07:00", bed: "23:00" }, weight: { on: true, at: "07:20" }, steps: { on: true }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
 function remCfg() {
   let c = {}; try { c = JSON.parse(LS.get("rem") || "{}"); } catch {}
   const out = JSON.parse(JSON.stringify(REM_DEF));
@@ -665,10 +665,22 @@ act("remSet", async (el) => {
     const p = await Notification.requestPermission(); if (p !== "granted") { toast("Sin permiso no puedo avisarte"); return refresh(); }
   }
   let o = c; for (const k of path.slice(0, -1)) o = o[k]; o[path[path.length - 1]] = v;
+  if (el.dataset.k === "sched.wake") c.weight.at = minTo(toMin(v) + 20);
+  if (S.cid) db.set(`${P()}/settings/reminders`, { ...c, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, at: Date.now() }, false); // para avisos con la app cerrada (próximo paso)
+  if (path[0] === "sched") refresh();
   LS.set("rem", JSON.stringify(c)); if (path[0] === "on" || path[1] === "on") refresh();
   checkReminders();
 });
+const minTo = (m) => { m = ((m % 1440) + 1440) % 1440; return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; };
 const toMin = (t) => { const [h, m] = String(t || "0:0").split(":").map(Number); return h * 60 + (m || 0); };
+// Recuadro grande de cierre del día: pasos + pendientes
+async function nightBox() {
+  const day = await getDay(ymd()), pend = (S.pend || []).filter((p) => p.to !== "pasos");
+  const b = sheet("Cierre del día", `<div class="nightbox"><div class="nb-ic">👣</div><b>Recuerda anotar tus pasos</b><p class="muted small">Revisa tu app de pasos o reloj y anótalos aquí.</p>
+    <input id="stepsI" type="number" inputmode="numeric" class="bignum" value="${day.steps || ""}" placeholder="Ej: 10.000"><button class="btn primary big" data-a="stepsSave">Guardar pasos</button></div>
+    ${pend.length ? `<div class="card-t mt">También te queda pendiente</div><div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}" data-a="closeSheet"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}`);
+  setTimeout(() => $("#stepsI", b)?.focus(), 300);
+}
 // Revisa qué falta registrar y avisa una sola vez por recordatorio
 export async function checkReminders() {
   try {
@@ -687,8 +699,12 @@ export async function checkReminders() {
       }
     }
     if (r.steps.on) {
-      const goal = c.steps || 8000, st = day.steps || 0;
-      r.steps.times.forEach((t, k) => { if (t && nm >= toMin(t) && nm < toMin(t) + 180 && st < goal * (k ? 0.75 : 0.4)) once("pasos-" + k, "Sal a caminar 🚶", `Llevas ${st.toLocaleString("es-CL")} de ${goal.toLocaleString("es-CL")} pasos`); });
+      const t = toMin(r.sched.bed) - 60;
+      if (nm >= t && nm < t + 240 && !day.steps) {
+        once("pasos-noche", "Anota tus pasos de hoy 👣", "Y revisa si te queda algo pendiente del día");
+        const k = `rs:pasos-box:${today}`;
+        if (!document.hidden && !LS.get(k) && !document.querySelector(".sheet-bg")) { LS.set(k, "1"); nightBox(); }
+      }
     }
     if (r.train.on && nm >= toMin(r.train.at)) {
       const [routines, sessions] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]);

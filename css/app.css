@@ -315,3 +315,7 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 /* Audio de retroalimentación */
 .audiofb { display: grid; gap: 10px; } .audiofb audio { width: 100%; }
 .btn.recording { background: var(--r) !important; animation: pulse 1.2s ease-in-out infinite; }
+
+.sched { padding: 4px 0 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; } .sched b { font-size: 14px; }
+.nightbox { display: grid; gap: 10px; text-align: center; justify-items: center; } .nightbox .nb-ic { font-size: 46px; } .nightbox b { font-size: 20px; }
+.bignum { font-size: 32px !important; font-weight: 800; text-align: center; padding: 14px !important; }
