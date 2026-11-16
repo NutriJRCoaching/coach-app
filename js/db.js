@@ -85,16 +85,32 @@ const fire = {
     this.auth = au.getAuth(this.app);
     await au.setPersistence(this.auth, au.indexedDBLocalPersistence);
   },
-  async get(path) {
-    const { doc, getDoc, getDocFromCache } = this.m;
-    try { const s = await getDoc(doc(this.db, path)); return s.exists() ? s.data() : null; }
-    catch { try { const s = await getDocFromCache(doc(this.db, path)); return s.exists() ? s.data() : null; } catch { return null; } }
+  // Lectura rápida: la primera vez en la sesión pregunta al servidor (máx. 2,5 s);
+  // después responde al instante desde el celular y revisa el servidor en segundo plano.
+  snap: new Map(), lastStale: new Map(), onStale: null, _t: null,
+  stale(key) {
+    const now = Date.now(); if (now - (this.lastStale.get(key) || 0) < 3000) return;
+    this.lastStale.set(key, now); clearTimeout(this._t); this._t = setTimeout(() => this.onStale?.(), 120);
   },
-  async list(col) {
-    const { collection, getDocs, getDocsFromCache } = this.m;
-    const map = (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }));
-    try { return map(await getDocs(collection(this.db, col))); }
-    catch { try { return map(await getDocsFromCache(collection(this.db, col))); } catch { return []; } }
+  async read(key, server, cache, map, empty) {
+    const bg = () => server().then((r) => { const v = map(r), j = JSON.stringify(v); if (this.snap.get(key) !== j) { this.snap.set(key, j); this.stale(key); } }).catch(() => {});
+    if (this.snap.has(key)) {
+      try { const v = map(await cache()); this.snap.set(key, JSON.stringify(v)); bg(); return v; } catch {}
+    }
+    try {
+      const v = map(await Promise.race([server(), new Promise((_, rej) => setTimeout(() => rej(new Error("lento")), 2500))]));
+      this.snap.set(key, JSON.stringify(v)); return v;
+    } catch {
+      try { const v = map(await cache()); this.snap.set(key, JSON.stringify(v)); bg(); return v; } catch { return empty; }
+    }
+  },
+  get(path) {
+    const { doc, getDoc, getDocFromCache } = this.m, ref = doc(this.db, path);
+    return this.read("d:" + path, () => getDoc(ref), () => getDocFromCache(ref), (s) => (s.exists() ? s.data() : null), null);
+  },
+  list(col) {
+    const { collection, getDocs, getDocsFromCache } = this.m, ref = collection(this.db, col);
+    return this.read("c:" + col, () => getDocs(ref), () => getDocsFromCache(ref), (s) => s.docs.map((d) => ({ id: d.id, ...d.data() })), []);
   },
   // Importante: NO se espera la respuesta del servidor. Firestore guarda localmente
   // al instante y sube el cambio cuando haya conexión.

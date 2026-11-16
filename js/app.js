@@ -65,26 +65,29 @@ act("coachSignup", async () => {
 act("logout", async () => { S.viewAs = null; await db.signOut(); location.hash = ""; });
 
 // El coach también puede usar la app como cliente (su propio registro)
-act("asClient", async () => {
+async function enterClient() {
   const id = S.user.uid;
   let c = await db.get("clients/" + id);
   if (!c) { c = { name: "Joaquín Rojas", email: S.user.email || "", startDate: ymd(), kcal: 2400, cho: 280, fat: 70, prot: 160, steps: 9000, water: 2800, sleep: 8, phase: "Mantención", schedule: {} }; await db.set("clients/" + id, c); }
   // Primera vez: carga su rutina inicial (Team JR) y el calendario semanal
-  if (!(await db.list(`clients/${id}/routines`)).length) {
+  if (!c.seeded && !(await db.list(`clients/${id}/routines`)).length) {
     const { jrRoutines } = await import("./seed-jr.js");
     const { routines, schedule, lib } = jrRoutines();
     for (const [rid, r] of Object.entries(routines)) await db.set(`clients/${id}/routines/${rid}`, r);
     c = { ...c, schedule, rest: c.rest || 180, startDate: c.startDate && c.startDate <= ymd() ? c.startDate : ymd() };
-    await db.set("clients/" + id, { schedule, rest: c.rest, startDate: c.startDate });
+    c.seeded = true;
+    await db.set("clients/" + id, { schedule, rest: c.rest, startDate: c.startDate, seeded: true });
     const cur = (await db.get("library/exercises"))?.items || [];
     if (!cur.length) await db.set("library/exercises", { items: lib }, false);
     toast("Tu rutina quedó cargada ✓");
   }
-  S.viewAs = "client"; S.cid = id; S.raw = c;
+  S.viewAs = "client"; S.cid = id; S.raw = c; LS.set("viewAs", "client");
   db.watch("clients/" + id, (x) => { if (x && S.cid === id) S.raw = x; });
-  location.hash = "inicio";
-});
-act("asCoach", () => { S.viewAs = null; location.hash = "coach"; });
+  if (!location.hash || location.hash.startsWith("#coach")) location.hash = "inicio";
+  render();
+}
+act("asClient", enterClient);
+act("asCoach", () => { S.viewAs = null; LS.set("viewAs", "coach"); location.hash = "coach"; });
 
 // ---------------------------------------------------------- AUTH
 async function onUser(u) {
@@ -98,6 +101,7 @@ async function onUser(u) {
     S.raw = (await db.get("clients/" + u.uid)) || {}; S.client = S.raw;
     db.watch("clients/" + u.uid, (c) => { if (c) { S.raw = c; } });
   }
+  if (isCoach && LS.get("viewAs") === "client" && !location.hash.startsWith("#coach")) return enterClient();
   const coachHash = location.hash.startsWith("#coach");
   if (!location.hash || isCoach !== coachHash) location.hash = isCoach ? "coach" : "inicio";
   render();
@@ -121,6 +125,7 @@ async function render() {
       const main = await clientView();
       root.innerHTML = `<div id="net" class="net" hidden></div><main class="cmain">${main}<p class="ver">${esc(CONFIG.appName)} · v${CONFIG.appVersion}</p></main>${clientTabs()}`;
     }
+    if (!sameRoute) root.querySelector(".cmain, .cpanel")?.classList.add("enter");
     root.dataset.route = location.hash;
     netBadge();
     if (sameRoute) window.scrollTo(0, scrollY); else window.scrollTo(0, 0);
@@ -130,6 +135,7 @@ async function render() {
   if (pending) { pending = false; render(); }
 }
 setRefresher(render);
+db.onStale = () => { if (!document.querySelector(".sheet-bg") && !document.activeElement?.matches?.("input,textarea,select")) render(); };
 addEventListener("hashchange", render);
 
 // ---------------------------------------------------------- BOOT
@@ -142,5 +148,29 @@ addEventListener("hashchange", render);
     console.error(e);
     root.innerHTML = `<div class="pad"><p class="err">No se pudo iniciar la app. Si es la primera vez, necesitas conexión.</p><p class="small muted">${esc(e.message)}</p></div>`;
   }
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:") registerSW();
 })();
+
+// ---------------------------------------------------------- ACTUALIZACIONES
+function registerSW() {
+  let updating = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (updating) location.reload(); });
+  const ask = (w) => {
+    if (document.getElementById("upd")) return;
+    const d = document.createElement("div");
+    d.id = "upd"; d.className = "upd";
+    d.innerHTML = `<span><b>Nueva versión disponible</b><small>Toca para actualizar la app</small></span><button class="btn small">Actualizar</button>`;
+    d.querySelector("button").onclick = () => { updating = true; d.querySelector("button").textContent = "Actualizando…"; w.postMessage("skip"); setTimeout(() => location.reload(), 4000); };
+    document.body.appendChild(d);
+  };
+  navigator.serviceWorker.register("sw.js").then((reg) => {
+    if (reg.waiting && navigator.serviceWorker.controller) ask(reg.waiting);
+    reg.addEventListener("updatefound", () => {
+      const w = reg.installing;
+      w?.addEventListener("statechange", () => { if (w.state === "installed" && navigator.serviceWorker.controller) ask(w); });
+    });
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
+    setInterval(check, 15 * 60 * 1000);
+  }).catch(() => {});
+}

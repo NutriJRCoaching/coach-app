@@ -1,11 +1,13 @@
 // Service worker: guarda la app en el celular para que abra sin conexión.
 // Cada vez que publiques cambios, sube el número de versión.
-const VERSION = "v7";
+const VERSION = "v8";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "css/app.css", "icons/icon-192.png", "icons/icon-512.png", "icons/logo.png", "js/seed-jr.js",
   "js/app.js", "js/config.js", "js/db.js", "js/util.js", "js/ui.js", "js/state.js", "js/data.js", "js/foods.js", "js/realfoods.js", "js/icons.js",
   "js/client.js", "js/train.js", "js/coach.js", "js/demo.js"];
 
-self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL))); self.skipWaiting(); });
+self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL))); });
+// La versión nueva espera hasta que el usuario toque "Actualizar"
+self.addEventListener("message", (e) => { if (e.data === "skip") self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))));
   self.clients.claim();
