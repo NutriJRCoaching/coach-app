@@ -85,24 +85,29 @@ const fire = {
     this.auth = au.getAuth(this.app);
     await au.setPersistence(this.auth, au.indexedDBLocalPersistence);
   },
-  // Lectura rápida: la primera vez en la sesión pregunta al servidor (máx. 2,5 s);
-  // después responde al instante desde el celular y revisa el servidor en segundo plano.
+  // Lectura rápida y segura:
+  // - Si este celular ya descargó ese dato alguna vez, lo muestra al instante desde su copia
+  //   local y revisa el servidor en segundo plano (si cambió, la pantalla se actualiza sola).
+  // - Si nunca lo descargó, espera al servidor (así nunca muestra vacío algo que sí existe).
   snap: new Map(), lastStale: new Map(), onStale: null, _t: null,
+  known(key) { if (this.snap.has(key)) return true; try { return localStorage.getItem("f:" + key) === "1"; } catch { return false; } },
+  mark(key, v) { this.snap.set(key, JSON.stringify(v)); try { localStorage.setItem("f:" + key, "1"); } catch {} },
   stale(key) {
     const now = Date.now(); if (now - (this.lastStale.get(key) || 0) < 3000) return;
-    this.lastStale.set(key, now); clearTimeout(this._t); this._t = setTimeout(() => this.onStale?.(), 120);
+    this.lastStale.set(key, now); clearTimeout(this._t); this._t = setTimeout(() => this.onStale?.(), 150);
   },
   async read(key, server, cache, map, empty) {
-    const bg = () => server().then((r) => { const v = map(r), j = JSON.stringify(v); if (this.snap.get(key) !== j) { this.snap.set(key, j); this.stale(key); } }).catch(() => {});
-    if (this.snap.has(key)) {
-      try { const v = map(await cache()); this.snap.set(key, JSON.stringify(v)); bg(); return v; } catch {}
+    if (this.known(key)) {
+      try {
+        const v = map(await cache()), j = JSON.stringify(v);
+        if (Array.isArray(v) && !v.length) throw 0; // lista vacía en el celular: mejor confirmar con el servidor
+        this.snap.set(key, j);
+        server().then((r) => { const nv = map(r), nj = JSON.stringify(nv); if (nj !== this.snap.get(key)) { this.snap.set(key, nj); this.stale(key); } }).catch(() => {});
+        return v;
+      } catch {}
     }
-    try {
-      const v = map(await Promise.race([server(), new Promise((_, rej) => setTimeout(() => rej(new Error("lento")), 2500))]));
-      this.snap.set(key, JSON.stringify(v)); return v;
-    } catch {
-      try { const v = map(await cache()); this.snap.set(key, JSON.stringify(v)); bg(); return v; } catch { return empty; }
-    }
+    try { const v = map(await server()); this.mark(key, v); return v; }
+    catch { try { return map(await cache()); } catch { return empty; } }
   },
   get(path) {
     const { doc, getDoc, getDocFromCache } = this.m, ref = doc(this.db, path);
