@@ -55,7 +55,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## Notificaciones
 - Ícono pequeño (`badge`) = `icons/badge-96.png`, silueta blanca del logo sobre transparente (Android exige monocromo; si no, muestra una campana).
-- El texto "· nutrijrcoaching.github.io" lo agrega Chrome a los avisos de páginas web; desaparece solo si la app está instalada como app de verdad (Chrome → ⋮ → "Instalar app", que crea una WebAPK), no como acceso directo.
+- El texto "· nutrijrcoaching.github.io" lo agrega Chrome a todo aviso web, incluso con la app instalada (comprobado 17-nov). No se puede quitar desde el código: solo con la app Android nativa (Capacitor/TWA, ya pendiente por Health Connect) o con un dominio propio (pagado) en vez de github.io.
 
 ## Compartir con el coach
 - Una web no puede mandar un archivo directo a un número de WhatsApp (wa.me solo acepta texto). Se usa el menú de compartir del celular; tras la primera vez el chat del coach aparece arriba como acceso directo. El audio y la sesión quedan igual en el panel del coach.
