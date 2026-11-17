@@ -48,7 +48,6 @@ async function run() {
     }
     if (r.steps?.checks) for (const [t, need, id] of [[toMin(sched.wake) + 360, 0.4, "medio"], [toMin(sched.bed) - 240, 0.75, "tarde"]])
       if (within(t) && st < goalSteps * need) add("pasos-" + id, "¿Cuántos pasos llevas? 👟", st ? `Llevas ${fmt(st)} de ${fmt(goalSteps)}. ¿Hacemos una caminata?` : "Anótalos y te digo cuánto te falta para tu meta", "#inicio");
-    if (r.steps?.on && within(toMin(sched.bed) - 60, 180) && !day.steps) add("pasos-noche", "Anota tus pasos de hoy 👣", "Y revisa si te queda algo pendiente del día", "#inicio");
     if (r.train?.on && within(toMin(r.train.at), 240) && c.schedule?.[dow]) {
       const ses = await db.collection(`clients/${cid}/sessions`).where("date", "==", date).get();
       if (!ses.docs.some((d) => d.data().status === "fin")) {

@@ -70,6 +70,7 @@ async function home() {
   const inProgress = sessions.find((s) => s.status === "curso");
   const cdays = c.cardio?.days || [];
   const trainTxt = inProgress ? `<small class="muted">Sesión en curso</small><b>${esc(inProgress.routineName)}</b>` : slot && !slot.rest ? `<small class="muted">${slot.status === "hecho" ? "Completado" : date === today ? "Hoy te toca" : "Este día toca"}</small><b>${esc(slot.name)}</b>` : `<small class="muted">Hoy</small><b>Descanso</b>`;
+  if (date === today) setTimeout(askYesterdaySteps, 900);
   return `<header class="topbar ima"><img src="icons/logo.png?v=ima2" class="hdr-logo" alt="IMA"><div class="brand-t">INTELIGENCIA MUSCULAR APLICADA</div>${bellBtn(pend)}</header>${dayStrip()}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
@@ -658,7 +659,7 @@ async function settingsView() {
     ${row("Comidas", "Si a esa hora no has registrado esa comida", sw("meals.on", r.meals.on))}
     ${r.meals.on ? `<div class="remmeals">${Object.entries(r.meals.times).map(([m, t]) => `<span>${m}${tm("meals.times." + m, t)}</span>`).join("")}</div>` : ""}
     ${row("¿Cuántos pasos llevas?", `A mediodía (${minTo(toMin(r.sched.wake) + 360)}) y en la tarde (${minTo(toMin(r.sched.bed) - 240)}): te dice cuánto te falta y te propone una caminata`, sw("steps.checks", r.steps.checks))}
-    ${row("Pasos del día", `1 h antes de dormir (${minTo(toMin(r.sched.bed) - 60)}): anota tus pasos y revisa tus pendientes`, sw("steps.on", r.steps.on))}
+    ${row("Pasos de ayer", "Al abrir la app un día nuevo, si no anotaste los pasos del día anterior te los pide", sw("steps.on", r.steps.on))}
     ${row("Peso", "En ayunas", `${tm("weight.at", r.weight.at)}${sw("weight.on", r.weight.on)}`)}
     ${row("Entrenamiento", "Los días que te toca", `${tm("train.at", r.train.at)}${sw("train.on", r.train.on)}`)}
     ${row("Check-in semanal", "Al final de tu semana", `${tm("checkin.at", r.checkin.at)}${sw("checkin.on", r.checkin.on)}`)}
@@ -693,6 +694,25 @@ act("remSet", async (el) => {
 });
 const minTo = (m) => { m = ((m % 1440) + 1440) % 1440; return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; };
 const toMin = (t) => { const [h, m] = String(t || "0:0").split(":").map(Number); return h * 60 + (m || 0); };
+// Al entrar un día nuevo: "antes de que se te olvide, ¿cuántos pasos diste ayer?"
+async function askYesterdaySteps() {
+  const today = ymd(), k = "ystep:" + today;
+  if (LS.get(k) || !S.cid || remCfg().steps.on === false || document.querySelector(".sheet-bg")) return;
+  LS.set(k, "1");
+  const y = addDays(today, -1);
+  if (S.raw?.startDate && y < S.raw.startDate) return;
+  const d = await getDay(y); if (d.steps) return;
+  const dt = parseYmd(y), dia = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][dt.getDay()];
+  const b = sheet("Pasos de ayer", `<div class="nightbox"><div class="nb-ic">👣</div><b>Antes de que se te olvide…</b><p>¿Cuántos pasos diste ayer <b>${dia} ${dt.getDate()}</b>? Revisa tu app de pasos o reloj y regístralo aquí.</p>
+    <input id="yStepsI" type="number" inputmode="numeric" class="bignum" placeholder="Ej: 10.000"><button class="btn primary big" data-a="yStepsSave" data-d="${y}">Guardar pasos de ayer</button><button class="btn ghost block" data-a="closeSheet">Ahora no</button></div>`);
+  setTimeout(() => $("#yStepsI", b)?.focus(), 300);
+}
+act("yStepsSave", async (el) => {
+  const st = num($("#yStepsI").value); if (!st) return toast("Escribe tus pasos");
+  await setDay(el.dataset.d, { steps: st }); closeSheet();
+  const goal = S.client?.steps || 8000; toast(st >= goal ? "¡Ayer cumpliste tu meta de pasos! 🏆" : `Guardado: ${st.toLocaleString("es-CL")} de ${goal.toLocaleString("es-CL")} pasos`, 3000);
+  refresh();
+});
 // Recuadro grande de cierre del día: pasos + pendientes
 async function nightBox() {
   const day = await getDay(ymd()), pend = (S.pend || []).filter((p) => p.to !== "pasos");
@@ -721,14 +741,6 @@ export async function checkReminders() {
     if (r.steps.checks) [[toMin(r.sched.wake) + 360, 0.4, "medio"], [toMin(r.sched.bed) - 240, 0.75, "tarde"]].forEach(([t, need, id]) => {
       if (nm >= t && nm < t + 120 && (day.steps || 0) < (c.steps || 8000) * need) once("pasos-" + id, "¿Cuántos pasos llevas? 👟", "Anótalos y te digo cuánto te falta para tu meta");
     });
-    if (r.steps.on) {
-      const t = toMin(r.sched.bed) - 60;
-      if (nm >= t && nm < t + 240 && !day.steps) {
-        once("pasos-noche", "Anota tus pasos de hoy 👣", "Y revisa si te queda algo pendiente del día");
-        const k = `rs:pasos-box:${today}`;
-        if (!document.hidden && !LS.get(k) && !document.querySelector(".sheet-bg")) { LS.set(k, "1"); nightBox(); }
-      }
-    }
     if (r.train.on && nm >= toMin(r.train.at)) {
       const [routines, sessions] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]);
       const hoy = weekPlan(c, routines, sessions, today).slots.find((x) => x.date === today && x.status === "hoy");
