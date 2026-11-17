@@ -807,7 +807,7 @@ export async function checkReminders() {
     const once = (id, title, body) => { const k = `rs:${id}:${today}`; if (LS.get(k)) return; LS.set(k, "1"); if (!document.hidden) toast(title); else if (!pushOn()) notify(title, body); };
     const day = await getDay(today);
     if (r.weight.on && nm >= toMin(r.weight.at) && !day.weight) once("peso", "Registra tu peso", "En ayunas, antes de comer 🙌");
-    if (r.meals.on) for (const [m, t] of Object.entries(r.meals.times)) if (t && nm >= toMin(t) && nm < toMin(t) + 180 && !(day.meals?.[m] || []).length) once("m-" + m, `¿Ya registraste tu ${m.toLowerCase()}?`, "Anótala ahora que la tienes fresca");
+    if (r.meals.on) for (const [m, t] of Object.entries(r.meals.times)) if (t && nm >= toMin(t) && nm < toMin(t) + 180 && !(day.meals?.[m] || []).length) once("m-" + m, "¿Te falta registrar alguna comida? 🍽️", "Anota lo que comiste ahora que lo tienes fresco (también puedes dictarlo)");
     if (r.water.on) {
       const f = toMin(r.water.from), t = toMin(r.water.to), every = (+r.water.every || 2) * 60;
       if (nm >= f + every && nm <= t) {
