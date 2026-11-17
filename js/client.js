@@ -2,7 +2,7 @@
 import { CONFIG } from "./config.js";
 import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
-import { act, toast, sheet, closeSheet, bar, goalLevel, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
+import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
 import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
@@ -50,7 +50,7 @@ function dayStrip() {
 act("pickDay", (el) => { S.date = el.dataset.d; refresh(); });
 act("shiftDay", (el) => { S.date = addDays(S.date, +el.dataset.n); refresh(); });
 
-const mini = (v, goal, cls = "") => `<div class="minibar ${cls === "lv" ? "lv-" + goalLevel(v, goal) : cls}"><i style="width:${goal ? Math.min(100, (v / goal) * 100) : 0}%"></i></div>`;
+const mini = (v, goal, cls = "") => `<div class="minibar ${cls}"><i style="width:${goal ? Math.min(100, (v / goal) * 100) : 0}%"></i></div>`;
 const done = (v, goal, tol = 0.05) => (!goal || !v ? "" : v >= goal * (1 - tol) ? `<span class="badge g">✓ Cumplido</span>` : `<span class="badge y">Faltan ${goal - v >= 1000 ? (Math.round((goal - v) / 100) / 10).toLocaleString("es-CL") + (goal > 5000 ? " mil" : " L") : Math.round(goal - v)}</span>`);
 const status = (v, goal, tol = 0.1) => { if (!goal) return ""; if (!v) return ""; const d = (v - goal) / goal; return Math.abs(d) <= tol ? `<span class="badge g">En meta</span>` : d < 0 ? `<span class="badge y">Bajo</span>` : `<span class="badge r">Alto</span>`; };
 const fmtH = (h) => `${Math.floor(h)}h ${pad(Math.round((h % 1) * 60))}m`;
@@ -75,9 +75,9 @@ async function home() {
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   <div class="grid2">
-    <a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "lv")}</div></a>
+    <a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div></a>
     <a class="card tile" href="#comida"><div class="card-t">${I.macros}Macros</div>
-      ${[["C", tot.cho, c.cho, "lv"], ["L", tot.fat, c.fat, "lv"], ["P", tot.prot, c.prot, "lv"]].map(([l, v, g, cl]) => `<div class="mrow"><b>${l}</b>${mini(v, g, cl)}<span>${r0(v)}/${g || "–"}</span></div>`).join("")}</a>
+      ${[["C", tot.cho, c.cho, "y"], ["L", tot.fat, c.fat, "b"], ["P", tot.prot, c.prot, "g"]].map(([l, v, g, cl]) => `<div class="mrow"><b>${l}</b>${mini(v, g, cl)}<span>${r0(v)}/${g || "–"}${g && v >= g * 0.95 ? " ✓" : ""}</span></div>`).join("")}</a>
     <a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div><div class="foot"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>
     <div class="card tile" data-a="stepsEdit"><div class="card-t">${I.steps}Pasos ${done(day.steps, c.steps)}</div><div class="big">${(day.steps || 0).toLocaleString("es-CL")}</div><div class="foot grow">${mini(day.steps || 0, c.steps || 8000, "g")}</div><div class="muted small">Meta ${(c.steps || 8000).toLocaleString("es-CL")}</div></div>
     <a class="card tile" href="#sueno"><div class="card-t">${I.moon}Sueño</div><div class="big" style="color:${sl != null ? sleepColor(sl) : "inherit"}">${sl != null ? fmtH(sl) : "—"}</div><div class="muted small">${day.sleep?.quality ? "Calidad " + day.sleep.quality + "/5" : "Registrar"} · meta ${c.sleep || 8} h</div></a>
@@ -189,14 +189,14 @@ async function food() {
   if (pauta) for (const items of Object.values(day.meals || {})) for (const it of items) if (it.cat && it.por && pauta[it.cat] != null) used[it.cat] = (used[it.cat] || 0) + (+it.g || 0) / it.por;
   const photos = (await db.list(P() + "/photos")).filter((p) => p.kind === "comida" && p.date === S.date);
   return `${head("Alimentación")}${dayStrip()}
-  <div class="card sticky-macros">${bar("Calorías", tot.kcal, c.kcal, "kcal")}${bar("CHO", tot.cho, c.cho, "g")}${bar("Lípidos", tot.fat, c.fat, "g")}${bar("Proteína", tot.prot, c.prot, "g")}</div>
+  <div class="card sticky-macros">${bar("Calorías", tot.kcal, c.kcal, "kcal", "c-k")}${bar("CHO", tot.cho, c.cho, "g", "c-c")}${bar("Lípidos", tot.fat, c.fat, "g", "c-l")}${bar("Proteína", tot.prot, c.prot, "g", "c-p")}</div>
   ${pauta ? `<details class="card"><summary class="card-t">Porciones de tu pauta</summary>${Object.entries(pauta).filter(([, v]) => +v > 0).map(([g, v]) => bar(g, r1(used[g] || 0), +v, "porc.")).join("")}<p class="muted small">Los alimentos de grupos fuera de la pauta suman calorías y macros, pero no descuentan porciones.</p></details>` : ""}
   ${mealList(day).map((m) => {
     const items = day.meals?.[m] || [], mt = items.reduce((t, it) => { const x = itemMacros(it); for (const k in t) t[k] += x[k]; return t; }, { kcal: 0, cho: 0, fat: 0, prot: 0 });
     const ph = photos.filter((p) => p.meal === m);
     return `<div class="card meal ${items.length ? "" : "empty"}"><div class="mh"><div><b>${m}</b><small>${r0(mt.kcal)} kcal · C ${r0(mt.cho)} · L ${r0(mt.fat)} · P ${r0(mt.prot)}</small></div>
     <div class="row"><button class="icon-btn" data-a="mealMenu" data-m="${m}">⋯</button><button class="icon-btn add" data-a="addFood" data-m="${m}">${I.plus}</button></div></div>
-    ${items.map((it, i) => `<div class="fi" data-a="editItem" data-m="${m}" data-i="${i}"><span>${esc(it.name)}<small>${r0(it.g)} g${it.por ? ` · ${r1(it.g / it.por)} porc.` : ""}</small></span><span>${r0(itemMacros(it).kcal)} kcal</span></div>`).join("")}
+    ${items.map((it, i) => `<div class="fi" data-a="editItem" data-m="${m}" data-i="${i}">${(() => { const x = itemMacros(it); return `<span>${esc(it.name)}<small>${r0(it.g)} g${it.por ? ` · ${r1(it.g / it.por)} porc.` : ""}</small><small class="imac"><i class="mc">C ${r1(x.cho)}</i><i class="ml">L ${r1(x.fat)}</i><i class="mp">P ${r1(x.prot)}</i></small></span><span>${r0(x.kcal)} kcal</span>`; })()}</div>`).join("")}
     ${day.mealNotes?.[m] ? `<div class="note">📝 ${esc(day.mealNotes[m])}</div>` : ""}
     ${ph.length ? `<div class="thumbs">${ph.map((p) => `<img src="${p.data}" data-a="viewPhoto" data-id="${p.id}">`).join("")}</div>` : ""}</div>`;
   }).join("")}
@@ -448,17 +448,16 @@ act("scan", async (el) => {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
     video.srcObject = stream; await video.play();
     const det = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
-    // Pide la misma lectura 3 veces seguidas (evita errores) y muestra un momento el código detectado antes de seguir
-    let last = "", hits = 0;
+    // Lee una vez y espera al menos 1 segundo mostrando el código antes de cargar los datos
+
     const loop = async () => {
       if (stop) return;
       try {
         const r = await det.detect(video), v = r[0]?.rawValue || "";
-        if (v && v === last) hits++; else { last = v; hits = v ? 1 : 0; }
-        if (hits >= 3) {
+        if (v) {
           stop = true; navigator.vibrate?.(80);
-          holder.querySelector(".scan-frame").classList.add("hit"); holder.querySelector("p").innerHTML = `✓ Código detectado<br><b>${esc(v)}</b>`;
-          await new Promise((ok) => setTimeout(ok, 700)); end();
+          holder.querySelector(".scan-frame").classList.add("hit"); holder.querySelector("p").innerHTML = `✓ Código detectado<br><b>${esc(v)}</b><br><span class="scan-load">Cargando datos del producto…</span>`;
+          await new Promise((ok) => setTimeout(ok, 1100)); end();
           return into ? ($("#" + into).value = v) : lookupCode(v);
         }
       } catch {}

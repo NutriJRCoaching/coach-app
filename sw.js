@@ -1,7 +1,7 @@
 // Service worker: guarda la app en el celular para que abra sin conexión.
 // Cada vez que publiques cambios, sube el número de versión.
-const VERSION = "v35";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "css/app.css", "icons/icon-192.png?v=ima2", "icons/icon-512.png?v=ima2", "icons/logo.png?v=ima2", "js/seed-jr.js",
+const VERSION = "v36";
+const SHELL = ["./", "index.html", "manifest.webmanifest", "css/app.css", "icons/icon-192.png?v=ima2", "icons/icon-512.png?v=ima2", "icons/logo.png?v=ima2", "icons/badge-96.png?v=ima2", "js/seed-jr.js",
   "js/app.js", "js/config.js", "js/db.js", "js/util.js", "js/ui.js", "js/state.js", "js/data.js", "js/foods.js", "js/realfoods.js", "js/icons.js",
   "js/client.js", "js/train.js", "js/coach.js", "js/demo.js", "js/voice.js", "js/push.js"];
 
@@ -25,7 +25,7 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let d = {}; try { d = e.data.json(); } catch {}
   const x = d.data || d.notification || d;
-  e.waitUntil(self.registration.showNotification(x.title || "IMA", { body: x.body || "", icon: "icons/icon-192.png?v=ima2", badge: "icons/icon-192.png?v=ima2", tag: x.tag || undefined, data: { url: x.url || "./" }, vibrate: [200, 100, 200] }));
+  e.waitUntil(self.registration.showNotification(x.title || "IMA", { body: x.body || "", icon: "icons/icon-192.png?v=ima2", badge: "icons/badge-96.png?v=ima2", tag: x.tag || undefined, data: { url: x.url || "./" }, vibrate: [200, 100, 200] }));
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();

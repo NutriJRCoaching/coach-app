@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.11.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.11.2**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -29,7 +29,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 | js/config.js | Firebase, `coachEmailHash` (SHA-256 del correo del coach; el correo NO va en el código), `vapidKey`, `appName`, `appVersion`, comidas por defecto |
 | js/db.js | Capa de datos (`get`, `list`, `set`, `del`, `watch`, auth). Lectura rápida: caché si ya se descargó + revisión del servidor en segundo plano (`onStale` → re-render) |
 | js/app.js | Login (mantener sesión, recordar correo), roles, `enterClient` (el coach como cliente, carga su rutina y sus metas una vez), render, transición `.enter`, aviso de actualización |
-| js/client.js | Vistas del cliente: inicio (campana de pendientes que se mueve, días con rutina abreviada), comida (Comida 1…N + "Agregar otra comida", sin mostrar hora, comidas con borde rojo brillante, voz, código de barras con confirmación de 3 lecturas, renombrar alimento escaneado o registrado), agua (+200), peso (dos preguntas Sí/No: "¿En ayunas?" → `weightFast` y "¿Después de ir al baño?" → `weightBath`; obliga a responder ambas), progreso, ajustes (recordatorios, horario, avisos push, "Probar notificación"), pasos de ayer + informe de ayer en 3 niveles con confeti |
+| js/client.js | Vistas del cliente: inicio (campana de pendientes que se mueve, días con rutina abreviada), comida (Comida 1…N + "Agregar otra comida", sin mostrar hora, comidas con borde rojo brillante, voz, código de barras (lee una vez y espera ~1 s con "Cargando datos del producto…"), macros C/L/P de cada alimento bajo su nombre, renombrar alimento escaneado o registrado), agua (+200), peso (dos preguntas Sí/No: "¿En ayunas?" → `weightFast` y "¿Después de ir al baño?" → `weightBath`; obliga a responder ambas), progreso, ajustes (recordatorios, horario, avisos push, "Probar notificación"), pasos de ayer + informe de ayer en 3 niveles con confeti |
 | js/train.js | Entrenamiento: semana (botón **Ver** rutina sin empezarla, con la última vez), sesión (objetivo destacado, técnica Mejor/Igual/Peor en azul/verde/rojo, unilaterales Izq/Der con diferencia, video por serie guardado en el celular, descanso ajustable con pantalla encendida y alarma a pantalla completa que suena y vibra, reiniciar/descartar), resumen con progreso por serie, imagen para compartir, audio para el coach (graba en m4a si se puede; se guarda en el panel y se comparte con un toque) |
 | js/data.js | Helpers de datos, `weekPlan`, `setVerdict` / `suggest` (progresión), `setProgress`, `mealList`, etapas (`applyStage`), CHECKIN |
 | js/coach.js | Panel coach: clientes, timeline, etapas, entrenamientos (con audio y progreso), rutinas, alimentación, check-ins, feedback, biblioteca |
@@ -50,8 +50,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Reglas: el cliente escribe sus subcolecciones, salvo `routines` y `feedbacks`. El doc del cliente solo lo escribe el coach.
 
 ## Reglas de colores y cumplimiento (v1.11)
-- **Barras de macros** (`goalLevel` en ui.js): ±5 % verde · 6–10 % amarillo · 11–15 % naranjo · pasado >15 % rojo · bajo 16–50 % azul ("en camino") · bajo >50 % gris.
+- **Barras de macros**: color fijo por macro (Calorías rojo, CHO amarillo, Lípidos azul, Proteína verde; igual en inicio y en comida) y un ✓ cuando llegan al 95 % de la meta. Joaquín descartó los colores según % de cumplimiento.
 - **Informe de ayer**: ±5 % cumplido · 6–10 % "un pelito" · >10 % "hay que mejorar". En agua y pasos, pasarse cuenta como cumplido. Confeti completo solo si todo está cumplido.
+
+## Notificaciones
+- Ícono pequeño (`badge`) = `icons/badge-96.png`, silueta blanca del logo sobre transparente (Android exige monocromo; si no, muestra una campana).
+- El texto "· nutrijrcoaching.github.io" lo agrega Chrome a los avisos de páginas web; desaparece solo si la app está instalada como app de verdad (Chrome → ⋮ → "Instalar app", que crea una WebAPK), no como acceso directo.
 
 ## Compartir con el coach
 - Una web no puede mandar un archivo directo a un número de WhatsApp (wa.me solo acepta texto). Se usa el menú de compartir del celular; tras la primera vez el chat del coach aparece arriba como acceso directo. El audio y la sesión quedan igual en el panel del coach.

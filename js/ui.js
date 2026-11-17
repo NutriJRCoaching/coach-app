@@ -55,18 +55,11 @@ export function promptBox(msg, val = "") {
 }
 
 // Barra de progreso "llevas X de Y"
-// El color dice qué tan cerca vas de la meta: gris (en camino) → amarillo/naranjo (cerca) → verde (±5 %) → naranjo/rojo (pasado)
-export function goalLevel(val, goal) {
-  if (!goal) return "";
-  const d = (val - goal) / goal, a = Math.abs(d);
-  if (a <= 0.05) return "ok";
-  if (d > 0) return a <= 0.10 ? "near" : a <= 0.15 ? "mid" : "over";
-  return a <= 0.10 ? "near" : a <= 0.15 ? "mid" : a <= 0.5 ? "way" : "start";
-}
+// Barra "llevas X de Y": cada macro con su color (cls) y un ✓ cuando llegas al 95 % de la meta
 const rnd = (v) => (Math.abs(v) >= 20 ? Math.round(v) : Math.round(v * 10) / 10);
 export function bar(label, val, goal, unit = "", cls = "") {
-  const p = goal ? Math.min(100, (val / goal) * 100) : 0;
-  return `<div class="bar ${cls}"><div class="bar-t"><span>${label}</span><span><b>${rnd(val)}</b>${goal ? ` / ${rnd(goal)}` : ""} ${unit}</span></div><div class="bar-o"><div class="bar-i lv-${goalLevel(val, goal)}" style="width:${p}%"></div></div></div>`;
+  const p = goal ? Math.min(100, (val / goal) * 100) : 0, full = goal && val >= goal * 0.95;
+  return `<div class="bar ${cls} ${full ? "full" : ""}"><div class="bar-t"><span>${label}${full ? ' <i class="bchk">✓</i>' : ""}</span><span><b>${rnd(val)}</b>${goal ? ` / ${rnd(goal)}` : ""} ${unit}</span></div><div class="bar-o"><div class="bar-i" style="width:${p}%"></div></div></div>`;
 }
 
 // Gráfico de líneas simple en SVG: series = [{vals:[...], color, dots, dash}]
@@ -108,7 +101,7 @@ export async function notify(title, body) {
   try {
     if (Notification.permission !== "granted") return;
     const reg = await navigator.serviceWorker?.getRegistration();
-    if (reg) reg.showNotification(title, { body, icon: "icons/icon-192.png?v=ima2", vibrate: [300, 150, 300] });
-    else new Notification(title, { body });
+    if (reg) reg.showNotification(title, { body, icon: "icons/icon-192.png?v=ima2", badge: "icons/badge-96.png?v=ima2", vibrate: [300, 150, 300] });
+    else new Notification(title, { body, icon: "icons/icon-192.png?v=ima2", badge: "icons/badge-96.png?v=ima2" });
   } catch {}
 }

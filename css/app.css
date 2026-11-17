@@ -338,14 +338,7 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .rp .lo, .rp .hi { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; margin-left: 4px; } .rp .lo { background: var(--y-s, rgba(245,158,11,.18)); color: var(--y); } .rp .hi { background: var(--r-s); color: var(--r); }
 .confetti { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
 
-/* v1.11 — barras según cumplimiento de la meta */
 :root { --o: #f97316; }
-.bar-i.lv-start, .minibar.lv-start i { background: var(--dim); }
-.bar-i.lv-way, .minibar.lv-way i { background: var(--b); }
-.bar-i.lv-mid, .minibar.lv-mid i { background: var(--o); }
-.bar-i.lv-near, .minibar.lv-near i { background: var(--y); }
-.bar-i.lv-ok, .minibar.lv-ok i { background: var(--g); }
-.bar-i.lv-over, .minibar.lv-over i { background: var(--r); }
 /* Informe de ayer: tres niveles */
 .rp.near { border-color: var(--y); background: color-mix(in srgb, var(--y) 8%, var(--surf)); }
 .rp.warn { border-color: var(--o); background: color-mix(in srgb, var(--o) 9%, var(--surf)); }
@@ -365,3 +358,12 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 /* Escáner: confirma el código antes de seguir */
 .scan-frame.hit { border-color: #fff; background: rgba(34,197,94,.35); }
 .wq { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; text-align: left; } .wq > span { font-weight: 700; font-size: 14px; } .wq .chips { margin: 0; flex-wrap: nowrap; } .wq .chip { min-width: 52px; }
+/* v1.11.2 — cada macro con su color (igual en inicio y en comida) + ✓ al completar */
+.bar.c-k .bar-i, .minibar.k i { background: var(--acc); }
+.bar.c-c .bar-i { background: var(--y); } .bar.c-l .bar-i { background: var(--b); } .bar.c-p .bar-i { background: var(--g); }
+.bchk { font-style: normal; font-weight: 900; color: var(--g); margin-left: 4px; }
+.bar.full .bar-t span:first-child { color: var(--txt); font-weight: 700; }
+/* Macros de cada alimento dentro de la comida */
+.fi .imac { display: flex; gap: 8px; margin-top: 2px; } .fi .imac i { font-style: normal; font-weight: 600; font-size: 11px; }
+.imac .mc { color: var(--y); } .imac .ml { color: var(--b); } .imac .mp { color: var(--g); }
+.scan-load { font-size: 13px; opacity: .8; }
