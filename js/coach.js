@@ -19,7 +19,7 @@ export async function coachView() {
   if (sec === "c" && cid) main = await clientPanel(cid, tab || "resumen");
   else if (sec === "lib") main = await library();
   else main = await overview(clients);
-  return `<aside class="side"><div class="brand"><img src="icons/logo.png?v=ima" class="logo-sm" alt="">${esc(CONFIG.appName)}</div>
+  return `<aside class="side"><div class="brand"><img src="icons/logo.png?v=ima2" class="logo-sm" alt="">${esc(CONFIG.appName)}</div>
   <a href="#coach" class="${!sec ? "on" : ""}">Clientes</a>
   ${clients.map((c) => `<a href="#coach/c/${c.id}/${tab || "resumen"}" class="sub ${cid === c.id ? "on" : ""}">${esc(c.name || "Sin nombre")}</a>`).join("")}
   <a href="#coach/lib" class="${sec === "lib" ? "on" : ""}">Biblioteca</a>

@@ -367,7 +367,7 @@ async function sessionImage(s) {
   const c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
   g.fillStyle = "#0b0b0d"; g.fillRect(0, 0, W, H);
   const grd = g.createRadialGradient(W / 2, -100, 50, W / 2, -100, 900); grd.addColorStop(0, "rgba(160,15,25,.45)"); grd.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = grd; g.fillRect(0, 0, W, 600);
-  try { const im = new Image(); im.src = "icons/logo.png?v=ima"; await im.decode(); g.save(); g.beginPath(); g.roundRect(P, 48, 120, 120, 28); g.clip(); g.drawImage(im, P, 48, 120, 120); g.restore(); } catch {}
+  try { const im = new Image(); im.src = "icons/logo.png?v=ima2"; await im.decode(); g.save(); g.beginPath(); g.roundRect(P, 48, 120, 120, 28); g.clip(); g.drawImage(im, P, 48, 120, 120); g.restore(); } catch {}
   const F = (w, sz) => `${w} ${sz}px Inter, system-ui, sans-serif`;
   g.fillStyle = "#fff"; g.font = F(800, 52); g.fillText(s.routineName, P + 150, 104);
   g.fillStyle = "#a1a1aa"; g.font = F(500, 30); g.fillText(`${fmtDate(s.date, true)}${s.endedAt ? " · " + Math.round((s.endedAt - s.startedAt) / 60000) + " min" : ""}`, P + 150, 150);
