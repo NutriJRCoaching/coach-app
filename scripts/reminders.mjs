@@ -38,7 +38,7 @@ async function run() {
     const goalSteps = c.steps || 8000, st = day.steps || 0, sched = r.sched || { wake: "07:00", bed: "23:00" };
 
     if (r.weight?.on && within(toMin(r.weight.at)) && !day.weight) add("peso", "Registra tu peso ⚖️", "En ayunas, antes de comer", "#peso");
-    if (r.meals?.on) for (const [m, t] of Object.entries(r.meals.times || {})) if (t && within(toMin(t), 180) && !(day.meals?.[m] || []).length) add("m-" + m, `¿Ya registraste tu ${m.toLowerCase()}? 🍽️`, "Anótala ahora que la tienes fresca (también puedes dictarla)", "#comida");
+    if (r.meals?.on) for (const [m, t] of Object.entries(r.meals.times || {})) if (m.startsWith("Comida ") && t && within(toMin(t), 180) && !(day.meals?.[m] || []).length) add("m-" + m, `¿Ya registraste tu ${m.toLowerCase()}? 🍽️`, "Anótala ahora que la tienes fresca (también puedes dictarla)", "#comida");
     if (r.water?.on) {
       const f = toMin(r.water.from || "09:00"), to = toMin(r.water.to || "21:00"), every = (+r.water.every || 2) * 60;
       if (nm >= f + every && nm <= to) {

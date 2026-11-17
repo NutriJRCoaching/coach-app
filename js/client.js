@@ -4,7 +4,7 @@ import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
 import { pushReady, enablePush, pushOn } from "./push.js";
@@ -191,19 +191,21 @@ async function food() {
   return `${head("Alimentación")}${dayStrip()}
   <div class="card sticky-macros">${bar("Calorías", tot.kcal, c.kcal, "kcal")}${bar("CHO", tot.cho, c.cho, "g")}${bar("Lípidos", tot.fat, c.fat, "g")}${bar("Proteína", tot.prot, c.prot, "g")}</div>
   ${pauta ? `<details class="card"><summary class="card-t">Porciones de tu pauta</summary>${Object.entries(pauta).filter(([, v]) => +v > 0).map(([g, v]) => bar(g, r1(used[g] || 0), +v, "porc.")).join("")}<p class="muted small">Los alimentos de grupos fuera de la pauta suman calorías y macros, pero no descuentan porciones.</p></details>` : ""}
-  ${CONFIG.meals.map((m) => {
+  ${mealList(day).map((m) => {
     const items = day.meals?.[m] || [], mt = items.reduce((t, it) => { const x = itemMacros(it); for (const k in t) t[k] += x[k]; return t; }, { kcal: 0, cho: 0, fat: 0, prot: 0 });
-    const ph = photos.filter((p) => p.meal === m);
-    return `<div class="card meal"><div class="mh"><div><b>${m}</b><small>${r0(mt.kcal)} kcal · C ${r0(mt.cho)} · L ${r0(mt.fat)} · P ${r0(mt.prot)}</small></div>
+    const ph = photos.filter((p) => p.meal === m), hora = items.map((it) => it.t).filter(Boolean).sort()[0];
+    return `<div class="card meal ${items.length ? "" : "empty"}"><div class="mh"><div><b>${m}</b>${hora ? `<span class="mtime">🕒 ${hora}</span>` : ""}<small>${r0(mt.kcal)} kcal · C ${r0(mt.cho)} · L ${r0(mt.fat)} · P ${r0(mt.prot)}</small></div>
     <div class="row"><button class="icon-btn" data-a="mealMenu" data-m="${m}">⋯</button><button class="icon-btn add" data-a="addFood" data-m="${m}">${I.plus}</button></div></div>
     ${items.map((it, i) => `<div class="fi" data-a="editItem" data-m="${m}" data-i="${i}"><span>${esc(it.name)}<small>${r0(it.g)} g${it.por ? ` · ${r1(it.g / it.por)} porc.` : ""}</small></span><span>${r0(itemMacros(it).kcal)} kcal</span></div>`).join("")}
     ${day.mealNotes?.[m] ? `<div class="note">📝 ${esc(day.mealNotes[m])}</div>` : ""}
     ${ph.length ? `<div class="thumbs">${ph.map((p) => `<img src="${p.data}" data-a="viewPhoto" data-id="${p.id}">`).join("")}</div>` : ""}</div>`;
   }).join("")}
+  <button class="btn block ghost addmeal" data-a="addMeal">${I.plus} Agregar otra comida</button>
   <a class="card row between" href="#agua"><span><b>Agua</b> <span class="muted small">${r1(water / 1000)} / ${r1((c.water || 2500) / 1000)} L</span></span><span class="row gap"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></span></a>
   <a class="btn big block" href="#plan">Ver mi plan de alimentación</a>`;
 }
 
+act("addMeal", async () => { const d = await getDay(S.date); await setDay(S.date, { mealCount: mealList(d).filter((m) => m.startsWith("Comida ")).length + 1 }); refresh(); });
 act("mealMenu", (el) => {
   const m = el.dataset.m;
   sheet(m, `<button class="btn block" data-a="mealNote" data-m="${m}">📝 Añadir nota</button>
@@ -365,7 +367,8 @@ act("foodAdd", async () => {
   await addItems([{ name: f.name, g: FS.selG, kcal: f.kcal, cho: f.cho, fat: f.fat, prot: f.prot, cat: f.cat || "", por: f.portion || null, fid: f.id }]);
 });
 async function addItems(items) {
-  const d = await getDay(S.date);
+  const d = await getDay(S.date), t = S.date === ymd() ? hm(new Date()) : null;
+  if (t) items = items.map((it) => ({ t, ...it }));
   await setDay(S.date, { meals: { ...(d.meals || {}), [FS.meal]: [...(d.meals?.[FS.meal] || []), ...items] } });
   closeSheet(); toast("Añadido a " + FS.meal); refresh();
 }
@@ -668,11 +671,11 @@ async function settingsView() {
   </div>
   <div class="card"><div class="card-t">Unidades</div><p class="muted small">Kilogramos, litros y centímetros.</p></div>`;
 }
-const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { Desayuno: "09:30", Almuerzo: "14:30", Once: "18:30", Cena: "21:30" } }, sched: { wake: "07:00", bed: "23:00" }, weight: { on: true, at: "07:20" }, steps: { on: true, checks: true }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
+const REM_DEF = { on: false, water: { on: true, every: 2, from: "09:00", to: "21:00" }, meals: { on: true, times: { "Comida 1": "09:30", "Comida 2": "13:30", "Comida 3": "17:30", "Comida 4": "21:00" } }, sched: { wake: "07:00", bed: "23:00" }, weight: { on: true, at: "07:20" }, steps: { on: true, checks: true }, train: { on: true, at: "17:00" }, checkin: { on: true, at: "10:00" } };
 function remCfg() {
   let c = {}; try { c = JSON.parse(LS.get("rem") || "{}"); } catch {}
   const out = JSON.parse(JSON.stringify(REM_DEF));
-  for (const k of Object.keys(c)) out[k] = typeof c[k] === "object" ? { ...out[k], ...c[k], ...(k === "meals" ? { times: { ...out.meals.times, ...(c.meals.times || {}) } } : {}) } : c[k];
+  for (const k of Object.keys(c)) out[k] = typeof c[k] === "object" ? { ...out[k], ...c[k], ...(k === "meals" ? { times: { ...out.meals.times, ...Object.fromEntries(Object.entries(c.meals.times || {}).filter(([m]) => m.startsWith("Comida "))) } } : {}) } : c[k];
   return out;
 }
 act("pushOn", async () => {

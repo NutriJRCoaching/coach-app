@@ -12,6 +12,14 @@ export async function getDays(from, to, cid) {
   const all = await db.list(C(cid) + "/days");
   return Object.fromEntries(all.filter((d) => d.id >= from && d.id <= to).map((d) => [d.id, d]));
 }
+// Comidas del día: Comida 1…5 + las que agregue el cliente (+ nombres antiguos si tenían datos)
+export function mealList(day = {}) {
+  const has = (k) => (day.meals?.[k] || []).length || day.mealNotes?.[k];
+  const nums = Object.keys(day.meals || {}).map((k) => +(k.match(/^Comida (\d+)$/) || [])[1] || 0);
+  const n = Math.max(5, day.mealCount || 0, ...nums);
+  const legacy = Object.keys(day.meals || {}).filter((k) => !/^Comida \d+$/.test(k) && has(k));
+  return [...legacy, ...Array.from({ length: n }, (_, i) => "Comida " + (i + 1))];
+}
 export const getRoutines = async (cid) => (await db.list(C(cid) + "/routines")).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
 export const getSessions = async (cid) => (await db.list(C(cid) + "/sessions")).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
 export const getClient = async (cid) => (await db.get(C(cid))) || {};

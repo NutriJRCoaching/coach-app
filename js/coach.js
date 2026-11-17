@@ -5,7 +5,7 @@ import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, $, $$ } from "./ui.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
-import { getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN } from "./data.js";
+import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN } from "./data.js";
 import { weeksTable } from "./client.js";
 import { GROUPS } from "./foods.js";
 
@@ -219,7 +219,7 @@ async function foodView(c, w) {
   return w.days.map((d) => {
     const x = days[d] || {}, t = dayTotals(x), has = Object.values(x.meals || {}).some((m) => m.length);
     return `<details class="card" ${has ? "" : ""}><summary class="row between"><b>${fmtDate(d, true)}</b><span class="small">${has ? `${r0(t.kcal)} / ${c.kcal || "–"} kcal · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)}` : '<span class="muted">Sin registro</span>'}</span></summary>
-    ${CONFIG.meals.map((m) => { const it = x.meals?.[m] || [], ph = photos.filter((p) => p.date === d && p.meal === m); if (!it.length && !x.mealNotes?.[m] && !ph.length) return ""; return `<div class="mt"><b>${m}</b>${it.map((i) => `<div class="li row between small"><span>${esc(i.name)} · ${r0(i.g)} g${i.quick ? " (rápido)" : ""}</span><span>${r0(itemMacros(i).kcal)} kcal</span></div>`).join("")}${x.mealNotes?.[m] ? `<div class="note">📝 ${esc(x.mealNotes[m])}</div>` : ""}${ph.length ? `<div class="thumbs">${ph.map((p) => `<img src="${p.data}">`).join("")}</div>` : ""}</div>`; }).join("")}</details>`;
+    ${mealList(x).map((m) => { const it = x.meals?.[m] || [], ph = photos.filter((p) => p.date === d && p.meal === m); if (!it.length && !x.mealNotes?.[m] && !ph.length) return ""; return `<div class="mt"><b>${m}</b>${it.map((i) => `<div class="li row between small"><span>${esc(i.name)} · ${r0(i.g)} g${i.quick ? " (rápido)" : ""}</span><span>${r0(itemMacros(i).kcal)} kcal</span></div>`).join("")}${x.mealNotes?.[m] ? `<div class="note">📝 ${esc(x.mealNotes[m])}</div>` : ""}${ph.length ? `<div class="thumbs">${ph.map((p) => `<img src="${p.data}">`).join("")}</div>` : ""}</div>`; }).join("")}</details>`;
   }).join("");
 }
 
