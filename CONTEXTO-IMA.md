@@ -1,0 +1,63 @@
+# CONTEXTO-IMA — léelo primero
+
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 16-nov-2026, versión **1.10.5**.
+
+## Qué es
+**IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
+- **Clientes:** la usan en el celular (PWA instalable desde Chrome).
+- **Coach:** usa el panel de escritorio.
+- **Él mismo** también la usa como cliente, con la opción "Mi registro (vista cliente)".
+- **Sin conexión:** funciona offline y sincroniza al volver la señal.
+- **Costo:** todo con planes gratuitos, no usar servicios pagados.
+
+- App: https://nutrijrcoaching.github.io/coach-app/
+- Repositorio: `NutriJRCoaching/coach-app` (rama main). GitHub Pages publica solo al hacer push.
+- Copia local en su PC: `~/OneDrive/Escritorio/Claudio App/App (código)/` (sincronizar a mano tras los cambios).
+- Firebase: proyecto `jr-coach` (plan Spark; Firestore en nam5; Auth con correo/contraseña).
+
+## Stack
+- JS vanilla con módulos ES, **sin compilación**. Enrutado por hash (`#inicio`, `#comida`, `#coach/...`).
+- Acciones por delegación: `data-a="nombre"` para clic, y `data-a-change` / `data-a-input`, más el registro `act("nombre", fn)` (en ui.js).
+- Firebase v10.12.2 desde gstatic, con `persistentLocalCache` (offline). Las escrituras **no se esperan**.
+- Modo demo: si `apiKey` está vacío usa IndexedDB local. La copia de pruebas está en /tmp/demoapp con `apiKey: ""`.
+- `sw.js`: red primero y caché de respaldo. **Cada versión: subir `VERSION` en sw.js y `appVersion` en js/config.js.** El aviso "Nueva versión disponible" sale cuando cambia sw.js.
+- Íconos con `?v=ima2` para romper el caché.
+
+## Archivos
+| Archivo | Qué hace |
+|---|---|
+| js/config.js | Firebase, `coachEmailHash` (SHA-256 del correo del coach; el correo NO va en el código), `vapidKey`, `appName`, `appVersion`, comidas por defecto |
+| js/db.js | Capa de datos (`get`, `list`, `set`, `del`, `watch`, auth). Lectura rápida: caché si ya se descargó + revisión del servidor en segundo plano (`onStale` → re-render) |
+| js/app.js | Login (mantener sesión, recordar correo), roles, `enterClient` (el coach como cliente, carga su rutina y sus metas una vez), render, transición `.enter`, aviso de actualización |
+| js/client.js | Vistas del cliente: inicio (campana de pendientes que se mueve, días con rutina abreviada), comida (Comida 1…N + "Agregar otra comida", hora de registro, voz, código de barras, medidas), agua (+200), progreso, ajustes (recordatorios, horario despertar/dormir, avisos push), pasos de ayer + resumen de ayer con confeti |
+| js/train.js | Entrenamiento: semana, sesión (objetivo destacado, técnica Mejor/Igual/Peor en azul/verde/rojo, unilaterales Izq/Der con diferencia, video por serie guardado en el celular, descanso ajustable, reiniciar/descartar), resumen con progreso por serie, imagen para compartir, audio para el coach (se guarda + WhatsApp) |
+| js/data.js | Helpers de datos, `weekPlan`, `setVerdict` / `suggest` (progresión), `setProgress`, `mealList`, etapas (`applyStage`), CHECKIN |
+| js/coach.js | Panel coach: clientes, timeline, etapas, entrenamientos (con audio y progreso), rutinas, alimentación, check-ins, feedback, biblioteca |
+| js/voice.js | Registro de comidas por voz o texto: separa los alimentos, cantidades, medidas caseras y gramos estimados |
+| js/push.js | Token de FCM para avisos con la app cerrada |
+| js/realfoods.js | 250 alimentos USDA en español: [nombre, grupo, kcal, cho, lip, prot por 100 g, g por porción de intercambio, medida, gramos] |
+| js/seed-jr.js | Rutina de Joaquín (Lun–Sáb, LD/PG; serie 1 8 reps @RIR1, serie 2 6 reps @RIR1) |
+| scripts/reminders.mjs + .github/workflows/reminders.yml | "Reloj" de avisos cada 15 min (GitHub Actions + firebase-admin + FCM). Necesita el secreto `FIREBASE_SERVICE_ACCOUNT` y la variable `PUSH_ON=1` (ya configurados) |
+| firestore.rules | Plantilla (las reglas reales están publicadas en la consola con el correo del coach, incluida `barcodes`) |
+
+## Datos (Firestore)
+- `users/{uid}`
+- `library/exercises`, `library/foods`
+- `barcodes/{code}` (compartida)
+- `clients/{cid}` (metas, `schedule`, `startDate`, `stages`)
+  - `days/{fecha}`: `meals` (`{"Comida 1": [items]}`, cada item con `t` = hora), `water`, `steps`, `weight`, `sleep`, `mealCount`
+  - Otras subcolecciones: `sessions`, `routines`, `foods`, `checkins`, `exnotes`, `photos`, `audios`, `settings` (`reminders`, `push`, `pushlog`)
+- Reglas: el cliente escribe sus subcolecciones, salvo `routines` y `feedbacks`. El doc del cliente solo lo escribe el coach.
+
+## Pendientes / ideas acordadas
+- **Criterio completo de progresión de cargas.** Actualmente: técnica primero; bajar el peso si hay fallo o faltan 2 o más reps; unilaterales con el mismo peso en ambos lados.
+- **"Loom" dentro de IMA** para retroalimentación en video al cliente: grabador con burbuja de cámara, guardado en Google Drive, contador de vistas, comentarios con minuto, subtítulos y velocidad.
+- **App Android (Capacitor) para leer los pasos desde Health Connect** (hoy se anotan a mano).
+- **Tips de ejecución por ejercicio** desde su hoja "Programa y tips".
+- **Plan de alimentación** en porciones de intercambio y más alimentos.
+- **Planificación desde el lado del coach.**
+
+## Forma de trabajar con Joaquín
+- Habla en español de Chile, informal. Prefiere ver el código en el chat y no como adjunto.
+- Pedir permiso antes de acciones irreversibles o en sus cuentas.
+- Para ahorrar uso: chats nuevos, Sonnet para cambios chicos, varios pedidos juntos; "sin probar" para cambios simples.
