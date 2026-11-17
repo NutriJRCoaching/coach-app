@@ -100,7 +100,7 @@ export async function notify(title, body) {
   try {
     if (Notification.permission !== "granted") return;
     const reg = await navigator.serviceWorker?.getRegistration();
-    if (reg) reg.showNotification(title, { body, icon: "icons/icon-192.png", vibrate: [300, 150, 300] });
+    if (reg) reg.showNotification(title, { body, icon: "icons/icon-192.png?v=ima", vibrate: [300, 150, 300] });
     else new Notification(title, { body });
   } catch {}
 }
