@@ -60,13 +60,23 @@ async function run() {
       if (date >= addDays(w.last, -1) && !(await db.doc(`clients/${cid}/checkins/${w.key}`).get()).exists) add("chk-" + w.key, "Completa tu check-in semanal 📋", "Así tu coach puede ajustar tu plan", "#checkin");
     }
 
+    // Solo se marca como enviado si llegó a algún celular; los tokens caducados se borran
+    const dead = new Set(), okIds = new Set(done);
     for (const n of out) {
+      let ok = false;
       for (const token of tokens) {
-        try { await fcm.send({ token, data: { title: n.title, body: n.body, url: n.url, tag: n.id } , webpush: { headers: { Urgency: "high", TTL: "3600" } } }); sent++; }
-        catch (e) { console.log(cid, "token inválido:", e.code); }
+        if (dead.has(token)) continue;
+        try { await fcm.send({ token, data: { title: n.title, body: n.body, url: n.url, tag: n.id }, webpush: { headers: { Urgency: "high", TTL: "3600" } } }); sent++; ok = true; }
+        catch (e) { console.log(cid, "token inválido:", e.code); if (/not-registered|invalid-registration|invalid-argument/.test(e.code || "")) dead.add(token); }
       }
+      if (!ok) okIds.delete(n.id);
     }
-    if (out.length) await logRef.set({ date, sent: [...done] });
+    if (dead.size) {
+      const all = ps.data()?.tokens || {}, keep = Object.fromEntries(Object.entries(all).filter(([, t]) => !dead.has(t)));
+      await db.doc(`clients/${cid}/settings/push`).set({ tokens: keep, at: Date.now() });
+      console.log(cid, "tokens caducados borrados:", dead.size);
+    }
+    if (out.length) await logRef.set({ date, sent: [...okIds] });
   }
   console.log("Avisos enviados:", sent);
 }

@@ -2,12 +2,12 @@
 import { CONFIG } from "./config.js";
 import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
-import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
+import { act, toast, sheet, closeSheet, bar, goalLevel, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
 import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
-import { pushReady, enablePush, pushOn } from "./push.js";
+import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
 
 const P = () => "clients/" + S.cid;
@@ -50,7 +50,7 @@ function dayStrip() {
 act("pickDay", (el) => { S.date = el.dataset.d; refresh(); });
 act("shiftDay", (el) => { S.date = addDays(S.date, +el.dataset.n); refresh(); });
 
-const mini = (v, goal, cls = "") => `<div class="minibar ${cls}"><i style="width:${goal ? Math.min(100, (v / goal) * 100) : 0}%"></i></div>`;
+const mini = (v, goal, cls = "") => `<div class="minibar ${cls === "lv" ? "lv-" + goalLevel(v, goal) : cls}"><i style="width:${goal ? Math.min(100, (v / goal) * 100) : 0}%"></i></div>`;
 const done = (v, goal, tol = 0.05) => (!goal || !v ? "" : v >= goal * (1 - tol) ? `<span class="badge g">✓ Cumplido</span>` : `<span class="badge y">Faltan ${goal - v >= 1000 ? (Math.round((goal - v) / 100) / 10).toLocaleString("es-CL") + (goal > 5000 ? " mil" : " L") : Math.round(goal - v)}</span>`);
 const status = (v, goal, tol = 0.1) => { if (!goal) return ""; if (!v) return ""; const d = (v - goal) / goal; return Math.abs(d) <= tol ? `<span class="badge g">En meta</span>` : d < 0 ? `<span class="badge y">Bajo</span>` : `<span class="badge r">Alto</span>`; };
 const fmtH = (h) => `${Math.floor(h)}h ${pad(Math.round((h % 1) * 60))}m`;
@@ -75,13 +75,13 @@ async function home() {
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   <div class="grid2">
-    <a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal)}</div></a>
+    <a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "lv")}</div></a>
     <a class="card tile" href="#comida"><div class="card-t">${I.macros}Macros</div>
-      ${[["C", tot.cho, c.cho, "y"], ["L", tot.fat, c.fat, "b"], ["P", tot.prot, c.prot, "g"]].map(([l, v, g, cl]) => `<div class="mrow"><b>${l}</b>${mini(v, g, cl)}<span>${r0(v)}/${g || "–"}</span></div>`).join("")}</a>
+      ${[["C", tot.cho, c.cho, "lv"], ["L", tot.fat, c.fat, "lv"], ["P", tot.prot, c.prot, "lv"]].map(([l, v, g, cl]) => `<div class="mrow"><b>${l}</b>${mini(v, g, cl)}<span>${r0(v)}/${g || "–"}</span></div>`).join("")}</a>
     <a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div><div class="foot"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>
     <div class="card tile" data-a="stepsEdit"><div class="card-t">${I.steps}Pasos ${done(day.steps, c.steps)}</div><div class="big">${(day.steps || 0).toLocaleString("es-CL")}</div><div class="foot grow">${mini(day.steps || 0, c.steps || 8000, "g")}</div><div class="muted small">Meta ${(c.steps || 8000).toLocaleString("es-CL")}</div></div>
     <a class="card tile" href="#sueno"><div class="card-t">${I.moon}Sueño</div><div class="big" style="color:${sl != null ? sleepColor(sl) : "inherit"}">${sl != null ? fmtH(sl) : "—"}</div><div class="muted small">${day.sleep?.quality ? "Calidad " + day.sleep.quality + "/5" : "Registrar"} · meta ${c.sleep || 8} h</div></a>
-    <a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? "Registrado" : "En ayunas"}</div></a>
+    <a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? (day.weightFast === false ? "Sin ayuno" : "En ayunas ✓") : "En ayunas"}</div></a>
     <div class="card tile"><div class="card-t">${I.run}Cardio <span class="badge ${Object.keys(cardioDone).length >= (c.cardio?.perWeek || 0) && c.cardio?.perWeek ? "g" : ""}">${Object.keys(cardioDone).length}/${c.cardio?.perWeek || 0}</span></div>
       <div class="cweek">${w.days.map((d) => { const dw = new Date(d + "T12:00").getDay(); return `<span class="${cardioDone[d] ? "ok" : cdays.includes(dw) ? "plan" : ""} ${d === today ? "today" : ""}">${D1[dw]}</span>`; }).join("")}</div>
       <div class="legend-mini"><span>● hecho</span><span>○ sugerido</span></div><div class="foot"><button class="btn tiny" data-a="cardioAdd">Registrar</button></div></div>
@@ -193,8 +193,8 @@ async function food() {
   ${pauta ? `<details class="card"><summary class="card-t">Porciones de tu pauta</summary>${Object.entries(pauta).filter(([, v]) => +v > 0).map(([g, v]) => bar(g, r1(used[g] || 0), +v, "porc.")).join("")}<p class="muted small">Los alimentos de grupos fuera de la pauta suman calorías y macros, pero no descuentan porciones.</p></details>` : ""}
   ${mealList(day).map((m) => {
     const items = day.meals?.[m] || [], mt = items.reduce((t, it) => { const x = itemMacros(it); for (const k in t) t[k] += x[k]; return t; }, { kcal: 0, cho: 0, fat: 0, prot: 0 });
-    const ph = photos.filter((p) => p.meal === m), hora = items.map((it) => it.t).filter(Boolean).sort()[0];
-    return `<div class="card meal ${items.length ? "" : "empty"}"><div class="mh"><div><b>${m}</b>${hora ? `<span class="mtime">🕒 ${hora}</span>` : ""}<small>${r0(mt.kcal)} kcal · C ${r0(mt.cho)} · L ${r0(mt.fat)} · P ${r0(mt.prot)}</small></div>
+    const ph = photos.filter((p) => p.meal === m);
+    return `<div class="card meal ${items.length ? "" : "empty"}"><div class="mh"><div><b>${m}</b><small>${r0(mt.kcal)} kcal · C ${r0(mt.cho)} · L ${r0(mt.fat)} · P ${r0(mt.prot)}</small></div>
     <div class="row"><button class="icon-btn" data-a="mealMenu" data-m="${m}">⋯</button><button class="icon-btn add" data-a="addFood" data-m="${m}">${I.plus}</button></div></div>
     ${items.map((it, i) => `<div class="fi" data-a="editItem" data-m="${m}" data-i="${i}"><span>${esc(it.name)}<small>${r0(it.g)} g${it.por ? ` · ${r1(it.g / it.por)} porc.` : ""}</small></span><span>${r0(itemMacros(it).kcal)} kcal</span></div>`).join("")}
     ${day.mealNotes?.[m] ? `<div class="note">📝 ${esc(day.mealNotes[m])}</div>` : ""}
@@ -299,7 +299,7 @@ act("selFood", (el) => { FS.sel = FS.results.find((f) => String(f.id) === el.dat
 const unitOpts = (f) => { const mi = medidaInfo(f); return [["g", "Gramos", 1], ...(mi ? [["med", mi.label, mi.each]] : []), ...(f.portion ? [["por", "Porción de intercambio", f.portion]] : [])]; };
 function foodDetail(f) {
   const opts = unitOpts(f), u = opts.find((o) => o[0] === FS.unit) || opts[0];
-  return `<button class="btn ghost small" data-a="foodBack">‹ Volver</button><h3>${esc(f.name)}</h3><div class="muted small">${esc(f.brand || "")}${f.cat ? `Grupo: ${esc(f.cat)}` : ""} · por 100 g: ${r0(f.kcal)} kcal · C ${r1(f.cho)} · L ${r1(f.fat)} · P ${r1(f.prot)}</div>
+  return `<button class="btn ghost small" data-a="foodBack">‹ Volver</button><div class="row between"><h3>${esc(f.name)}</h3>${f.src !== "base" ? `<button class="btn tiny" data-a="foodRename">✎ Nombre</button>` : ""}</div><div class="muted small">${esc(f.brand || "")}${f.cat ? `Grupo: ${esc(f.cat)}` : ""} · por 100 g: ${r0(f.kcal)} kcal · C ${r1(f.cho)} · L ${r1(f.fat)} · P ${r1(f.prot)}</div>
   <div class="card-t mt">¿Cómo lo vas a registrar?</div>
   <div class="seg">${opts.map(([k, l]) => `<button class="${u[0] === k ? "on" : ""}" data-a="dUnit" data-u="${k}">${esc(l)}</button>`).join("")}</div>
   <div class="qtyrow"><button class="btn" data-a="dStep" data-n="-1">−</button><label class="grow"><span>${u[0] === "g" ? "Gramos" : "Cantidad (" + esc(u[1]) + ")"}</span><input id="dQ" type="number" inputmode="decimal" step="${u[0] === "g" ? 1 : 0.25}" value="${FS.qty}" data-a-input="dSync"></label><button class="btn" data-a="dStep" data-n="1">＋</button></div>
@@ -375,6 +375,17 @@ async function addItems(items) {
   await setDay(S.date, { meals: { ...(d.meals || {}), [FS.meal]: [...(d.meals?.[FS.meal] || []), ...items] } });
   closeSheet(); toast("Añadido a " + FS.meal); refresh();
 }
+// Cambiar el nombre de un producto (ej. escaneado con un nombre genérico): queda así en tus alimentos y en la base compartida
+act("foodRename", async () => {
+  const f = FS.sel, name = await promptBox("Nombre del alimento", f.name); if (!name || name === f.name) return renderFoodTab();
+  f.name = name;
+  if (f.code) {
+    db.set(BC(f.code), { name, code: String(f.code), brand: f.brand || "", portion: f.portion || null, kcal: +f.kcal || 0, cho: +f.cho || 0, fat: +f.fat || 0, prot: +f.prot || 0, by: S.cid, at: Date.now() });
+    const mine = (await db.list(P() + "/foods")).find((x) => x.code === String(f.code));
+    await db.set(`${P()}/foods/${mine ? mine.id : "bc-" + f.code}`, mine ? { name } : (({ id, src, ...rest }) => ({ ...rest, name, type: "alimento", src: "custom" }))(f));
+  } else if (f.src === "custom") await db.set(`${P()}/foods/${f.id}`, { name });
+  toast("Nombre actualizado ✓"); renderFoodTab();
+});
 act("favToggle", async () => {
   const f = FS.sel;
   if (f.src === "base" || f.src === "off") { const id = uid(); await db.set(`${P()}/foods/${id}`, { ...f, id, src: "custom", type: "alimento", fav: true }); FS.sel = { ...f, id, src: "custom", fav: true }; }
@@ -403,10 +414,21 @@ act("createFood", async () => {
 });
 act("editItem", async (el) => {
   const m = el.dataset.m, i = +el.dataset.i, d = await getDay(S.date), it = d.meals[m][i];
-  sheet(it.name, `${it.per100 === false ? `<p class="muted small">${r0(it.kcal)} kcal · C${r0(it.cho)} L${r0(it.fat)} P${r0(it.prot)}</p>` : `<label>Gramos<input id="eG" type="number" inputmode="decimal" value="${it.g}"></label>`}
-  <div class="row gap"><button class="btn danger grow" data-a="itemDel" data-m="${m}" data-i="${i}">Eliminar</button>${it.per100 === false ? "" : `<button class="btn primary grow" data-a="itemSave" data-m="${m}" data-i="${i}">Guardar</button>`}</div>`);
+  sheet(it.name, `<label>Nombre<input id="eN" value="${esc(it.name)}"></label>${it.per100 === false ? `<p class="muted small">${r0(it.kcal)} kcal · C${r0(it.cho)} L${r0(it.fat)} P${r0(it.prot)}</p>` : `<label>Gramos<input id="eG" type="number" inputmode="decimal" value="${it.g}"></label>`}
+  <div class="row gap"><button class="btn danger grow" data-a="itemDel" data-m="${m}" data-i="${i}">Eliminar</button><button class="btn primary grow" data-a="itemSave" data-m="${m}" data-i="${i}">Guardar</button></div>`);
 });
-act("itemSave", async (el) => { const d = await getDay(S.date); d.meals[el.dataset.m][+el.dataset.i].g = num($("#eG").value) || 0; await setDay(S.date, { meals: d.meals }); closeSheet(); refresh(); });
+act("itemSave", async (el) => {
+  const d = await getDay(S.date), it = d.meals[el.dataset.m][+el.dataset.i], name = $("#eN").value.trim();
+  if ($("#eG")) it.g = num($("#eG").value) || 0;
+  if (name && name !== it.name) {
+    it.name = name;
+    // Si venía de un código de barras, el nombre nuevo también queda para buscarlo después
+    const code = String(it.fid || "").replace(/^(off-|bc-)/, "");
+    if (/^\d{6,}$/.test(code)) { const mine = (await db.list(P() + "/foods")).find((x) => x.code === code); db.set(BC(code), { name, code, kcal: +it.kcal || 0, cho: +it.cho || 0, fat: +it.fat || 0, prot: +it.prot || 0, by: S.cid, at: Date.now() }); db.set(`${P()}/foods/${mine ? mine.id : "bc-" + code}`, mine ? { name } : { name, code, kcal: it.kcal, cho: it.cho, fat: it.fat, prot: it.prot, type: "alimento", src: "custom" }); }
+    else if (it.fid) { const mine = (await db.list(P() + "/foods")).find((x) => x.id === it.fid); if (mine) db.set(`${P()}/foods/${mine.id}`, { name }); }
+  }
+  await setDay(S.date, { meals: d.meals }); closeSheet(); refresh();
+});
 act("itemDel", async (el) => { const d = await getDay(S.date); d.meals[el.dataset.m].splice(+el.dataset.i, 1); await setDay(S.date, { meals: d.meals }); closeSheet(); refresh(); });
 
 // Código de barras: cámara (Chrome Android) + Open Food Facts
@@ -426,7 +448,22 @@ act("scan", async (el) => {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
     video.srcObject = stream; await video.play();
     const det = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
-    const loop = async () => { if (stop) return; try { const r = await det.detect(video); if (r[0]) { end(); navigator.vibrate?.(80); return into ? ($("#" + into).value = r[0].rawValue) : lookupCode(r[0].rawValue); } } catch {} requestAnimationFrame(loop); };
+    // Pide la misma lectura 3 veces seguidas (evita errores) y muestra un momento el código detectado antes de seguir
+    let last = "", hits = 0;
+    const loop = async () => {
+      if (stop) return;
+      try {
+        const r = await det.detect(video), v = r[0]?.rawValue || "";
+        if (v && v === last) hits++; else { last = v; hits = v ? 1 : 0; }
+        if (hits >= 3) {
+          stop = true; navigator.vibrate?.(80);
+          holder.querySelector(".scan-frame").classList.add("hit"); holder.querySelector("p").innerHTML = `✓ Código detectado<br><b>${esc(v)}</b>`;
+          await new Promise((ok) => setTimeout(ok, 700)); end();
+          return into ? ($("#" + into).value = v) : lookupCode(v);
+        }
+      } catch {}
+      setTimeout(() => requestAnimationFrame(loop), 120);
+    };
     loop();
   } catch { end(); toast("No se pudo abrir la cámara"); }
 });
@@ -513,13 +550,20 @@ async function weightView() {
   const last = d.weight ?? [...vals].reverse().find((v) => v != null) ?? 70;
   return `${head("Peso", "progreso")}${dayStrip()}
   <div class="card center"><div class="card-t">${fmtDate(S.date, true)}</div><div class="stepper"><button class="btn" data-a="wStep" data-n="-0.1">−</button><input id="wI" type="number" step="0.1" inputmode="decimal" value="${r1(last)}"><button class="btn" data-a="wStep" data-n="0.1">＋</button></div>
-  <button class="btn primary big" data-a="wSave">${d.weight ? "Actualizar" : "Guardar"}</button><div class="muted small">Pésate en ayunas, después de ir al baño.</div></div>
+  <div class="card-t mt">¿Te pesaste en ayunas?</div>${chips("fast", [["1", "Sí, en ayunas", "g"], ["0", "No, ya había comido", "r"]], wFast ?? (d.weightFast === false ? "0" : "1"), "wFast")}
+  <button class="btn primary big" data-a="wSave">${d.weight ? "Actualizar" : "Guardar"}</button><div class="muted small">Lo ideal: en ayunas, después de ir al baño.</div></div>
   <div class="card stats3"><div><b>${a1 ? r1(a1) : "—"}</b><small>Promedio semana</small></div><div><b class="${a1 && a0 ? (a1 - a0 > 0 ? "up" : "down") : ""}">${a1 && a0 ? (a1 - a0 > 0 ? "+" : "") + r1(a1 - a0) + " kg" : "—"}</b><small>vs semana anterior</small></div><div><b>${regs}/7</b><small>Días registrados</small></div></div>
   <div class="card"><div class="card-t">Tendencia (90 días)</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals, color: "var(--muted)", dots: true, w: 1 }, { vals: tr, color: "var(--acc)" }], { unit: " kg" })}
   <div class="muted small">Puntos: pesajes diarios · Línea roja: tendencia (suaviza las subidas y bajadas del día a día).</div></div>`;
 }
 act("wStep", (el) => { const i = $("#wI"); i.value = r1((num(i.value) || 0) + +el.dataset.n); });
-act("wSave", async () => { const v = num($("#wI").value); if (!v) return; await setDay(S.date, { weight: v }); toast("Peso guardado"); refresh(); });
+let wFast = null;
+act("wFast", (el) => { wFast = el.dataset.v; $$('[data-a="wFast"]').forEach((b) => b.classList.toggle("on", b === el)); });
+act("wSave", async () => {
+  const v = num($("#wI").value); if (!v) return;
+  const d = await getDay(S.date), fast = (wFast ?? (d.weightFast === false ? "0" : "1")) === "1";
+  await setDay(S.date, { weight: v, weightFast: fast }); wFast = null; toast(fast ? "Peso guardado" : "Peso guardado (sin ayuno)"); refresh();
+});
 
 
 // ---------- Sueño
@@ -691,6 +735,7 @@ async function settingsView() {
     ${row("Entrenamiento", "Los días que te toca", `${tm("train.at", r.train.at)}${sw("train.on", r.train.on)}`)}
     ${row("Check-in semanal", "Al final de tu semana", `${tm("checkin.at", r.checkin.at)}${sw("checkin.on", r.checkin.on)}`)}
     <div class="li remrow"><span><b>Avisos con la app cerrada</b><small class="muted">${pushOn() ? "Activados en este celular ✓" : pushReady() ? "Te llegan como notificación aunque no abras la app" : "Tu coach aún está terminando de configurarlos"}</small></span>${pushReady() && !pushOn() ? `<button class="btn tiny primary" data-a="pushOn">Activar</button>` : ""}</div>
+    <button class="btn block small mt" data-a="testNotif">🔔 Probar notificación</button>
     <p class="muted small mt">La campana de arriba a la derecha se mueve cuando tienes algo urgente.</p>` : ""}
   </div>
   <div class="card"><div class="card-t">Unidades</div><p class="muted small">Kilogramos, litros y centímetros.</p></div>`;
@@ -746,24 +791,29 @@ async function yesterdayReport(y) {
   const d = await getDay(y), c = applyStage(S.raw || {}, y), tot = dayTotals(d);
   const water = sum(d.water || [], (x) => x.ml), ate = Object.values(d.meals || {}).some((m) => m.length);
   if (!ate && !water && !d.steps) return;
-  const ok = [], bad = [], n = (v) => Math.round(v).toLocaleString("es-CL");
-  const chk = (label, v, goal, lo, hi, unit) => {
-    if (!goal) return; const r = v / goal;
-    if (r >= lo && r <= hi) ok.push(`${label}: <b>${n(v)}</b> / ${n(goal)} ${unit}`);
-    else bad.push(`${label}: <b>${n(v)}</b> / ${n(goal)} ${unit} <span class="${r < lo ? "lo" : "hi"}">${r < lo ? "faltó" : "te pasaste"}</span>`);
+  // ±5 % cumplido · 6–10 % "un pelito" · más de 10 % "hay que mejorar". Agua y pasos: pasarse está bien.
+  const ok = [], near = [], bad = [], n = (v) => Math.round(v).toLocaleString("es-CL");
+  const chk = (label, v, goal, unit, overOk) => {
+    if (!goal) return; const dv = (v - goal) / goal, a = Math.abs(dv), line = `${label}: <b>${n(v)}</b> / ${n(goal)} ${unit}`;
+    if (a <= 0.05 || (overOk && dv > 0)) return ok.push(line);
+    const pct = `${dv > 0 ? "+" : "−"}${Math.round(a * 100)} %`;
+    if (a <= 0.10) near.push(`${line} <span class="${dv < 0 ? "lo" : "hi"}">${dv < 0 ? "faltó un pelito" : "te pasaste un pelito"} (${pct})</span>`);
+    else bad.push(`${line} <span class="${dv < 0 ? "lo" : "hi"}">${dv < 0 ? "faltó" : "te pasaste"} (${pct})</span>`);
   };
-  chk("💧 Agua", water, c.water || 2500, 0.95, 9, "ml");
-  if (d.steps != null) chk("👣 Pasos", d.steps || 0, c.steps || 8000, 1, 99, "");
+  chk("💧 Agua", water, c.water || 2500, "ml", true);
+  if (d.steps != null) chk("👣 Pasos", d.steps || 0, c.steps || 8000, "", true);
   if (ate) {
-    chk("🔥 Calorías", tot.kcal, c.kcal, 0.9, 1.1, "kcal");
-    chk("🍗 Proteína", tot.prot, c.prot, 0.9, 1.3, "g");
-    chk("🍚 Carbohidratos", tot.cho, c.cho, 0.85, 1.15, "g");
-    chk("🥑 Grasas", tot.fat, c.fat, 0.85, 1.2, "g");
+    chk("🔥 Calorías", tot.kcal, c.kcal, "kcal");
+    chk("🍗 Proteína", tot.prot, c.prot, "g");
+    chk("🍚 Carbohidratos", tot.cho, c.cho, "g");
+    chk("🥑 Grasas", tot.fat, c.fat, "g");
   } else bad.push(`🍽️ Comidas: <b>sin registrar</b> <span class="lo">faltó</span>`);
-  const all = !bad.length;
+  const all = !bad.length && !near.length;
   sheet(all ? "¡Felicidades! 🎉" : "Así te fue ayer", `<div class="report">
-    ${ok.length ? `<div class="rp ok"><b>${all ? "¡Cumpliste todo ayer! Enhorabuena 👏" : "Bien hecho en esto 👏"}</b><ul>${ok.map((x) => `<li>✅ ${x}</li>`).join("")}</ul></div>` : ""}
-    ${bad.length ? `<div class="rp warn"><b>👀 Ojo con esto</b><ul>${bad.map((x) => `<li>${x}</li>`).join("")}</ul><p>No te preocupes si ayer no lograste cumplir con esto: <b>hoy intentemos hacerlo mejor</b> 💪</p></div>` : ""}
+    ${ok.length ? `<div class="rp ok"><b>${all ? "¡Cumpliste todo ayer! Enhorabuena 👏" : "Cumplido ✅"}</b><ul>${ok.map((x) => `<li>✅ ${x}</li>`).join("")}</ul></div>` : ""}
+    ${near.length ? `<div class="rp near"><b>🤏 Casi, por un pelito</b><ul>${near.map((x) => `<li>${x}</li>`).join("")}</ul></div>` : ""}
+    ${bad.length ? `<div class="rp warn"><b>👀 Hay que mejorar</b><ul>${bad.map((x) => `<li>${x}</li>`).join("")}</ul></div>` : ""}
+    ${!all ? `<p class="small">No te preocupes si ayer no salió perfecto: <b>hoy intentemos hacerlo mejor</b> 💪</p>` : ""}
     <button class="btn primary big" data-a="closeSheet">${all ? "¡Vamos por otro día así!" : "¡Vamos con todo hoy!"}</button></div>`);
   if (ok.length) confetti(all ? 1 : 0.4);
 }
@@ -800,7 +850,7 @@ let remSynced = false;
 export async function checkReminders() {
   try {
     // Mantiene al día la copia de tus recordatorios que usa el servidor de avisos
-    if (!remSynced && S.cid && pushOn()) { remSynced = true; db.set(`${P()}/settings/reminders`, { ...remCfg(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, at: Date.now() }, false); }
+    if (!remSynced && S.cid && pushOn()) { remSynced = true; refreshPush(S.cid); db.set(`${P()}/settings/reminders`, { ...remCfg(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, at: Date.now() }, false); }
     const r = remCfg();
     if (!r.on || !S.cid || !("Notification" in window) || Notification.permission !== "granted") return;
     const today = ymd(), now = new Date(), nm = now.getHours() * 60 + now.getMinutes(), c = S.client || S.raw || {};
@@ -831,6 +881,13 @@ export async function checkReminders() {
 }
 setInterval(checkReminders, 60 * 1000);
 document.addEventListener("visibilitychange", () => setTimeout(checkReminders, 1500));
+act("testNotif", async () => {
+  if (!("Notification" in window)) return toast("Este navegador no permite notificaciones");
+  if (Notification.permission !== "granted" && (await Notification.requestPermission()) !== "granted") return toast("Activa las notificaciones para IMA en los ajustes del celular");
+  if (pushOn()) refreshPush(S.cid);
+  await notify("Así te llegan los avisos de IMA ✓", "Si ves esto, las notificaciones funcionan en este celular");
+  toast("Te mandé una notificación de prueba");
+});
 act("askNotif", async () => { await Notification.requestPermission(); refresh(); });
 
 // ================================================================ TIMELINE (como la hoja Timeline)

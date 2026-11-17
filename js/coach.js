@@ -120,6 +120,7 @@ async function tlView(c0, w) {
   </div>
   <div class="card scroll-x"><table class="tbl tl"><tr><th></th>${R.map((r) => `<th>${fmtDate(r.d)}</th>`).join("")}<th>Promedio</th><th>Objetivo</th><th>vs sem. ant.</th></tr>
   ${lines.map(([l, f, goal, fmt, pf]) => { const a = agg(R, f), pa = agg(pR, pf); return `<tr><td><b>${l}</b></td>${R.map((r) => cell(f(r), goal, fmt)).join("")}<td><b>${a != null ? fmt(a) : "—"}</b></td><td class="muted">${goal ? fmt(goal) : ""}</td><td>${cmp(a, pa, l.startsWith("Peso") || l.startsWith("Sueño"), l.startsWith("Peso"))}</td></tr>`; }).join("")}
+  <tr><td><b>Peso en ayunas</b></td>${R.map((r) => `<td>${r.x.weight ? (r.x.weightFast === false ? '<span class="r">No</span>' : '<span class="g">Sí</span>') : "—"}</td>`).join("")}<td colspan="3"></td></tr>
   <tr><td><b>Calidad sueño</b></td>${R.map((r) => `<td>${r.x.sleep?.quality || "—"}</td>`).join("")}<td colspan="3"></td></tr>
   </table><div class="legend small"><span><i class="okc"></i>±10% del objetivo</span><span><i class="lowc"></i>bajo</span><span><i class="hic"></i>sobre</span></div></div>
   <div class="card"><div class="card-t">Timeline por semanas (como en la planilla)</div>${weeksTable(c0, await getDays(c0.startDate || addDays(ymd(), -120), ymd(), c0.id), routines, sessions)}</div>`;

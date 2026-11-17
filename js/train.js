@@ -33,10 +33,24 @@ export async function trainView() {
   <div class="slots">${plan.slots.map((s) => s.rest
     ? `<div class="slot rest ${s.date === today ? "today" : ""}">${day(s.date)}<span class="rest-t">${s.date === today ? "Hoy · " : ""}Descanso</span></div>`
     : `<div class="slot ${s.status}">${day(s.date)}<span class="grow"><b>${esc(s.name)}</b><span class="badge ${s.status}">${STATUS[s.status]}</span></span>
-      ${s.status === "hecho" ? `<a class="btn tiny" href="#resumen/${s.session.id}">Ver</a>` : `<button class="btn tiny ${s.status === "hoy" || s.status === "atrasado" ? "primary" : ""}" data-a="startRoutine" data-r="${s.rid}">Empezar</button>`}</div>`).join("")}</div>
-  <div class="card"><div class="card-t">Todas tus rutinas</div>${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${r.changes?.week === plan.week.key ? ' · <span class="red">modificada</span>' : ""}</small></span><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></div>`).join("") || `<p class="muted small">Tu coach aún no carga tus rutinas.</p>`}</div>`;
+      ${s.status === "hecho" ? `<a class="btn tiny" href="#resumen/${s.session.id}">Ver</a>` : `<span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${s.rid}">Ver</button><button class="btn tiny ${s.status === "hoy" || s.status === "atrasado" ? "primary" : ""}" data-a="startRoutine" data-r="${s.rid}">Empezar</button></span>`}</div>`).join("")}</div>
+  <div class="card"><div class="card-t">Todas tus rutinas</div>${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${r.changes?.week === plan.week.key ? ' · <span class="red">modificada</span>' : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${r.id}">Ver</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Tu coach aún no carga tus rutinas.</p>`}</div>`;
 }
+// Ver la rutina sin empezarla: ejercicios, series, reps, RIR e indicaciones
+act("viewRoutine", async (el) => {
+  const r = (await getRoutines(S.cid)).find((x) => x.id === el.dataset.r); if (!r) return;
+  const sessions = await getSessions(S.cid), last = sessions.filter((x) => x.routineId === r.id && x.status === "fin").sort((a, b) => b.startedAt - a.startedAt)[0];
+  sheet(r.name, `${(r.exercises || []).map((e, k) => {
+    const lx = last?.exercises.find((x) => x.exId === e.id), done = (lx?.sets || []).filter((x) => x.w !== "" || x.r !== "");
+    return `<div class="rvx" style="--exc:${exColor(k)}"><b>${k + 1}. ${esc(e.name)}</b>${e.changed ? ' <span class="badge r">Modificado</span>' : ""}
+    <div class="small">${(e.sets || []).map((t, j) => `<span class="rvset">S${j + 1}: ${planTxt(t)}</span>`).join("") || '<span class="muted">Series libres</span>'}</div>
+    ${e.notes ? `<div class="muted small">${esc(e.notes)}</div>` : ""}
+    ${done.length ? `<div class="muted small">Última vez: ${done.map((x) => `${x.w || "–"}×${x.r || "–"}`).join(" · ")}</div>` : ""}</div>`;
+  }).join("") || `<p class="muted">Esta rutina aún no tiene ejercicios.</p>`}
+  <button class="btn primary big" data-a="startRoutine" data-r="${r.id}">Empezar esta rutina</button>`);
+});
 act("startRoutine", async (el) => {
+  closeSheet();
   const sessions = await getSessions(S.cid);
   const cur = sessions.find((s) => s.status === "curso");
   if (cur && !(await confirmBox(`Tienes "${cur.routineName}" en curso. ¿Empezar otra igual?`, "Empezar otra"))) return go("sesion/" + cur.id);
@@ -268,8 +282,26 @@ act("restStart", () => {
 });
 act("restPickAdj", (el) => { const v = Math.max(15, restSec() + +el.dataset.n); LS.set("restSec", v); $("#rpT").textContent = fmtSec(v); });
 act("restPickSet", (el) => { LS.set("restSec", +el.dataset.n); $("#rpT").textContent = fmtSec(+el.dataset.n); });
-act("restGo", () => { S.rest = { end: Date.now() + restSec() * 1000, fired: false }; closeSheet(); refresh(); });
-act("restStop", () => { S.rest = null; refresh(); });
+// El audio y la pantalla encendida se piden al tocar "Iniciar" (el celular solo los permite tras un toque)
+let AC = null, WL = null;
+const keepAwake = async (on) => { try { if (on && !WL && navigator.wakeLock) { WL = await navigator.wakeLock.request("screen"); WL.addEventListener("release", () => (WL = null)); } else if (!on && WL) { await WL.release(); WL = null; } } catch {} };
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.rest) keepAwake(true); });
+act("restGo", () => {
+  try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); AC.resume(); } catch {}
+  S.rest = { end: Date.now() + restSec() * 1000, fired: false }; keepAwake(true); closeSheet(); refresh();
+});
+act("restStop", () => { S.rest = null; keepAwake(false); refresh(); });
+// Fin del descanso: pantalla completa que suena y vibra hasta que la toques (máx. ~20 s)
+function restAlarm() {
+  $("#restDone")?.remove();
+  const o = document.createElement("div"); o.id = "restDone"; o.className = "restdone";
+  o.innerHTML = `<div class="rd-in"><div class="rd-ic">⏱️</div><h2>¡Se acabó el descanso!</h2><p>Vamos con la siguiente serie 💪</p><button class="btn primary big">Listo</button></div>`;
+  document.body.appendChild(o);
+  let n = 0; const ring = () => { beep(AC); }; ring();
+  const iv = setInterval(() => { if (++n >= 8) return stop(); ring(); }, 2500);
+  const stop = () => { clearInterval(iv); navigator.vibrate?.(0); o.remove(); keepAwake(false); };
+  o.onclick = stop;
+}
 act("restAdj", (el) => { if (S.rest) S.rest.end += +el.dataset.n * 1000; });
 export function restBar() {
   if (!S.rest || S.route[0] === "sesion") return "";
@@ -279,7 +311,7 @@ setInterval(() => {
   const c = $("#clock"); if (c && S.session) c.textContent = timeSince(S.session.startedAt);
   if (!S.rest) return;
   const t = $("#restT"); if (t) t.textContent = fmtRest();
-  if (Date.now() >= S.rest.end && !S.rest.fired) { S.rest.fired = true; beep(); notify("Terminó tu descanso", "Vamos con la siguiente serie 💪"); setTimeout(() => { S.rest = null; refresh(); }, 1500); }
+  if (Date.now() >= S.rest.end && !S.rest.fired) { S.rest.fired = true; restAlarm(); if (document.hidden) notify("Terminó tu descanso", "Vamos con la siguiente serie 💪"); S.rest = null; refresh(); }
 }, 500);
 
 // ================================================================ ENCUESTA
@@ -323,14 +355,15 @@ export async function summaryView(id) {
   ${s.comment ? `<div class="card note">${esc(s.comment)}</div>` : ""}
   <div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
     ${audio?.data ? `<audio controls src="${audio.data}"></audio><button class="btn primary big" data-a="audioShare">Enviar audio por WhatsApp</button><button class="btn ghost block" data-a="audioRec">Grabar de nuevo</button>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>
-  <div class="pad-x"><button class="btn primary big" data-a="shareImg">Compartir con tu coach (imagen)</button><button class="btn block" data-a="shareCoach">Enviar como texto</button><a class="btn block" href="#entreno">Volver</a></div>`;
+  <div class="pad-x"><button class="btn primary big" data-a="shareImg">Compartir con tu coach</button><a class="btn block" href="#entreno">Volver</a>
+  <p class="muted small center">Se abre el menú para compartir: elige WhatsApp y el chat de tu coach. Después de la primera vez, su chat aparece arriba como acceso directo.</p></div>`;
 }
 // ---------- Audio de retroalimentación (se guarda para el coach; máx. 3 min)
 let REC = null;
 act("audioRec", async () => {
   if (REC) { REC.stop(); return; }
   let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("Activa el permiso de micrófono"); }
-  const type = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
+  const type = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find((t) => MediaRecorder.isTypeSupported(t)) || "";
   const mr = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 24000 }), chunks = [];
   const t0 = Date.now(), btn = () => $('[data-a="audioRec"]');
   mr.ondataavailable = (e) => chunks.push(e.data);
@@ -342,19 +375,28 @@ act("audioRec", async () => {
     // 1) se guarda solo en el panel del coach  2) se abre WhatsApp para mandarlo sí o sí
     await db.set(`${P()}/audios/${S.session.id}`, { data, secs: Math.round((Date.now() - t0) / 1000), at: Date.now(), routine: S.session.routineName, date: S.session.date }, false);
     S.session.audio = true; save();
-    const file = new File([blob], `Audio ${S.session.routineName}.webm`, { type: blob.type });
-    try { if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], text: `🎙️ ${S.session.routineName} · ${fmtDate(S.session.date, true)}` }); toast("Audio enviado ✓"); return refresh(); } } catch (e) { if (e.name === "AbortError") { toast("Audio guardado · falta enviarlo por WhatsApp"); return refresh(); } }
-    S.audioPending = true; refresh();
+    lastAudio = { id: S.session.id, blob };
+    toast("Audio guardado ✓ Ahora toca “Enviar audio por WhatsApp”"); refresh();
   };
   mr.start(1000); REC = mr;
   const tick = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); const b = btn(); if (b) b.textContent = `■ Detener (${Math.floor(sec / 60)}:${pad(sec % 60)})`; if (sec >= 180) mr.stop(); }, 500);
   const b = btn(); if (b) { b.classList.add("recording"); b.textContent = "■ Detener (0:00)"; }
 });
+// Android solo deja compartir ciertos tipos de archivo: el tipo debe ir "limpio" (sin ";codecs=…") y con la extensión correcta
+let lastAudio = null;
+function audioFile(blob, name) {
+  const mp4 = /mp4|m4a|aac/.test(blob.type);
+  return new File([blob], `${name}.${mp4 ? "m4a" : "weba"}`.replace(/[\\/:*?"<>|]/g, ""), { type: mp4 ? "audio/x-m4a" : "audio/webm" });
+}
 act("audioShare", async () => {
-  const a = await db.get(`${P()}/audios/${S.session.id}`); if (!a?.data) return;
-  const blob = await (await fetch(a.data)).blob(), file = new File([blob], `Audio ${S.session.routineName}.webm`, { type: blob.type });
-  try { if (navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file] }); } catch (e) { if (e.name === "AbortError") return; }
-  toast("Tu celular no permite compartir audio desde aquí");
+  let blob = lastAudio?.id === S.session.id ? lastAudio.blob : null;
+  if (!blob) { const a = await db.get(`${P()}/audios/${S.session.id}`); if (!a?.data) return; blob = await (await fetch(a.data)).blob(); lastAudio = { id: S.session.id, blob }; }
+  const file = audioFile(blob, `Audio ${S.session.routineName} ${S.session.date}`);
+  try { if (navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], text: `🎙️ ${S.session.routineName} · ${fmtDate(S.session.date, true)}` }); }
+  catch (e) { if (e.name === "AbortError") return; }
+  // Último recurso: lo descarga para adjuntarlo a mano (igual ya quedó guardado en el panel de tu coach)
+  const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+  toast("Audio descargado: adjúntalo en WhatsApp (tu coach igual ya lo tiene en su panel)", 3500);
 });
 
 // Resumen como imagen (para mandarlo por WhatsApp como una captura ordenada)
@@ -403,18 +445,4 @@ act("shareImg", async () => {
   const blob = await sessionImage(s), file = new File([blob], `${s.routineName} ${s.date}.png`.replace(/[\\/:*?"<>|]/g, ""), { type: "image/png" });
   try { if (navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], text: `${s.routineName} · ${fmtDate(s.date, true)}` }); } catch (e) { if (e.name === "AbortError") return; }
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = file.name; a.click(); toast("Imagen descargada: adjúntala en WhatsApp");
-});
-act("shareCoach", () => {
-  const s = S.session, sv = s.survey || {};
-  let t = `*${s.routineName}* · ${fmtDate(s.date, true)}\n`;
-  if (sv.intensidad) t += `Intensidad ${sv.intensidad}/10 · Fuerza ${sv.fuerza ?? "–"}/5 · Energía ${sv.energia ?? "–"}/5 · DOMS ${sv.doms ?? "–"}/5\n`;
-  if (sv.articular === "si") t += `⚠ Molestia articular: ${sv.articularDet || "sí"}\n`;
-  if (sv.orden === "no") t += `Cambió el orden de la rutina\n`;
-  for (const e of s.exercises) {
-    const d = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!d.length) continue;
-    t += `\n${e.extra ? "➕ " : ""}${e.name}\n`;
-    e.sets.forEach((x, j) => { if (x.w === "" && x.r === "") return; const ref = refSet(prev, e.exId, j); t += `  ${e.sides ? (j % 2 ? "Der " : "Izq ") : ""}${x.w}kg × ${x.r}${x.rir !== "" ? " RIR" + x.rir : ""}${x.tech ? ` (téc. ${x.tech})` : ""}${ref ? `  (sem. pasada ${ref.w}×${ref.r})` : ""}\n`; });
-  }
-  if (s.comment) t += `\n💬 ${s.comment}`;
-  window.open(`https://wa.me/${CONFIG.coachWhatsapp}?text=${encodeURIComponent(t)}`, "_blank");
 });
