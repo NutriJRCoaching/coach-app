@@ -364,3 +364,4 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 @keyframes rdpulse { 50% { filter: brightness(1.25); } }
 /* Escáner: confirma el código antes de seguir */
 .scan-frame.hit { border-color: #fff; background: rgba(34,197,94,.35); }
+.wq { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; text-align: left; } .wq > span { font-weight: 700; font-size: 14px; } .wq .chips { margin: 0; flex-wrap: nowrap; } .wq .chip { min-width: 52px; }

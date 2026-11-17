@@ -81,7 +81,7 @@ async function home() {
     <a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div><div class="foot"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>
     <div class="card tile" data-a="stepsEdit"><div class="card-t">${I.steps}Pasos ${done(day.steps, c.steps)}</div><div class="big">${(day.steps || 0).toLocaleString("es-CL")}</div><div class="foot grow">${mini(day.steps || 0, c.steps || 8000, "g")}</div><div class="muted small">Meta ${(c.steps || 8000).toLocaleString("es-CL")}</div></div>
     <a class="card tile" href="#sueno"><div class="card-t">${I.moon}Sueño</div><div class="big" style="color:${sl != null ? sleepColor(sl) : "inherit"}">${sl != null ? fmtH(sl) : "—"}</div><div class="muted small">${day.sleep?.quality ? "Calidad " + day.sleep.quality + "/5" : "Registrar"} · meta ${c.sleep || 8} h</div></a>
-    <a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? (day.weightFast === false ? "Sin ayuno" : "En ayunas ✓") : "En ayunas"}</div></a>
+    <a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? [day.weightFast === false ? "Sin ayuno" : "Ayunas ✓", day.weightBath === false ? "sin baño" : day.weightBath ? "baño ✓" : ""].filter(Boolean).join(" · ") : "En ayunas"}</div></a>
     <div class="card tile"><div class="card-t">${I.run}Cardio <span class="badge ${Object.keys(cardioDone).length >= (c.cardio?.perWeek || 0) && c.cardio?.perWeek ? "g" : ""}">${Object.keys(cardioDone).length}/${c.cardio?.perWeek || 0}</span></div>
       <div class="cweek">${w.days.map((d) => { const dw = new Date(d + "T12:00").getDay(); return `<span class="${cardioDone[d] ? "ok" : cdays.includes(dw) ? "plan" : ""} ${d === today ? "today" : ""}">${D1[dw]}</span>`; }).join("")}</div>
       <div class="legend-mini"><span>● hecho</span><span>○ sugerido</span></div><div class="foot"><button class="btn tiny" data-a="cardioAdd">Registrar</button></div></div>
@@ -550,19 +550,22 @@ async function weightView() {
   const last = d.weight ?? [...vals].reverse().find((v) => v != null) ?? 70;
   return `${head("Peso", "progreso")}${dayStrip()}
   <div class="card center"><div class="card-t">${fmtDate(S.date, true)}</div><div class="stepper"><button class="btn" data-a="wStep" data-n="-0.1">−</button><input id="wI" type="number" step="0.1" inputmode="decimal" value="${r1(last)}"><button class="btn" data-a="wStep" data-n="0.1">＋</button></div>
-  <div class="card-t mt">¿Te pesaste en ayunas?</div>${chips("fast", [["1", "Sí, en ayunas", "g"], ["0", "No, ya había comido", "r"]], wFast ?? (d.weightFast === false ? "0" : "1"), "wFast")}
-  <button class="btn primary big" data-a="wSave">${d.weight ? "Actualizar" : "Guardar"}</button><div class="muted small">Lo ideal: en ayunas, después de ir al baño.</div></div>
+  <div class="wq"><span>¿En ayunas?</span>${chips("fast", [["1", "Sí", "g"], ["0", "No", "r"]], WQ.fast ?? (d.weightFast === false ? "0" : d.weight ? "1" : ""), "wQ")}</div>
+  <div class="wq"><span>¿Después de ir al baño?</span>${chips("bath", [["1", "Sí", "g"], ["0", "No", "r"]], WQ.bath ?? (d.weightBath === false ? "0" : d.weightBath ? "1" : ""), "wQ")}</div>
+  <button class="btn primary big" data-a="wSave">${d.weight ? "Actualizar" : "Guardar"}</button><div class="muted small">Lo ideal: en ayunas y después de ir al baño.</div></div>
   <div class="card stats3"><div><b>${a1 ? r1(a1) : "—"}</b><small>Promedio semana</small></div><div><b class="${a1 && a0 ? (a1 - a0 > 0 ? "up" : "down") : ""}">${a1 && a0 ? (a1 - a0 > 0 ? "+" : "") + r1(a1 - a0) + " kg" : "—"}</b><small>vs semana anterior</small></div><div><b>${regs}/7</b><small>Días registrados</small></div></div>
   <div class="card"><div class="card-t">Tendencia (90 días)</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals, color: "var(--muted)", dots: true, w: 1 }, { vals: tr, color: "var(--acc)" }], { unit: " kg" })}
   <div class="muted small">Puntos: pesajes diarios · Línea roja: tendencia (suaviza las subidas y bajadas del día a día).</div></div>`;
 }
 act("wStep", (el) => { const i = $("#wI"); i.value = r1((num(i.value) || 0) + +el.dataset.n); });
-let wFast = null;
-act("wFast", (el) => { wFast = el.dataset.v; $$('[data-a="wFast"]').forEach((b) => b.classList.toggle("on", b === el)); });
+let WQ = {};
+act("wQ", (el) => { WQ[el.dataset.name] = el.dataset.v; $$(`[data-a="wQ"][data-name="${el.dataset.name}"]`).forEach((b) => b.classList.toggle("on", b === el)); });
 act("wSave", async () => {
   const v = num($("#wI").value); if (!v) return;
-  const d = await getDay(S.date), fast = (wFast ?? (d.weightFast === false ? "0" : "1")) === "1";
-  await setDay(S.date, { weight: v, weightFast: fast }); wFast = null; toast(fast ? "Peso guardado" : "Peso guardado (sin ayuno)"); refresh();
+  const d = await getDay(S.date);
+  const fast = WQ.fast ?? (d.weightFast === false ? "0" : d.weight ? "1" : ""), bath = WQ.bath ?? (d.weightBath === false ? "0" : d.weightBath ? "1" : "");
+  if (!fast || !bath) return toast("Responde las dos preguntas (sí o no)");
+  await setDay(S.date, { weight: v, weightFast: fast === "1", weightBath: bath === "1" }); WQ = {}; toast("Peso guardado"); refresh();
 });
 
 
