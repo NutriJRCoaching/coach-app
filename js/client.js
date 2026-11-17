@@ -796,8 +796,11 @@ async function nightBox() {
   setTimeout(() => $("#stepsI", b)?.focus(), 300);
 }
 // Revisa qué falta registrar y avisa una sola vez por recordatorio
+let remSynced = false;
 export async function checkReminders() {
   try {
+    // Mantiene al día la copia de tus recordatorios que usa el servidor de avisos
+    if (!remSynced && S.cid && pushOn()) { remSynced = true; db.set(`${P()}/settings/reminders`, { ...remCfg(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, at: Date.now() }, false); }
     const r = remCfg();
     if (!r.on || !S.cid || !("Notification" in window) || Notification.permission !== "granted") return;
     const today = ymd(), now = new Date(), nm = now.getHours() * 60 + now.getMinutes(), c = S.client || S.raw || {};

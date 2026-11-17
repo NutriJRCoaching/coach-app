@@ -27,7 +27,7 @@ export const CONFIG = {
   appName: "IMA",
   // Clave pública para avisos con la app cerrada (Firebase → Configuración → Cloud Messaging → Certificados web push)
   vapidKey: "BM_EJh8lKa6m4CNrG7l_Z7OIh8eGAr2MwJLrKfq0OrEVEGtAVNvedfJCGx4en_4zGRU-X8VI0s0jI0ORUyKsiJM",
-  appVersion: "1.10.3",
+  appVersion: "1.10.4",
 
   // Tiempos de comida
   meals: ["Comida 1", "Comida 2", "Comida 3", "Comida 4", "Comida 5"],
