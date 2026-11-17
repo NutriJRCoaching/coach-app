@@ -364,6 +364,7 @@ act("vAdd", async () => {
 act("foodBack", () => { FS.sel = null; openFoodSheet(); });
 act("foodAdd", async () => {
   const f = FS.sel; if (!FS.selG) return toast("Indica los gramos");
+  if (f.code && (f.src === "off" || f.src === "bc")) saveBarcode(f);
   await addItems([{ name: f.name, g: FS.selG, kcal: f.kcal, cho: f.cho, fat: f.fat, prot: f.prot, cat: f.cat || "", por: f.portion || null, fid: f.id }]);
 });
 async function addItems(items) {
@@ -395,6 +396,7 @@ act("createFood", async () => {
   const food = { type: $("#nT").value, name, brand: $("#nB").value, code: $("#nCode").value, portion: por || null, src: "custom",
     kcal: (num($("#nK").value) || 0) * f, cho: (num($("#nC").value) || 0) * f, fat: (num($("#nF").value) || 0) * f, prot: (num($("#nP").value) || 0) * f };
   const id = uid(); await db.set(`${P()}/foods/${id}`, food); toast("Creado");
+  if (food.code) db.set(BC(food.code), { name, brand: food.brand, code: food.code, portion: food.portion, kcal: food.kcal, cho: food.cho, fat: food.fat, prot: food.prot, by: S.cid, at: Date.now() });
   FS.sel = { ...food, id }; FS.selG = por || 100; FS.tab = food.type === "supl" ? "supl" : "buscar"; openFoodSheet();
 });
 act("editItem", async (el) => {
@@ -426,14 +428,25 @@ act("scan", async (el) => {
     loop();
   } catch { end(); toast("No se pudo abrir la cámara"); }
 });
+// Base compartida de códigos de barras: lo que escanea cualquiera queda guardado para todos
+const BC = (code) => "barcodes/" + String(code).replace(/[^0-9A-Za-z]/g, "");
+async function saveBarcode(f) {
+  if (!f?.code) return;
+  const food = { name: f.name, brand: f.brand || "", code: String(f.code), portion: f.portion || null, kcal: +f.kcal || 0, cho: +f.cho || 0, fat: +f.fat || 0, prot: +f.prot || 0, by: S.cid, at: Date.now() };
+  db.set(BC(f.code), food);
+  const mine = (await db.list(P() + "/foods")).find((x) => x.code === String(f.code));
+  if (!mine) db.set(`${P()}/foods/bc-${food.code}`, { ...food, type: "alimento", src: "custom" });
+}
 async function lookupCode(code) {
   const mine = (await db.list(P() + "/foods")).find((f) => f.code === code);
   if (mine) { FS.sel = mine; FS.selG = mine.portion || 100; return renderFoodTab(); }
+  const shared = await db.get(BC(code));
+  if (shared) { FS.sel = { ...shared, id: "bc-" + code, src: "bc" }; FS.selG = shared.portion || 100; saveBarcode(shared); toast("Encontrado en la base de IMA ✓"); return renderFoodTab(); }
   if (!navigator.onLine) return toast("Sin conexión: no se puede buscar el código");
   try {
     const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,nutriments,serving_quantity`).then((r) => r.json());
     if (r.status !== 1) { toast("Producto no encontrado. Puedes crearlo."); FS.tab = "crear"; await openFoodSheet(); $("#nCode").value = code; return; }
-    FS.sel = offToFood(r.product, code); FS.selG = FS.sel.portion || 100; renderFoodTab();
+    FS.sel = offToFood(r.product, code); FS.selG = FS.sel.portion || 100; saveBarcode(FS.sel); toast("Guardado en la base de alimentos ✓"); renderFoodTab();
   } catch { toast("No se pudo consultar Open Food Facts"); }
 }
 function offToFood(p, code) {
