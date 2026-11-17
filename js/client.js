@@ -697,25 +697,72 @@ act("remSet", async (el) => {
 });
 const minTo = (m) => { m = ((m % 1440) + 1440) % 1440; return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; };
 const toMin = (t) => { const [h, m] = String(t || "0:0").split(":").map(Number); return h * 60 + (m || 0); };
-// Al entrar un día nuevo: "antes de que se te olvide, ¿cuántos pasos diste ayer?"
+// Al entrar un día nuevo: 1) pide los pasos de ayer si faltan  2) muestra cómo te fue ayer
 async function askYesterdaySteps() {
   const today = ymd(), k = "ystep:" + today;
-  if (LS.get(k) || !S.cid || remCfg().steps.on === false || document.querySelector(".sheet-bg")) return;
+  if (LS.get(k) || !S.cid || document.querySelector(".sheet-bg")) return;
   LS.set(k, "1");
   const y = addDays(today, -1);
   if (S.raw?.startDate && y < S.raw.startDate) return;
-  const d = await getDay(y); if (d.steps) return;
+  const d = await getDay(y);
+  if (d.steps || remCfg().steps.on === false) return yesterdayReport(y);
   const dt = parseYmd(y), dia = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][dt.getDay()];
   const b = sheet("Pasos de ayer", `<div class="nightbox"><div class="nb-ic">👣</div><b>Antes de que se te olvide…</b><p>¿Cuántos pasos diste ayer <b>${dia} ${dt.getDate()}</b>? Revisa tu app de pasos o reloj y regístralo aquí.</p>
-    <input id="yStepsI" type="number" inputmode="numeric" class="bignum" placeholder="Ej: 10.000"><button class="btn primary big" data-a="yStepsSave" data-d="${y}">Guardar pasos de ayer</button><button class="btn ghost block" data-a="closeSheet">Ahora no</button></div>`);
+    <input id="yStepsI" type="number" inputmode="numeric" class="bignum" placeholder="Ej: 10.000"><button class="btn primary big" data-a="yStepsSave" data-d="${y}">Guardar pasos de ayer</button><button class="btn ghost block" data-a="ySkip" data-d="${y}">Ahora no</button></div>`);
   setTimeout(() => $("#yStepsI", b)?.focus(), 300);
 }
 act("yStepsSave", async (el) => {
   const st = num($("#yStepsI").value); if (!st) return toast("Escribe tus pasos");
-  await setDay(el.dataset.d, { steps: st }); closeSheet();
-  const goal = S.client?.steps || 8000; toast(st >= goal ? "¡Ayer cumpliste tu meta de pasos! 🏆" : `Guardado: ${st.toLocaleString("es-CL")} de ${goal.toLocaleString("es-CL")} pasos`, 3000);
-  refresh();
+  await setDay(el.dataset.d, { steps: st }); closeSheet(); refresh(); setTimeout(() => yesterdayReport(el.dataset.d), 400);
 });
+act("ySkip", (el) => { closeSheet(); setTimeout(() => yesterdayReport(el.dataset.d), 300); });
+
+// ¿Cómo te fue ayer? Celebra lo cumplido (con confeti) y marca con cariño lo que faltó o se pasó
+async function yesterdayReport(y) {
+  const d = await getDay(y), c = applyStage(S.raw || {}, y), tot = dayTotals(d);
+  const water = sum(d.water || [], (x) => x.ml), ate = Object.values(d.meals || {}).some((m) => m.length);
+  if (!ate && !water && !d.steps) return;
+  const ok = [], bad = [], n = (v) => Math.round(v).toLocaleString("es-CL");
+  const chk = (label, v, goal, lo, hi, unit) => {
+    if (!goal) return; const r = v / goal;
+    if (r >= lo && r <= hi) ok.push(`${label}: <b>${n(v)}</b> / ${n(goal)} ${unit}`);
+    else bad.push(`${label}: <b>${n(v)}</b> / ${n(goal)} ${unit} <span class="${r < lo ? "lo" : "hi"}">${r < lo ? "faltó" : "te pasaste"}</span>`);
+  };
+  chk("💧 Agua", water, c.water || 2500, 0.95, 9, "ml");
+  if (d.steps != null) chk("👣 Pasos", d.steps || 0, c.steps || 8000, 1, 99, "");
+  if (ate) {
+    chk("🔥 Calorías", tot.kcal, c.kcal, 0.9, 1.1, "kcal");
+    chk("🍗 Proteína", tot.prot, c.prot, 0.9, 1.3, "g");
+    chk("🍚 Carbohidratos", tot.cho, c.cho, 0.85, 1.15, "g");
+    chk("🥑 Grasas", tot.fat, c.fat, 0.85, 1.2, "g");
+  } else bad.push(`🍽️ Comidas: <b>sin registrar</b> <span class="lo">faltó</span>`);
+  const all = !bad.length;
+  sheet(all ? "¡Felicidades! 🎉" : "Así te fue ayer", `<div class="report">
+    ${ok.length ? `<div class="rp ok"><b>${all ? "¡Cumpliste todo ayer! Enhorabuena 👏" : "Bien hecho en esto 👏"}</b><ul>${ok.map((x) => `<li>✅ ${x}</li>`).join("")}</ul></div>` : ""}
+    ${bad.length ? `<div class="rp warn"><b>👀 Ojo con esto</b><ul>${bad.map((x) => `<li>${x}</li>`).join("")}</ul><p>No te preocupes si ayer no lograste cumplir con esto: <b>hoy intentemos hacerlo mejor</b> 💪</p></div>` : ""}
+    <button class="btn primary big" data-a="closeSheet">${all ? "¡Vamos por otro día así!" : "¡Vamos con todo hoy!"}</button></div>`);
+  if (ok.length) confetti(all ? 1 : 0.4);
+}
+// Confeti y serpentinas (sin librerías)
+function confetti(power = 1) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const cv = document.createElement("canvas"), g = cv.getContext("2d"), W = (cv.width = innerWidth), H = (cv.height = innerHeight);
+  cv.className = "confetti"; document.body.appendChild(cv);
+  const cols = ["#e0313b", "#ffffff", "#f59e0b", "#22c55e", "#3b82f6", "#ec4899"], N = Math.round(160 * power);
+  const P = Array.from({ length: N }, (_, i) => ({ x: W / 2 + (Math.random() - 0.5) * 80, y: H * 0.35, vx: (Math.random() - 0.5) * 14, vy: -Math.random() * 16 - 6, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.4, w: 6 + Math.random() * 6, h: 10 + Math.random() * 8, c: cols[i % cols.length], s: i % 7 === 0 }));
+  let t0 = performance.now();
+  (function f(t) {
+    const k = (t - t0) / 1000; g.clearRect(0, 0, W, H);
+    for (const p of P) {
+      p.vy += 0.45; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.globalAlpha = Math.max(0, 1 - k / 3.2);
+      if (p.s) { g.strokeStyle = p.c; g.lineWidth = 3; g.beginPath(); for (let j = 0; j < 24; j++) g.lineTo(Math.sin(j / 2.5 + k * 6) * 6, j * 2.2); g.stroke(); }
+      else { g.fillStyle = p.c; g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); }
+      g.restore();
+    }
+    if (k < 3.3) requestAnimationFrame(f); else cv.remove();
+  })(t0);
+}
 // Recuadro grande de cierre del día: pasos + pendientes
 async function nightBox() {
   const day = await getDay(ymd()), pend = (S.pend || []).filter((p) => p.to !== "pasos");

@@ -328,3 +328,12 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .meal .mtime { margin-left: 8px; font-size: 11.5px; font-weight: 700; color: var(--muted); }
 .meal.empty .mh small { opacity: .5; }
 .addmeal { margin: 4px 14px 10px; width: auto; border-style: dashed !important; }
+
+/* Resumen de ayer */
+.report { display: grid; gap: 12px; }
+.rp { border-radius: 14px; padding: 12px 14px; border: 1px solid var(--line); } .rp b { font-size: 15px; }
+.rp ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 7px; font-size: 14px; }
+.rp.ok { border-color: var(--g); background: color-mix(in srgb, var(--g) 9%, var(--surf)); }
+.rp.warn { border-color: var(--y); background: color-mix(in srgb, var(--y) 8%, var(--surf)); } .rp.warn p { margin: 10px 0 0; font-size: 14px; }
+.rp .lo, .rp .hi { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; margin-left: 4px; } .rp .lo { background: var(--y-s, rgba(245,158,11,.18)); color: var(--y); } .rp .hi { background: var(--r-s); color: var(--r); }
+.confetti { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
