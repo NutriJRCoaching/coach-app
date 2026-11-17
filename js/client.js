@@ -241,7 +241,7 @@ act("delPhoto", async (el) => { if (!(await confirmBox("¿Eliminar foto?"))) ret
 
 // ---------- Agregar alimento
 let FS = { meal: "", tab: "buscar", q: "", sel: null, results: [] };
-act("addFood", (el) => { FS = { meal: el.dataset.m, tab: "buscar", q: "", sel: null, results: [] }; openFoodSheet(); });
+act("addFood", (el) => { rescueScanned(); FS = { meal: el.dataset.m, tab: "buscar", q: "", sel: null, results: [] }; openFoodSheet(); });
 async function openFoodSheet() {
   const tabs = [["voz", "🎤 Por voz"], ["buscar", "Buscar"], ["rapido", "Añadir rápido"], ["fav", "Favoritos"], ["recetas", "Recetas"], ["supl", "Suplementos"], ["crear", "Crear"]];
   const b = sheet(FS.meal, `<div class="seg scroll">${tabs.map(([k, l]) => `<button class="${FS.tab === k ? "on" : ""}" data-a="foodTab" data-t="${k}">${l}</button>`).join("")}</div><div id="fsb"></div>`);
@@ -288,7 +288,9 @@ async function showResults(custom) {
   const box = $("#fres"); if (!box) return;
   const q = norm(FS.q.trim());
   const base = await getFoodBase();
-  const pool = [...(custom || await db.list(P() + "/foods")).filter((f) => f.type !== "receta"), ...base];
+  const shared = (await db.list("barcodes").catch(() => [])).map((f) => ({ ...f, id: "bc-" + f.id, src: "bc" }));
+  const mineList = (custom || await db.list(P() + "/foods")).filter((f) => f.type !== "receta"), codes = new Set(mineList.map((f) => f.code).filter(Boolean));
+  const pool = [...mineList, ...shared.filter((f) => !codes.has(f.code)), ...base];
   FS.results = q ? pool.filter((f) => norm(f.name).includes(q) || norm(f.brand || "").includes(q)).slice(0, 40) : pool.filter((f) => f.src !== "base").slice(0, 15);
   box.innerHTML = FS.results.map(resRow).join("") || (q ? `<p class="muted small pad">Sin resultados en tu base. Prueba “Añadir rápido” o Open Food Facts.</p>` : `<p class="muted small pad">Escribe para buscar en tu base de alimentos.</p>`);
 }
@@ -428,6 +430,15 @@ act("scan", async (el) => {
     loop();
   } catch { end(); toast("No se pudo abrir la cámara"); }
 });
+// Una vez: guarda en "tus alimentos" los productos escaneados que ya habías registrado en comidas
+async function rescueScanned() {
+  if (LS.get("rescue-bc:" + S.cid)) return; LS.set("rescue-bc:" + S.cid, "1");
+  const days = await getDays(addDays(ymd(), -60), ymd()), seen = new Set((await db.list(P() + "/foods")).map((f) => f.code));
+  for (const d of Object.values(days)) for (const items of Object.values(d.meals || {})) for (const it of items) {
+    const code = String(it.fid || "").startsWith("off-") ? it.fid.slice(4) : null;
+    if (code && !seen.has(code)) { seen.add(code); saveBarcode({ name: it.name, code, portion: null, kcal: it.kcal, cho: it.cho, fat: it.fat, prot: it.prot }); }
+  }
+}
 // Base compartida de códigos de barras: lo que escanea cualquiera queda guardado para todos
 const BC = (code) => "barcodes/" + String(code).replace(/[^0-9A-Za-z]/g, "");
 async function saveBarcode(f) {
