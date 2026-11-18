@@ -28,6 +28,7 @@ const chip = (a, cid) => `<a class="badge ${a.c === "i" ? "" : a.c}" href="#coac
 
 const TABS = [["resumen", "Timeline semanal"], ["etapas", "Etapas"], ["entrenos", "Entrenamientos"], ["rutinas", "Rutinas"], ["comida", "Alimentación"], ["plan", "Plan alimentación"], ["progreso", "Progreso"], ["checkins", "Check-ins"], ["feedback", "Retroalimentación"], ["datos", "Datos y objetivos"]];
 let CW = null; // semana que está viendo el coach
+let PF = null; // último cliente precargado
 
 export async function coachView() {
   const [, sec, cid, tab] = S.route;
@@ -103,6 +104,8 @@ act("copyInv", () => { navigator.clipboard.writeText($("#inv").innerText); toast
 async function clientPanel(cid, tab, AA) {
   const c = { id: cid, ...(await getClient(cid)) };
   if (tab === "entrenos") db.set("clients/" + cid, { seen: { ...(c.seen || {}), entrenos: Date.now() } });
+  // Adelanta en segundo plano lo que usan las otras pestañas, así cambiar de pestaña es instantáneo
+  if (PF !== cid) { PF = cid; ["routines", "sessions", "days", "checkins", "feedbacks", "measures", "exnotes"].forEach((x) => db.list(`clients/${cid}/${x}`).catch(() => {})); db.get("library/exercises").catch(() => {}); }
   const A = (AA?.A || []).filter((a) => a.c !== "i"), info = (AA?.A || []).filter((a) => a.c === "i");
   const now = weekInfo(c, ymd());
   if (!CW || CW.cid !== cid) CW = { cid, n: now.n };

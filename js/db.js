@@ -100,34 +100,48 @@ const fire = {
     this.lastStale.set(key, now); clearTimeout(this._t); this._t = setTimeout(() => this.onStale?.(), 150);
   },
   async read(key, server, cache, map, empty) {
+    const t0 = Date.now();
     if (this.known(key)) {
       try {
         const v = map(await cache()), j = JSON.stringify(v);
         if (Array.isArray(v) && !v.length) throw 0; // lista vacía en el celular: mejor confirmar con el servidor
         this.snap.set(key, j);
-        server().then((r) => { const nv = map(r), nj = JSON.stringify(nv); if (nj !== this.snap.get(key)) { this.snap.set(key, nj); this.stale(key); } }).catch(() => {});
+        server().then((r) => { if ((this.forgotAt.get(key) || 0) >= t0) return; // se guardó algo mientras tanto: manda lo local
+          const nv = map(r), nj = JSON.stringify(nv); if (nj !== this.snap.get(key)) { this.snap.set(key, nj); this.memo.set(key, { at: Date.now(), p: Promise.resolve(nv) }); this.stale(key); } }).catch(() => {});
         return v;
       } catch {}
     }
     try { const v = map(await server()); this.mark(key, v); return v; }
     catch { try { return map(await cache()); } catch { return empty; } }
   },
+  // Memoria rápida: lo leído en los últimos 20 s se entrega al instante (sin volver a consultar la base),
+  // y dos pantallas que piden lo mismo a la vez comparten una sola lectura. Al guardar algo se olvida lo afectado.
+  memo: new Map(), forgotAt: new Map(), TTL: 20000,
+  remember(key, fn) {
+    const m = this.memo.get(key);
+    if (m && Date.now() - m.at < this.TTL) return m.p.then(clean);
+    const p = fn(); this.memo.set(key, { at: Date.now(), p });
+    p.catch(() => this.memo.delete(key));
+    return p.then(clean);
+  },
+  forget(path) { const n = Date.now(); for (const k of ["d:" + path, "c:" + parentOf(path)]) { this.memo.delete(k); this.forgotAt.set(k, n); } },
   get(path) {
     const { doc, getDoc, getDocFromCache } = this.m, ref = doc(this.db, path);
-    return this.read("d:" + path, () => getDoc(ref), () => getDocFromCache(ref), (s) => (s.exists() ? s.data() : null), null);
+    return this.remember("d:" + path, () => this.read("d:" + path, () => getDoc(ref), () => getDocFromCache(ref), (s) => (s.exists() ? s.data() : null), null));
   },
   list(col) {
     const { collection, getDocs, getDocsFromCache } = this.m, ref = collection(this.db, col);
-    return this.read("c:" + col, () => getDocs(ref), () => getDocsFromCache(ref), (s) => s.docs.map((d) => ({ id: d.id, ...d.data() })), []);
+    return this.remember("c:" + col, () => this.read("c:" + col, () => getDocs(ref), () => getDocsFromCache(ref), (s) => s.docs.map((d) => ({ id: d.id, ...d.data() })), []));
   },
   // Importante: NO se espera la respuesta del servidor. Firestore guarda localmente
   // al instante y sube el cambio cuando haya conexión.
   set(path, data, merge = true) {
     const { doc, setDoc } = this.m;
+    this.forget(path);
     setDoc(doc(this.db, path), clean(data), { merge }).catch((e) => console.error("set", path, e));
     return Promise.resolve();
   },
-  del(path) { const { doc, deleteDoc } = this.m; deleteDoc(doc(this.db, path)).catch(console.error); return Promise.resolve(); },
+  del(path) { this.forget(path); const { doc, deleteDoc } = this.m; deleteDoc(doc(this.db, path)).catch(console.error); return Promise.resolve(); },
   watch(path, cb) {
     const { doc, collection, onSnapshot } = this.m;
     const isCol = path.split("/").length % 2 === 1;
