@@ -3,7 +3,7 @@
 import { db } from "./db.js";
 import { S } from "./state.js";
 
-export const SVC_COLS = [["completa", "Asesoría 1-1"], ["entrenamiento", "Solo entrenamiento"], ["nutricion", "Solo nutrición"]];
+export const SVC_COLS = [["completa", "Coaching 1-1"], ["entrenamiento", "Entrenamiento"], ["nutricion", "Nutrición"]];
 const T = [1, 1, 1], E = [1, 1, 0], N = [1, 0, 1], O = [0, 1, 0], X = [0, 0, 1];
 // [grupo, clave, nombre, descripción, [1-1, entrenamiento, nutrición]]
 export const FEATURES = [

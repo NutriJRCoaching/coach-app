@@ -7,7 +7,7 @@ import { esc, fmtDate, embedUrl, DAYS, LS } from "./util.js";
 import { has } from "./features.js";
 import { pushReady } from "./push.js";
 
-const SVC = { completa: "Asesoría 1-1 (entrenamiento + nutrición)", entrenamiento: "Asesoría de entrenamiento", nutricion: "Asesoría de nutrición" };
+const SVC = { completa: "Coaching 1-1 (entrenamiento + nutrición)", entrenamiento: "Asesoría de entrenamiento", nutricion: "Asesoría de nutrición" };
 let OB = { i: 0, cfg: {} };
 
 function steps() {

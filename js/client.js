@@ -3,11 +3,12 @@ import { CONFIG } from "./config.js";
 import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
+import { diffDays } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
 import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
-import { macroGuide, adjTxt } from "./data.js";
+import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg } from "./data.js";
 import { has, loadMatrix } from "./features.js";
 import { maybeOnboard } from "./onboarding.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
@@ -27,6 +28,8 @@ export async function clientView() {
   const [r, a] = S.route;
   S.client = applyStage(S.raw || {}, S.date); // objetivos de la etapa vigente
   await loadMatrix();
+  // Agua automática: 40 ml por kg del último peso (si el coach no fijó una meta a mano)
+  if (!S.raw?.water && !(S.client.stage?.water)) { const dd = await getDays(addDays(ymd(), -30), ymd()); const kg = Object.keys(dd).sort().map((k) => weightCorr(dd[k])).filter(Boolean).pop() || S.raw?.weightStart; if (kg) S.client.water = waterAuto(kg); }
   S.feat = { macroGuide: has("macro_guide"), selfTrain: has("train_self") };
   // Solo entrenamiento: si el coach no fijó metas exactas, las metas del día son el punto medio de su guía de macros
   if (S.feat.macroGuide && !S.client.kcal) { const g = macroGuide(S.client, S.client.weightStart); if (g) Object.assign(S.client, { prot: Math.round((g.prot[0] + g.prot[1]) / 2), fat: Math.round((g.fat[0] + g.fat[1]) / 2), cho: Math.round((g.cho[0] + g.cho[1]) / 2), kcal: Math.round((g.kcal[0] + g.kcal[1]) / 2) }); }
@@ -85,6 +88,7 @@ async function home() {
   return `<header class="topbar ima"><img src="icons/logo.png?v=ima2" class="hdr-logo" alt="IMA"><div class="brand-t">INTELIGENCIA MUSCULAR APLICADA</div>${bellBtn(pend)}</header>${dayStrip()}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
+  ${date === today && c.payDate && diffDays(c.payDate, today) >= 0 && diffDays(c.payDate, today) <= 3 ? `<div class="card paycard">${payMsg(c)}</div>` : ""}
   ${date === today && has("feedback") && freshFb(c) ? `<a class="card fbmini" href="#progreso"><div class="card-t">${I.info}Tu coach respondió tu check-in · Semana ${+freshFb(c).week.slice(1)}</div><div class="small">${esc(freshFb(c).text || freshFb(c).points?.[0] || "Toca para ver tu retroalimentación")}</div>${freshFb(c).videoUrl ? `<span class="badge">${I.play} Video</span>` : ""}</a>` : ""}
   <div class="grid2">
     ${has("home_kcal") ? `<a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div>${pctTxt(tot.kcal, c.kcal)}</a>
@@ -642,6 +646,7 @@ async function sleepView() {
   <div class="grid2" style="margin:0"><label>Me acosté a las<input id="sB" type="time" value="${s.bed || "23:00"}"></label><label>Desperté a las<input id="sW" type="time" value="${s.wake || "07:00"}"></label></div>
   <label>Minutos despierto durante la noche<input id="sA" type="number" inputmode="numeric" value="${s.awake || ""}" placeholder="0"></label>
   <div class="card-t">Calidad del sueño (1 a 5)</div>${chips("q", [1, 2, 3, 4, 5].map((n) => [n, n]), s.quality || "", "sleepQ")}
+  <div class="card-t">¿Tomaste café, té, bebida cola o energética el día anterior después de las 12:00?</div>${chips("caf", [["1", "Sí", "r"], ["0", "No", "g"]], d.cafPM == null ? "" : d.cafPM ? "1" : "0", "sleepCaf")}
   <button class="btn primary big" data-a="sleepSave">Guardar</button></div>
   <div class="card stats3"><div><b>${last7.length ? fmtH(avg(last7)) : "—"}</b><small>Prom. 7 días</small></div><div><b>${last30.length ? fmtH(avg(last30)) : "—"}</b><small>Prom. 30 días</small></div><div><b>${q7 ? r1(q7) + "/5" : "—"}</b><small>Calidad 7 días</small></div>
   <div><b>${last30.length ? fmtH(Math.max(...last30)) : "—"}</b><small>Mejor noche</small></div><div><b>${last30.length ? fmtH(Math.min(...last30)) : "—"}</b><small>Peor noche</small></div><div><b>${r1(sum(w.days.map(hrs).filter((x) => x != null)))} h</b><small>Total semana</small></div></div>
@@ -649,12 +654,13 @@ async function sleepView() {
   <div class="cal"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>${"<i></i>".repeat(off)}${Array.from({ length: nd }, (_, i) => { const k = `${first.getFullYear()}-${pad(first.getMonth() + 1)}-${pad(i + 1)}`, h = hrs(k); return `<b style="background:${sleepColor(h)};${h == null ? "color:var(--dim)" : ""}" title="${h != null ? fmtH(h) : ""}">${i + 1}</b>`; }).join("")}</div>
   <div class="legend"><span><i style="background:#ef4444"></i>&lt;6 h</span><span><i style="background:#eab308"></i>6–7 h</span><span><i style="background:#22c55e"></i>7–8 h</span><span><i style="background:#3b82f6"></i>8 h o más</span></div></div>`;
 }
-let sleepQ = null;
+let sleepQ = null, sleepCaf = null;
+act("sleepCaf", (el) => { sleepCaf = el.dataset.v === "1"; $$('[data-a="sleepCaf"]').forEach((b) => b.classList.toggle("on", b === el)); });
 act("sleepQ", (el) => { sleepQ = +el.dataset.v; $$('[data-a="sleepQ"]').forEach((b) => b.classList.toggle("on", b === el)); });
 act("sleepSave", async () => {
   const d = await getDay(S.date);
-  await setDay(S.date, { sleep: { bed: $("#sB").value, wake: $("#sW").value, awake: num($("#sA").value) || 0, quality: sleepQ || d.sleep?.quality || null } });
-  sleepQ = null; toast("Sueño guardado"); refresh();
+  await setDay(S.date, { sleep: { bed: $("#sB").value, wake: $("#sW").value, awake: num($("#sA").value) || 0, quality: sleepQ || d.sleep?.quality || null }, ...(sleepCaf != null ? { cafPM: sleepCaf } : {}) });
+  sleepQ = null; sleepCaf = null; toast("Sueño guardado"); refresh();
 });
 
 // ---------- Fotos
@@ -991,19 +997,20 @@ export function weeksTable(raw, days, routines, sessions, today = ymd()) {
     const reg = D.filter((d) => Object.values(d.meals || {}).some((m) => m.length));
     const T = (k) => avg(reg.map((d) => dayTotals(d)[k]));
     const plan = weekPlan(raw, routines, sessions, w.first);
-    const wAvg = A((d) => d.weight);
+    const wAvg = A((d) => weightCorr(d));
     rows.push({ n, w, t, reg: reg.length, kcal: T("kcal"), cho: T("cho"), fat: T("fat"), prot: T("prot"), ses: `${plan.doneCount}/${plan.planned.length}`, steps: A((d) => d.steps), cardio: sum(D.flatMap((d) => d.cardio || []), (x) => x.min), weight: wAvg, dW: wAvg && prevAvg ? wAvg - prevAvg : null, sleep: A((d) => sleepHours(d.sleep)), cur: n === cur.n });
     if (wAvg) prevAvg = wAvg;
   }
-  const cell = (v, goal, f = r0, tol = 0.1) => v == null || v === 0 ? `<td class="dim">—</td>` : `<td class="${goal ? (Math.abs(v - goal) / goal <= tol ? "okc" : v < goal ? "lowc" : "hic") : ""}">${f(v)}</td>`;
-  return `<div class="scroll-x"><table class="xl"><thead>
+  let curPh = "";
+  const cell = (v, goal, f = r0, k = "") => v == null || v === 0 ? `<td class="dim">—</td>` : `<td class="${judge(k, v, goal, curPh)}">${f(v)}</td>`;
+  return `<div class="scroll-x wk-scroll"><table class="xl"><thead>
     <tr><th></th><th colspan="2">Coaching</th><th colspan="5">Nutrición (registro)</th><th colspan="5">Métricas diarias</th><th colspan="6">Metas</th></tr>
     <tr><th>Sem.</th><th>Fecha</th><th>Etapa</th><th>Días reg.</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Sesiones</th><th>Pasos</th><th>Cardio</th><th>Peso prom.</th><th>Sueño</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Agua</th><th>Pasos</th></tr></thead>
-    <tbody>${rows.slice().reverse().map((r) => `<tr class="${r.cur ? "cur" : ""}"><td>${r.n}</td><td>${fmtDate(r.w.first)}</td><td><span class="ph" style="background:${phaseColor(r.t.phase)}">${esc(r.t.phase || "—")}</span></td>
-      <td>${r.reg}/7</td>${cell(r.kcal, r.t.kcal)}${cell(r.cho, r.t.cho)}${cell(r.fat, r.t.fat)}${cell(r.prot, r.t.prot)}<td>${r.ses}</td>${cell(r.steps, r.t.steps, (v) => r0(v).toLocaleString("es-CL"))}<td>${r.cardio ? r.cardio + " min" : "—"}</td>
+    <tbody>${rows.map((r) => { curPh = r.t.phase || ""; return `<tr class="${r.cur ? "cur" : ""}"><td>${r.n}</td><td>${fmtDate(r.w.first)}</td><td><span class="ph" style="background:${phaseColor(r.t.phase)}">${esc(r.t.phase || "—")}</span></td>
+      <td>${r.reg}/7</td>${cell(r.kcal, r.t.kcal, r0, "kcal")}${cell(r.cho, r.t.cho, r0, "cho")}${cell(r.fat, r.t.fat, r0, "fat")}${cell(r.prot, r.t.prot, r0, "prot")}<td>${r.ses}</td>${cell(r.steps, r.t.steps, (v) => r0(v).toLocaleString("es-CL"), "steps")}<td>${r.cardio ? r.cardio + " min" : "—"}</td>
       <td>${r.weight ? r1(r.weight) + (r.dW != null ? ` <small class="muted">(${r.dW > 0 ? "+" : ""}${r1(r.dW)})</small>` : "") : "—"}</td><td style="color:${sleepColor(r.sleep)}">${r.sleep ? r1(r.sleep) + " h" : "—"}</td>
-      <td class="muted">${r.t.kcal || "—"}</td><td class="muted">${r.t.cho || "—"}</td><td class="muted">${r.t.fat || "—"}</td><td class="muted">${r.t.prot || "—"}</td><td class="muted">${r.t.water ? r1(r.t.water / 1000) + " L" : "—"}</td><td class="muted">${(r.t.steps || 0).toLocaleString("es-CL")}</td></tr>`).join("")}</tbody></table></div>
-    <div class="legend small"><span><i class="okc"></i>±10% de la meta</span><span><i class="lowc"></i>bajo</span><span><i class="hic"></i>sobre</span></div>`;
+      <td class="muted">${r.t.kcal || "—"}</td><td class="muted">${r.t.cho || "—"}</td><td class="muted">${r.t.fat || "—"}</td><td class="muted">${r.t.prot || "—"}</td><td class="muted">${r.t.water ? r1(r.t.water / 1000) + " L" : "—"}</td><td class="muted">${(r.t.steps || 0).toLocaleString("es-CL")}</td></tr>`; }).join("")}</tbody></table></div>
+    <div class="legend small"><span><i class="okc"></i>en meta</span><span><i class="lowc"></i>ojo</span><span><i class="hic"></i>lejos de la meta</span></div>`;
 }
 async function timelineView() {
   const raw = S.raw || {}, today = ymd(), cur = weekInfo(raw, today);

@@ -121,7 +121,7 @@ export async function sessionView(id) {
   <div class="card ex ${ex.extra ? "extra" : ""}" style="--exc:${exColor(i)}">
     <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra</span>' : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
     <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video && has("train_videos") ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
-    ${!has("train_targets") ? `<div class="goal"><small>Registra el peso y las repeticiones de cada serie</small></div>` : ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div></div>` : `<div class="goal"><small>Series libres</small></div>`}
+    ${!has("train_targets") ? `<div class="goal"><small>Registra el peso y las repeticiones de cada serie</small></div>` : ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div>${ex.tempo || ex.rest ? `<small class="muted">${ex.tempo ? `Tempo ${esc(ex.tempo)} (bajada-pausa-subida-pausa)` : ""}${ex.tempo && ex.rest ? " · " : ""}${ex.rest ? `Descanso ${Math.floor(ex.rest / 60)}:${String(ex.rest % 60).padStart(2, "0")}` : ""}</small>` : ""}</div>` : `<div class="goal"><small>Series libres</small></div>`}
     <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span>${has("train_tech") ? "<span>Técnica</span>" : ""}</div>
     ${ex.sets.map((st, j) => setRow(ex, i, j)).join("")}</div>
     <div class="row gap"><button class="btn tiny" data-a="addSet">${I.plus} Serie</button>${ex.sets.length > (ex.target.length || 0) ? `<button class="btn tiny ghost" data-a="delSet">Quitar serie</button>` : ""}<span class="grow"></span>${has("train_tech") ? '<span class="muted small">Técnica vs. semana pasada</span>' : ""}</div>
@@ -266,7 +266,7 @@ act("tips", async () => {
 });
 act("useAlt", (el) => {
   const ex = cur(), a = ex.alts[+el.dataset.k];
-  ex.replacedFrom = ex.replacedFrom || ex.name; ex.name = a.name; ex.video = a.video || ""; ex.replaced = true;
+  ex.replacedFrom = ex.replacedFrom || ex.name; ex.name = a.name; ex.video = a.video || ""; ex.notes = a.tips || ex.notes; ex.replaced = true;
   save(); closeSheet(); toast("Reemplazado por " + a.name); refresh();
 });
 act("setupSave", async () => { await db.set(`${P()}/exnotes/${cur().exId}`, { text: $("#suT").value }); closeSheet(); toast("Guardado"); refresh(); });

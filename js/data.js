@@ -1,7 +1,7 @@
 // Acceso a datos del cliente + lógica de entrenamiento compartida (cliente y coach)
 import { db } from "./db.js";
 import { S } from "./state.js";
-import { ymd, addDays, weekInfo, e1rm, uid } from "./util.js";
+import { ymd, addDays, weekInfo, e1rm, uid, esc, fmtDate } from "./util.js";
 import { REAL_FOODS, realToFood } from "./realfoods.js";
 import { GROUPS } from "./foods.js";
 
@@ -109,7 +109,7 @@ export function newSession(client, routine, date = ymd()) {
     exercises: routine.exercises.map((e) => {
       const sides = e.uni ?? isUniName(e.name), tg = e.sets || [];
       return {
-        exId: e.id, name: e.name, video: e.video || "", inc: e.inc || 2.5, rest: e.rest || null, notes: e.notes || "",
+        exId: e.id, name: e.name, video: e.video || "", inc: e.inc || 2.5, rest: e.rest || null, notes: e.notes || "", tempo: e.tempo || "",
         target: sides ? splitSides(tg) : tg, alts: e.alts || [], changed: !!e.changed, sides,
         sets: sides ? splitSides(tg.map(blankSet), blankSet) : tg.map(blankSet), tech: ""
       };
@@ -207,11 +207,11 @@ export const PHOTO_TYPES = [["frente", "Frente"], ["espalda", "Espalda"], ["perf
 
 // ---------- Etapas nutricionales (calendario por semanas)
 // client.stages = [{ phase, from, to, kcal, cho, fat, prot, steps, water, note }]  (from/to = n° de semana)
-export const PHASES = { "Déficit leve": "#e0484e", "Déficit moderado": "#c3242b", "Déficit agresivo": "#8e1b1f", "Mini cut": "#b0263a", "Mantención": "#7d7d86", "Recomposición corporal": "#3b82f6", "Dieta reversa": "#d6a21e", "Superávit / Volumen": "#22a35a" };
+export const PHASES = { "Break de dieta": "#a855f7", "Déficit leve": "#e0484e", "Déficit moderado": "#c3242b", "Déficit agresivo": "#8e1b1f", "Mini cut": "#b0263a", "Mantención": "#7d7d86", "Recomposición corporal": "#3b82f6", "Dieta reversa": "#d6a21e", "Superávit / Volumen": "#22a35a" };
 export const phaseColor = (p) => PHASES[p] || "#6b6b72";
 export function stageAt(c, date) {
   const n = weekInfo(c, date).n;
-  return (c.stages || []).find((s) => n >= +s.from && n <= +s.to) || null;
+  return (c.stages || []).find((s) => +s.from >= 1 && n >= +s.from && n <= +s.to) || null;
 }
 // Objetivos vigentes en una fecha: los de la etapa (si hay) sobre los generales del cliente
 // Cada etapa puede ajustar porciones por grupo (s.adj = { "Cereales": -1, "Aceites y grasas": -0.5 }):
@@ -232,6 +232,7 @@ export function applyStage(c, date = ymd()) {
     if (c.menus) o.menus = c.menus.map((m) => ({ ...m, meals: m.meals.map((ml) => ({ ...ml, items: ml.items.map((it) => (f[it.cat] != null && f[it.cat] !== 1 ? { ...it, por: it.por != null ? Math.round(it.por * f[it.cat] * 100) / 100 : it.por, g: it.g != null ? Math.round(it.g * f[it.cat]) : it.g, adj: true } : it)).filter((it) => !(it.adj && !it.g)) })) }));
     for (const k of ["kcal", "cho", "fat", "prot"]) if ((s[k] === "" || s[k] == null) && c[k]) o[k] = Math.round(c[k] + dm[k]);
   }
+  for (const k of ["kcal", "cho", "fat", "prot", "water"]) if ((s[k] === "" || s[k] == null) && s.auto?.[k] != null) o[k] = +s.auto[k];
   for (const k of ["kcal", "cho", "fat", "prot", "steps", "water"]) if (s[k] !== "" && s[k] != null) o[k] = +s[k];
   return o;
 }
@@ -316,3 +317,51 @@ export const CHECKIN = [
 ];
 // Preguntas de versiones anteriores: se siguen mostrando en el panel si un check-in antiguo las tiene
 export const CHECKIN_OLD = { todos: "¿Hiciste todos los entrenamientos?", progCarga: "¿Hubo progreso de carga/repeticiones?", progTec: "¿Hubo progreso de técnica?", comEnt: "Comentarios de entrenamiento", top2: "Top 2", top3: "Top 3", motivNut: "Motivación para tomar buenas decisiones alimentarias", contribuyen: "¿Las decisiones que tomaste contribuyen a tus objetivos?", comNut: "Comentarios de nutrición", comFreq: "Comentarios de consumo", comRec: "Comentarios de recuperación", dificil: "¿Algo que se te haya dificultado más?", mejorar: "¿Algo que desees mejorar para la semana que viene?", expResp: "Tiempo de respuesta", expServ: "Servicio en general" };
+
+
+// ---------- Calendario del mes con las etapas (lu–do), como un calendario normal
+const MES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+// opts: { month: "AAAA-MM", selWeek: n, act: "acción al tocar un día", nav: "acción ‹ ›", paint: true }
+export function monthCal(c, opts = {}) {
+  const today = ymd(), [y, m] = (opts.month || today.slice(0, 7)).split("-").map(Number);
+  const first = new Date(y, m - 1, 1), startDow = (first.getDay() + 6) % 7, nDays = new Date(y, m, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= nDays; d++) cells.push(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  while (cells.length % 7) cells.push(null);
+  const used = new Set();
+  const cell = (d) => {
+    if (!d) return `<span class="mc-d empty"></span>`;
+    const st = c.startDate && d >= c.startDate ? stageAt(c, d) : null, wn = c.startDate && d >= c.startDate ? weekInfo(c, d).n : null;
+    if (st) used.add(st.phase);
+    const sel = opts.selWeek && wn === opts.selWeek;
+    return `<button type="button" class="mc-d ${st ? "st" : ""} ${d === today ? "today" : ""} ${sel ? "sel" : ""}" ${st ? `style="--pc:${phaseColor(st.phase)}"` : ""} ${opts.act && wn ? `data-a="${opts.act}" data-w="${wn}"` : ""} title="${wn ? "Semana " + wn + (st ? " · " + st.phase : "") : ""}">${+d.slice(8)}</button>`;
+  };
+  const prev = `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`, next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}`;
+  return `<div class="mcal"><div class="mc-h">${opts.nav ? `<button class="icon-btn" data-a="${opts.nav}" data-m="${prev}">‹</button>` : ""}<b>${MES[m - 1][0].toUpperCase() + MES[m - 1].slice(1)} ${y}</b>${opts.nav ? `<button class="icon-btn" data-a="${opts.nav}" data-m="${next}">›</button>` : ""}</div>
+  <div class="mc-g">${["lu", "ma", "mi", "ju", "vi", "sá", "do"].map((x) => `<span class="mc-w">${x}</span>`).join("")}${cells.map(cell).join("")}</div>
+  <div class="mc-l">${[...used].map((p) => `<span><i style="background:${phaseColor(p)}"></i>${p}</span>`).join("") || '<span class="muted">Sin etapas en este mes</span>'}</div></div>`;
+}
+
+// ---------- ¿Qué tan bien está una métrica? (con criterio según el objetivo)
+// devuelve "okc" (bien), "lowc" (ojo) o "hic" (lejos); "" si no hay meta
+export function judge(metric, v, goal, phase = "") {
+  if (v == null || v === 0 || !goal) return "";
+  const d = (v - goal) / goal, cut = /Déficit|Mini cut|Mantención|Recomposición|Break/.test(phase), bulk = /Superávit|reversa/.test(phase);
+  if (metric === "kcal") { if (Math.abs(d) <= 0.1) return "okc"; if (d > 0) return cut ? "hic" : "lowc"; return bulk ? "hic" : d < -0.25 ? "hic" : "lowc"; }
+  if (metric === "cho" || metric === "fat") return Math.abs(d) <= 0.15 ? "okc" : Math.abs(d) <= 0.3 ? "lowc" : "hic";
+  if (metric === "prot") return d >= -0.1 ? "okc" : d >= -0.25 ? "lowc" : "hic"; // pasarse en proteína no es malo
+  // pasos, agua, sueño: más es mejor
+  return d >= -0.1 ? "okc" : d >= -0.3 ? "lowc" : "hic";
+}
+// Peso corregido: si se pesó sin ir al baño se le resta una deposición promedio (~0,12 kg; mediana 128 g/día y 1,1 deposiciones/día, Rose et al. 2015)
+export const STOOL_KG = 0.12;
+export const weightCorr = (d) => (d?.weight ? (d.weightBath === false ? d.weight - STOOL_KG : d.weight) : null);
+// Agua automática: 40 ml por kg del último peso registrado (redondeado a 100 ml)
+export const waterAuto = (kg) => (kg ? Math.round((kg * 40) / 100) * 100 : null);
+
+// Recordatorio de pago que ve el cliente (mismo texto en el panel, para revisarlo antes)
+export function payMsg(c) {
+  const first = (c.name || "").split(" ")[0];
+  return `<b>¡Hola${first ? " " + esc(first) : ""}! 💪</b><br>Te recuerdo que tu asesoría se renueva el <b>${fmtDate(c.payDate, true)}</b>. Gracias por seguir confiando en el proceso: lo que llevamos hasta ahora es puro trabajo tuyo.<br><small class="muted">Si tienes dudas con el pago o quieres cambiar algo de tu plan, escríbeme por WhatsApp.</small>`;
+}

@@ -4,16 +4,17 @@ import { CONFIG } from "./config.js";
 import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { I } from "./icons.js";
-import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, $, $$ } from "./ui.js";
+import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, dualChart, $, $$ } from "./ui.js";
+import { e1rm } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
-import { DEFAULT_RANGES, adjTxt } from "./data.js";
+import { DEFAULT_RANGES, adjTxt, payMsg, monthCal, judge, weightCorr, STOOL_KG, waterAuto } from "./data.js";
 import "./onboarding.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
 import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN, CHECKIN_OLD } from "./data.js";
 import { weeksTable } from "./client.js";
 import { GROUPS } from "./foods.js";
 import { menusEditor } from "./menus.js";
-import { loadCtx, alertsFor, levelOf, SERVICES, emailKey, checkinDayTxt } from "./alerts.js";
+import { loadCtx, alertsFor, levelOf, SERVICES, SERVICE_GROUPS, emailKey, checkinDayTxt } from "./alerts.js";
 
 // Pendientes de todos los clientes (se recalculan como máximo cada 30 s o al guardar algo)
 let AL = { at: 0, map: {} };
@@ -42,7 +43,7 @@ export async function coachView() {
   const nR = Object.values(ALL).reduce((t, v) => t + v.A.filter((a) => a.c === "r").length, 0), nY = Object.values(ALL).reduce((t, v) => t + v.A.filter((a) => a.c === "y").length, 0);
   return `<aside class="side"><div class="brand"><img src="icons/logo.png?v=ima2" class="logo-sm" alt="">${esc(CONFIG.appName)}<button class="icon-btn bell ${nR ? "ring" : ""}" data-a="coachBell" title="Pendientes">${I.bell}${nR + nY ? `<i class="bdg ${nR ? "" : "y"}">${nR + nY}</i>` : ""}</button></div>
   <a href="#coach" class="${!sec ? "on" : ""}">Clientes</a>
-  ${clients.map((c) => `<a href="#coach/c/${c.id}/${tab || "resumen"}" class="sub ${cid === c.id ? "on" : ""}"><span class="lv ${levelOf(ALL[c.id]?.A || [])}"></span>${esc(c.name || "Sin nombre")}</a>`).join("")}
+  ${SERVICE_GROUPS.map(([k, l]) => { const g = clients.filter((c) => (c.service || "") === k); return g.length ? `<div class="side-g">${l}</div>${g.map((c) => `<a href="#coach/c/${c.id}/${tab || "resumen"}" class="sub ${cid === c.id ? "on" : ""}"><span class="lv ${levelOf(ALL[c.id]?.A || [])}"></span>${esc(c.name || "Sin nombre")}</a>`).join("")}` : ""; }).join("")}
   <a href="#coach/lib" class="${sec === "lib" ? "on" : ""}">Biblioteca</a>
   <button class="btn small" data-a="asClient">Mi registro (vista cliente)</button>
   <button class="btn small" data-a="newClient">＋ Nuevo cliente</button>
@@ -123,42 +124,61 @@ async function clientPanel(cid, tab, AA) {
 }
 act("cwShift", (el) => { CW.n += +el.dataset.n; refresh(); });
 
-// ---------- Timeline semanal (equivalente a tu hoja Timeline)
+// ---------- Timeline semanal
+let TLM = { m: "kcal", month: null };
+const METRICS = [["kcal", "Calorías", "#ef4444", "kcal"], ["cho", "Carbohidratos", "#eab308", "g"], ["fat", "Grasas", "#3b82f6", "g"], ["prot", "Proteína", "#22c55e", "g"], ["steps", "Pasos", "#14b8a6", ""], ["water", "Agua", "#06b6d4", "ml"], ["sleep", "Sueño", "#a855f7", "h"], ["cardio", "Cardio", "#f97316", "min"]];
+const dayVal = (x, k) => { if (!x) return null; if (["kcal", "cho", "fat", "prot"].includes(k)) { const t = dayTotals(x); return Object.values(x.meals || {}).some((m) => m.length) ? t[k] : null; } if (k === "water") return sum(x.water || [], (y) => y.ml) || null; if (k === "sleep") return sleepHours(x.sleep); if (k === "cardio") return sum(x.cardio || [], (y) => y.min) || null; return x[k] || null; };
+const ma7 = (vals) => vals.map((_, i) => { const w = vals.slice(Math.max(0, i - 6), i + 1).filter((v) => v != null); return w.length >= 2 ? avg(w) : null; });
 async function tlView(c0, w) {
-  const c = applyStage(c0, w.first);
+  const c = applyStage(c0, w.first), ph = c.phase || "";
   const prevW = weekInfo(c, addDays(w.first, -7));
-  const [days, pdays, sessions, routines] = await Promise.all([getDays(w.first, w.last, c.id), getDays(prevW.first, prevW.last, c.id), getSessions(c.id), getRoutines(c.id)]);
+  const from = addDays(ymd(), -55);
+  const [days, pdays, sessions, routines, allDays] = await Promise.all([getDays(w.first, w.last, c.id), getDays(prevW.first, prevW.last, c.id), getSessions(c.id), getRoutines(c.id), getDays(c0.startDate && c0.startDate < from ? c0.startDate : from, ymd(), c.id)]);
   const plan = weekPlan(c, routines, sessions, w.first);
   const row = (d) => { const x = days[d] || {}, t = dayTotals(x), sl = sleepHours(x.sleep); return { d, x, t, sl, water: sum(x.water || [], (y) => y.ml), cardio: sum(x.cardio || [], (y) => y.min) }; };
   const R = w.days.map(row);
   const agg = (dd, f) => avg(dd.map(f).filter((v) => v != null && v !== 0));
   const pR = prevW.days.map((d) => { const x = pdays[d] || {}; return { x, t: dayTotals(x), sl: sleepHours(x.sleep) }; });
   const cmp = (a, b, dec = 1, neutral) => a == null || b == null ? "" : `<small class="${neutral ? "muted" : a - b > 0 ? "g" : "r"}">${a - b > 0 ? "+" : ""}${dec ? r1(a - b) : r0(a - b)}</small>`;
-  const cell = (v, goal, fmt = r0, tol = 0.1) => v == null || v === 0 ? `<td class="muted">—</td>` : `<td class="${goal ? (Math.abs(v - goal) / goal <= tol ? "okc" : v < goal ? "lowc" : "hic") : ""}">${fmt(v)}</td>`;
+  const cell = (k, v, goal, fmt = r0) => v == null || v === 0 ? `<td class="muted">—</td>` : `<td class="${judge(k, v, goal, ph)}">${fmt(v)}</td>`;
   const lines = [
-    ["Peso (kg)", (r) => r.x.weight, null, r1, (r) => r.x.weight],
-    ["Calorías", (r) => r.t.kcal, c.kcal, r0, (r) => r.t.kcal],
-    ["CHO (g)", (r) => r.t.cho, c.cho, r0, (r) => r.t.cho],
-    ["Lípidos (g)", (r) => r.t.fat, c.fat, r0, (r) => r.t.fat],
-    ["Proteína (g)", (r) => r.t.prot, c.prot, r0, (r) => r.t.prot],
-    ["Pasos", (r) => r.x.steps, c.steps, (v) => r0(v).toLocaleString("es-CL"), (r) => r.x.steps],
-    ["Agua (ml)", (r) => r.water, c.water, r0, (r) => sum(r.x.water || [], (y) => y.ml)],
-    ["Sueño (h)", (r) => r.sl, c.sleep, r1, (r) => r.sl],
-    ["Cardio (min)", (r) => r.cardio, null, r0, (r) => sum(r.x.cardio || [], (y) => y.min)]
+    ["weight", "Peso (kg)", (r) => r.x.weight, null, r1, (r) => r.x.weight],
+    ["wcorr", "Peso corregido (kg)", (r) => weightCorr(r.x), null, r1, (r) => weightCorr(r.x)],
+    ["kcal", "Calorías", (r) => r.t.kcal, c.kcal, r0, (r) => r.t.kcal],
+    ["cho", "CHO (g)", (r) => r.t.cho, c.cho, r0, (r) => r.t.cho],
+    ["fat", "Lípidos (g)", (r) => r.t.fat, c.fat, r0, (r) => r.t.fat],
+    ["prot", "Proteína (g)", (r) => r.t.prot, c.prot, r0, (r) => r.t.prot],
+    ["steps", "Pasos", (r) => r.x.steps, c.steps, (v) => r0(v).toLocaleString("es-CL"), (r) => r.x.steps],
+    ["water", "Agua (ml)", (r) => r.water, c.water, r0, (r) => sum(r.x.water || [], (y) => y.ml)],
+    ["sleep", "Sueño (h)", (r) => r.sl, c.sleep, r1, (r) => r.sl],
+    ["cardio", "Cardio (min)", (r) => r.cardio, null, r0, (r) => sum(r.x.cardio || [], (y) => y.min)]
   ];
-  return `<div class="card"><div class="card-t">Etapa de esta semana: <span style="color:${phaseColor(c.phase)}">${esc(c.phase || "—")}</span></div>${stagesBar(c0, w.n)}</div><div class="grid-cards">
-  <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.planned.length}</div>${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}">${s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("")}</div>
-  <div class="card"><div class="card-t">Peso promedio</div><div class="big">${r1(agg(R, (r) => r.x.weight)) || "—"} kg</div>${cmp(agg(R, (r) => r.x.weight), agg(pR, (r) => r.x.weight), 1, true)} <small class="muted">vs semana anterior</small></div>
-  <div class="card"><div class="card-t">Adherencia de registro</div><div class="small">Comida: <b>${R.filter((r) => Object.values(r.x.meals || {}).some((m) => m.length)).length}/7</b> · Peso: <b>${R.filter((r) => r.x.weight).length}/7</b> · Sueño: <b>${R.filter((r) => r.sl).length}/7</b> · Pasos: <b>${R.filter((r) => r.x.steps).length}/7</b></div></div>
-  </div>
+  const reg = (f) => R.filter(f).length;
+  // gráfico: peso vs la métrica elegida, últimos 56 días, con media móvil de 7 días
+  const keys = Array.from({ length: 56 }, (_, i) => addDays(ymd(), i - 55));
+  const wv = keys.map((k) => weightCorr(allDays[k])), mm = METRICS.find((x) => x[0] === TLM.m), mv = keys.map((k) => dayVal(allDays[k], TLM.m));
+  const goalOf = { kcal: c.kcal, cho: c.cho, fat: c.fat, prot: c.prot, steps: c.steps, water: c.water, sleep: c.sleep }[TLM.m];
+  if (!TLM.month) TLM.month = w.first.slice(0, 7);
+  return `<div class="tl-top">
+  <div class="card tl-cal">${monthCal(c0, { month: TLM.month, selWeek: w.n, nav: "tlMonth", act: "tlWeek" })}</div>
+  <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.planned.length}</div>${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}">${s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("") || '<p class="muted small">Sin calendario de rutinas.</p>'}</div>
+  <div class="tl-side"><div class="card"><div class="card-t">Peso promedio</div><div class="big">${r1(agg(R, (r) => weightCorr(r.x))) || "—"} <small>kg</small></div>${cmp(agg(R, (r) => weightCorr(r.x)), agg(pR, (r) => weightCorr(r.x)), 1, true)} <small class="muted">vs sem. anterior</small></div>
+  <div class="card"><div class="card-t">Días con registro</div><ul class="adh">${[["Comida", reg((r) => Object.values(r.x.meals || {}).some((m) => m.length))], ["Peso", reg((r) => r.x.weight)], ["Sueño", reg((r) => r.sl)], ["Pasos", reg((r) => r.x.steps)], ["Agua", reg((r) => r.water)]].map(([l, n]) => `<li><span>${l}</span><b class="${n >= 5 ? "g" : n >= 3 ? "y" : "r"}">${n}/7</b></li>`).join("")}</ul></div></div></div>
+  <div class="card"><div class="row between"><div class="card-t">Tendencia · peso corporal vs ${mm[1].toLowerCase()} (últimos 56 días, media de 7 días)</div></div>
+  <div class="chips">${METRICS.map(([k, l, col]) => `<button class="chip ${k === TLM.m ? "on" : ""}" style="${k === TLM.m ? `background:${col};border-color:${col}` : ""}" data-a="tlMetric" data-k="${k}">${l}</button>`).join("")}</div>
+  ${dualChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), { vals: wv, trend: ma7(wv), color: "var(--txt)", unit: "kg" }, { vals: mv, trend: ma7(mv), color: mm[2], unit: mm[3], goal: goalOf })}
+  <div class="legend small"><span><i style="background:var(--txt)"></i>Peso (kg, eje izquierdo)</span><span><i style="background:${mm[2]}"></i>${mm[1]} (eje derecho)</span><span>- - - meta</span></div></div>
   <div class="card scroll-x"><table class="tbl tl"><tr><th></th>${R.map((r) => `<th>${fmtDate(r.d)}</th>`).join("")}<th>Promedio</th><th>Objetivo</th><th>vs sem. ant.</th></tr>
-  ${lines.map(([l, f, goal, fmt, pf]) => { const a = agg(R, f), pa = agg(pR, pf); return `<tr><td><b>${l}</b></td>${R.map((r) => cell(f(r), goal, fmt)).join("")}<td><b>${a != null ? fmt(a) : "—"}</b></td><td class="muted">${goal ? fmt(goal) : ""}</td><td>${cmp(a, pa, l.startsWith("Peso") || l.startsWith("Sueño"), l.startsWith("Peso"))}</td></tr>`; }).join("")}
-  <tr><td><b>Peso en ayunas</b></td>${R.map((r) => `<td>${r.x.weight ? (r.x.weightFast === false ? '<span class="r">No</span>' : '<span class="g">Sí</span>') : "—"}</td>`).join("")}<td colspan="3"></td></tr>
-  <tr><td><b>Peso después del baño</b></td>${R.map((r) => `<td>${r.x.weight && r.x.weightBath != null ? (r.x.weightBath ? '<span class="g">Sí</span>' : '<span class="r">No</span>') : "—"}</td>`).join("")}<td colspan="3"></td></tr>
+  ${lines.map(([k, l, f, goal, fmt, pf]) => { const a = agg(R, f), pa = agg(pR, pf); return `<tr><td><b>${l}</b></td>${R.map((r) => cell(k, f(r), goal, fmt)).join("")}<td class="${judge(k, a, goal, ph)}"><b>${a != null ? fmt(a) : "—"}</b></td><td class="muted">${goal ? fmt(goal) : ""}</td><td>${cmp(a, pa, ["weight", "wcorr", "sleep"].includes(k), k === "weight" || k === "wcorr")}</td></tr>`; }).join("")}
+  <tr><td><b>Pesaje</b></td>${R.map((r) => `<td class="small">${r.x.weight ? `${r.x.weightFast === false ? '<span class="r">sin ayuno</span>' : '<span class="g">ayunas</span>'}${r.x.weightBath === false ? '<br><span class="y">sin baño</span>' : ""}` : "—"}</td>`).join("")}<td colspan="3"></td></tr>
   <tr><td><b>Calidad sueño</b></td>${R.map((r) => `<td>${r.x.sleep?.quality || "—"}</td>`).join("")}<td colspan="3"></td></tr>
-  </table><div class="legend small"><span><i class="okc"></i>±10% del objetivo</span><span><i class="lowc"></i>bajo</span><span><i class="hic"></i>sobre</span></div></div>
-  <div class="card"><div class="card-t">Timeline por semanas (como en la planilla)</div>${weeksTable(c0, await getDays(c0.startDate || addDays(ymd(), -120), ymd(), c0.id), routines, sessions)}</div>`;
+  <tr><td><b>Cafeína PM (día anterior)</b></td>${R.map((r) => `<td>${r.x.cafPM == null ? "—" : r.x.cafPM ? '<span class="y">Sí</span>' : '<span class="g">No</span>'}</td>`).join("")}<td colspan="3"></td></tr>
+  </table><div class="legend small"><span><i class="okc"></i>en meta</span><span><i class="lowc"></i>ojo</span><span><i class="hic"></i>lejos de la meta</span><span class="muted">Pasarse en pasos, agua, sueño o proteína no se marca como malo. Peso corregido = si se pesó sin ir al baño, se restan ${STOOL_KG * 1000} g (una deposición promedio).</span></div></div>
+  <div class="card"><div class="card-t">Timeline por semanas</div>${weeksTable(c0, await getDays(c0.startDate || addDays(ymd(), -120), ymd(), c0.id), routines, sessions)}</div>`;
 }
+act("tlMetric", (el) => { TLM.m = el.dataset.k; refresh(); });
+act("tlMonth", (el) => { TLM.month = el.dataset.m; refresh(); });
+act("tlWeek", (el) => { CW.n = +el.dataset.w; refresh(); });
 
 // ---------- Entrenamientos de la semana
 async function sessionsView(c, w) {
@@ -199,28 +219,44 @@ act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = ne
 act("rEdit", async (el) => { const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: { id: el.dataset.id, ...r }, orig: JSON.stringify(r.exercises || []) }; refresh(); });
 act("rNew", () => { RE = { cid: CW.cid, r: { id: uid(), name: "Nueva rutina", exercises: [], isNew: true }, orig: "[]" }; refresh(); });
 function routineEditor(r, lib) {
+  const T = ["Excéntrica", "Pausa abajo", "Concéntrica", "Pausa arriba"];
   return `<div class="card"><div class="row gap"><input class="h-in" value="${esc(r.name)}" data-a-change="rName" placeholder="Nombre de la rutina"><button class="btn primary" data-a="rSave">Guardar cambios</button><button class="btn ghost" data-a="rDup">Duplicar</button><button class="btn danger" data-a="rDel">Eliminar</button></div>
-  <p class="muted small">Series: escribe una por línea o separadas por coma, con formato <b>reps@RIR</b>. Ej: <code>8@1, 6@0</code> o <code>6-8@1, 6-8@1</code>.</p>
-  ${r.exercises.map((e, k) => `<div class="exed"><div class="row gap"><b>${k + 1}</b><input class="grow" list="exlib" value="${esc(e.name)}" data-a-change="exF" data-k="${k}" data-f="name" placeholder="Ejercicio">
-    <input value="${esc((e.sets || []).map((s) => s.reps + (s.rir !== "" && s.rir != null ? "@" + s.rir : "")).join(", "))}" data-a-change="exF" data-k="${k}" data-f="sets" placeholder="8@1, 6@0" style="width:150px">
-    <input type="number" value="${e.rest || ""}" data-a-change="exF" data-k="${k}" data-f="rest" placeholder="Desc. s" style="width:80px" title="Descanso (segundos)">
-    <input type="number" step="0.5" value="${e.inc || ""}" data-a-change="exF" data-k="${k}" data-f="inc" placeholder="Salto kg" style="width:80px" title="Salto de carga disponible (kg)">
-    <button class="icon-btn" data-a="exMove" data-k="${k}" data-n="-1">↑</button><button class="icon-btn" data-a="exMove" data-k="${k}" data-n="1">↓</button><button class="icon-btn" data-a="exDel" data-k="${k}">✕</button></div>
-    <div class="row gap"><input class="grow" value="${esc(e.video || "")}" data-a-change="exF" data-k="${k}" data-f="video" placeholder="Link del video (YouTube no listado)"><input class="grow" value="${esc(e.notes || "")}" data-a-change="exF" data-k="${k}" data-f="notes" placeholder="Indicaciones para el cliente"></div>
-    <div class="row gap"><input class="grow" value="${esc((e.alts || []).map((a) => a.name + (a.video ? " | " + a.video : "")).join("; "))}" data-a-change="exF" data-k="${k}" data-f="alts" placeholder="Reemplazos: Nombre | link; Nombre | link"></div></div>`).join("")}
+  ${r.exercises.map((e, k) => { const tp = String(e.tempo || "").split("-"); return `<div class="exed"><div class="row gap"><b class="exn">${k + 1}</b><input class="grow exname" list="exlib" value="${esc(e.name)}" data-a-change="exF" data-k="${k}" data-f="name" placeholder="Ejercicio (escribe y elige de la biblioteca)">
+    <button class="icon-btn" data-a="exMove" data-k="${k}" data-n="-1" title="Subir">↑</button><button class="icon-btn" data-a="exMove" data-k="${k}" data-n="1" title="Bajar">↓</button><button class="icon-btn" data-a="exDel" data-k="${k}" title="Quitar">✕</button></div>
+    <div class="exgrid"><table class="tbl sets-t"><tr><th>Serie</th><th>Repeticiones</th><th>RIR</th><th></th></tr>
+      ${(e.sets || []).map((x, j) => `<tr><td>${j + 1}</td><td><input value="${esc(x.reps ?? "")}" data-a-change="setF" data-k="${k}" data-j="${j}" data-f="reps" placeholder="8-10" style="width:80px"></td><td><input value="${esc(x.rir ?? "")}" data-a-change="setF" data-k="${k}" data-j="${j}" data-f="rir" placeholder="1" style="width:56px"></td><td><button class="icon-btn" data-a="setDel" data-k="${k}" data-j="${j}">✕</button></td></tr>`).join("")}
+      <tr><td colspan="4"><button class="btn tiny" data-a="setAdd" data-k="${k}">＋ Serie</button></td></tr></table>
+    <div><label>Descanso sugerido (s)<input type="number" value="${e.rest || ""}" data-a-change="exF" data-k="${k}" data-f="rest" placeholder="180"></label>
+      <div class="small muted">Tempo (segundos)</div><div class="tempo">${T.map((l, i) => `<label>${l}<input type="number" min="0" value="${esc(tp[i] ?? "")}" data-a-change="tempoF" data-k="${k}" data-i="${i}" placeholder="–"></label>`).join("")}</div></div></div>
+    <label>Link del video (YouTube, Drive, Instagram…)<input value="${esc(e.video || "")}" data-a-change="exF" data-k="${k}" data-f="video"></label>
+    <label>Tips de ejecución (uno por línea; el cliente los ve como punteo)<textarea rows="3" data-a-change="exF" data-k="${k}" data-f="notes">${esc(String(e.notes || "").split(/\s*(?:\n|•)\s*/).filter(Boolean).join("\n"))}</textarea></label>
+    <details ${e.alts?.length ? "open" : ""}><summary class="small"><b>Reemplazos de emergencia (${(e.alts || []).length})</b> · si la máquina está ocupada</summary>
+      ${(e.alts || []).map((x, j) => `<div class="alt"><div class="row gap"><input class="grow" list="exlib" value="${esc(x.name)}" data-a-change="altF" data-k="${k}" data-j="${j}" data-f="name" placeholder="Ejercicio de reemplazo"><input class="grow" value="${esc(x.video || "")}" data-a-change="altF" data-k="${k}" data-j="${j}" data-f="video" placeholder="Link del video"><button class="icon-btn" data-a="altDel" data-k="${k}" data-j="${j}">✕</button></div>
+        <textarea rows="2" data-a-change="altF" data-k="${k}" data-j="${j}" data-f="tips" placeholder="Tips de este reemplazo (uno por línea)">${esc(x.tips || "")}</textarea></div>`).join("")}
+      <button class="btn tiny" data-a="altAdd" data-k="${k}">＋ Reemplazo</button></details></div>`; }).join("")}
   <button class="btn" data-a="exAdd">＋ Añadir ejercicio</button></div>`;
 }
+act("setF", (el) => { const x = RE.r.exercises[+el.dataset.k].sets[+el.dataset.j]; const v = el.value.trim(); x[el.dataset.f] = el.dataset.f === "rir" ? (v === "" ? "" : v.toUpperCase() === "F" ? "F" : +v) : v; });
+act("setAdd", (el) => { const e = RE.r.exercises[+el.dataset.k]; const l = e.sets[e.sets.length - 1] || { reps: "8-10", rir: 1 }; e.sets.push({ ...l }); refresh(); });
+act("setDel", (el) => { RE.r.exercises[+el.dataset.k].sets.splice(+el.dataset.j, 1); refresh(); });
+act("tempoF", (el) => { const e = RE.r.exercises[+el.dataset.k], t = String(e.tempo || "---").split("-"); while (t.length < 4) t.push(""); t[+el.dataset.i] = el.value; e.tempo = t.some((x) => x !== "") ? t.join("-") : ""; });
+act("altF", async (el) => {
+  const a = RE.r.exercises[+el.dataset.k].alts[+el.dataset.j]; a[el.dataset.f] = el.value;
+  if (el.dataset.f === "name") { const l = ((await db.get("library/exercises"))?.items || []).find((x) => x.name === el.value); if (l) { a.video = a.video || l.video || ""; a.tips = a.tips || l.tips || ""; refresh(); } }
+});
+act("altAdd", (el) => { const e = RE.r.exercises[+el.dataset.k]; (e.alts ||= []).push({ name: "", video: "", tips: "" }); refresh(); });
+act("altDel", (el) => { RE.r.exercises[+el.dataset.k].alts.splice(+el.dataset.j, 1); refresh(); });
 const parseSets = (s) => s.split(/[,\n]/).map((x) => x.trim()).filter(Boolean).map((x) => { const [reps, rir] = x.split("@"); return { reps: reps.trim(), rir: rir == null ? "" : rir.trim() === "F" ? "F" : +rir }; });
 act("rName", (el) => (RE.r.name = el.value));
 act("exF", async (el) => {
   const e = RE.r.exercises[+el.dataset.k], f = el.dataset.f;
   if (f === "sets") e.sets = parseSets(el.value);
   else if (f === "alts") e.alts = el.value.split(";").map((x) => x.trim()).filter(Boolean).map((x) => { const [name, video] = x.split("|").map((y) => y.trim()); return { name, video: video || "" }; });
-  else if (f === "rest" || f === "inc") e[f] = num(el.value);
+  else if (f === "rest") e[f] = num(el.value);
   else e[f] = el.value;
-  if (f === "name") { const lib = (await db.get("library/exercises"))?.items || []; const l = lib.find((x) => x.name === el.value); if (l) { e.video = e.video || l.video || ""; e.alts = e.alts?.length ? e.alts : l.alts || []; e.inc = e.inc || l.inc; e.libId = l.id; refresh(); } }
+  if (f === "name") { const lib = (await db.get("library/exercises"))?.items || []; const l = lib.find((x) => x.name === el.value); if (l) { e.video = e.video || l.video || ""; e.notes = e.notes || l.tips || ""; e.alts = e.alts?.length ? e.alts : (l.alts || []).map((a) => ({ name: a.name, video: a.video || "", tips: a.tips || "" })); e.libId = l.id; refresh(); } }
 });
-act("exAdd", () => { RE.r.exercises.push({ id: uid(), name: "", sets: [{ reps: "8", rir: 1 }, { reps: "8", rir: 1 }], alts: [] }); refresh(); });
+act("exAdd", () => { RE.r.exercises.push({ id: uid(), name: "", sets: [{ reps: "8-10", rir: 1 }, { reps: "8-10", rir: 1 }], alts: [] }); refresh(); });
 act("exDel", (el) => { RE.r.exercises.splice(+el.dataset.k, 1); refresh(); });
 act("exMove", (el) => { const a = RE.r.exercises, k = +el.dataset.k, n = k + +el.dataset.n; if (n < 0 || n >= a.length) return; [a[k], a[n]] = [a[n], a[k]]; refresh(); });
 act("rSave", async () => {
@@ -248,10 +284,24 @@ act("rDup", async () => { const id = uid(); await db.set(`clients/${CW.cid}/rout
 act("rDel", async () => { if (!(await confirmBox("¿Eliminar la rutina " + RE.r.name + "? Los entrenamientos ya registrados se mantienen."))) return; await db.del(`clients/${CW.cid}/routines/${RE.r.id}`); RE = null; refresh(); });
 
 // ---------- Alimentación de la semana
-async function foodView(c, w) {
+async function foodView(c0, w) {
+  const c = applyStage(c0, w.first);
   const days = await getDays(w.first, w.last, c.id);
   const photos = (await db.list(`clients/${c.id}/photos`)).filter((p) => p.kind === "comida" && p.week === w.key);
-  return w.days.map((d) => {
+  // Resumen de la semana: porciones por grupo, alimentos más frecuentes y lo que quedó fuera de la pauta
+  const regDays = w.days.filter((d) => Object.values(days[d]?.meals || {}).some((m) => m.length));
+  const por = {}, freq = {}, extra = {};
+  for (const d of regDays) for (const items of Object.values(days[d].meals || {})) for (const it of items) {
+    freq[it.name] = (freq[it.name] || 0) + 1;
+    if (it.cat && GROUPS[it.cat]?.[4] && it.por) por[it.cat] = (por[it.cat] || 0) + (+it.g || 0) / it.por;
+    else { const k = itemMacros(it).kcal; extra[it.name] = (extra[it.name] || 0) + k; }
+  }
+  const n = regDays.length || 1, groups = Object.keys({ ...(c.pauta || {}), ...por }).filter((g) => GROUPS[g]?.[4]);
+  const summary = regDays.length ? `<div class="card"><div class="card-t">Resumen de la semana · ${regDays.length} días con registro</div><div class="fsum">
+    <div><h4>Porciones promedio por día vs pauta</h4><table class="tbl"><tr><th>Grupo</th><th>Comió</th><th>Pauta</th></tr>${groups.map((g) => { const v = (por[g] || 0) / n, p = +(c.pauta?.[g] || 0), d = v - p; return `<tr><td>${esc(g)}</td><td class="${p ? (Math.abs(d) <= 0.5 ? "okc" : Math.abs(d) <= 1.5 ? "lowc" : "hic") : ""}">${r1(v)}</td><td class="muted">${p || "—"}</td></tr>`; }).join("")}</table></div>
+    <div><h4>Lo que más comió</h4>${Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `<div class="li row between small"><span>${esc(k)}</span><b>${v}×</b></div>`).join("")}</div>
+    <div><h4>Fuera de la pauta (no descuentan porciones)</h4>${Object.entries(extra).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `<div class="li row between small"><span>${esc(k)}</span><b>${r0(v)} kcal</b></div>`).join("") || '<p class="muted small">Nada fuera de la pauta.</p>'}</div></div></div>` : "";
+  return summary + w.days.map((d) => {
     const x = days[d] || {}, t = dayTotals(x), has = Object.values(x.meals || {}).some((m) => m.length);
     return `<details class="card" ${has ? "" : ""}><summary class="row between"><b>${fmtDate(d, true)}</b><span class="small">${has ? `${r0(t.kcal)} / ${c.kcal || "–"} kcal · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)}` : '<span class="muted">Sin registro</span>'}</span></summary>
     ${mealList(x).map((m) => { const it = x.meals?.[m] || [], ph = photos.filter((p) => p.date === d && p.meal === m); if (!it.length && !x.mealNotes?.[m] && !ph.length) return ""; return `<div class="mt"><b>${m}</b>${it.map((i) => `<div class="li row between small"><span>${esc(i.name)} · ${r0(i.g)} g${i.quick ? " (rápido)" : ""}</span><span>${r0(itemMacros(i).kcal)} kcal</span></div>`).join("")}${x.mealNotes?.[m] ? `<div class="note">📝 ${esc(x.mealNotes[m])}</div>` : ""}${ph.length ? `<div class="thumbs">${ph.map((p) => `<img src="${p.data}">`).join("")}</div>` : ""}</div>`; }).join("")}</details>`;
@@ -259,7 +309,8 @@ async function foodView(c, w) {
 }
 
 // ---------- Progreso
-let cmp = {};
+let cmp = {}, PEX = null;
+act("pexSel", (el) => { PEX = el.value; refresh(); });
 async function progView(c) {
   const today = ymd(), days = await getDays(addDays(today, -120), today, c.id);
   const keys = Object.keys(days).sort(), vals = keys.map((k) => days[k].weight ?? null);
@@ -269,7 +320,13 @@ async function progView(c) {
   const pick = (wk, t) => photos.filter((p) => p.week === wk && p.kind === t).sort((a, b) => b.at - a.at)[0];
   const meas = (await db.list(`clients/${c.id}/measures`)).sort((a, b) => a.id.localeCompare(b.id));
   const equip = (await db.list(`clients/${c.id}/photos`)).filter((p) => p.kind === "equipo");
+  const sess = (await getSessions(c.id)).filter((x) => x.status === "fin").sort((a, b) => a.startedAt - b.startedAt);
+  const exNames = [...new Set(sess.flatMap((x) => x.exercises.map((e) => e.name)))].sort((a, b) => a.localeCompare(b, "es"));
+  if (!PEX || !exNames.includes(PEX)) PEX = exNames[0];
+  const pts = sess.map((x) => { const e = x.exercises.find((y) => y.name === PEX); if (!e) return null; const v = e.sets.filter((y) => +y.w && +y.r); if (!v.length) return null; const best = v.reduce((a, y) => (e1rm(y.w, y.r, y.rir) > e1rm(a.w, a.r, a.rir) ? y : a)); return { d: x.date, rm: r1(e1rm(best.w, best.r, best.rir)), top: best }; }).filter(Boolean);
   return `<div class="card"><div class="card-t">Peso (120 días)</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals, color: "var(--muted)", dots: true, w: 1 }, { vals: trend(vals), color: "var(--acc)" }], { h: 240, unit: " kg" })}</div>
+  <div class="card"><div class="row between"><div class="card-t">Progreso por ejercicio · fuerza estimada (1RM con RIR)</div><select data-a-change="pexSel">${exNames.map((n) => `<option ${n === PEX ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div>
+  ${pts.length ? `${lineChart(pts.map((p) => p.d.slice(8) + "/" + p.d.slice(5, 7)), [{ vals: pts.map((p) => p.rm), color: "var(--acc)", dots: true }], { h: 200, unit: " kg" })}<p class="small muted">Mejor serie de cada sesión: ${pts.slice(-6).map((p) => `${fmtDate(p.d)} <b>${p.top.w}×${p.top.r}</b>`).join(" · ")}${pts.length > 1 ? ` · cambio total: <b class="${pts[pts.length - 1].rm >= pts[0].rm ? "g" : "r"}">${pts[pts.length - 1].rm - pts[0].rm >= 0 ? "+" : ""}${r1(pts[pts.length - 1].rm - pts[0].rm)} kg</b>` : ""}</p>` : `<p class="muted">Sin registros de este ejercicio.</p>`}</div>
   <div class="card"><div class="row between"><div class="card-t">Fotos</div><div class="row gap">${["a", "b"].map((k) => `<select data-a-change="cmpSel" data-k="${k}">${weeks.map((x) => `<option ${x === cmp[k] ? "selected" : ""} value="${x}">Semana ${+x.slice(1)}</option>`).join("")}</select>`).join(" vs ")}</div></div>
   ${weeks.length ? `<div class="cmp-grid">${PHOTO_TYPES.map(([t, l]) => { const a = pick(cmp.a, t), b = pick(cmp.b, t); return a || b ? `<div class="cmp"><div>${a ? `<img src="${a.data}">` : "—"}</div><div>${b ? `<img src="${b.data}">` : "—"}</div><small>${l}</small></div>` : ""; }).join("")}</div>` : `<p class="muted">Sin fotos aún.</p>`}</div>
   <div class="card scroll-x"><div class="card-t">Medidas (cm)</div>${meas.length ? `<table class="tbl"><tr><th>Zona</th>${meas.map((m) => `<th>${fmtDate(m.id)}</th>`).join("")}<th>Cambio</th></tr>${MEASURE_ZONES.map(([k, l]) => { const v = meas.map((m) => m[k]).filter((x) => x != null); return `<tr><td>${l}</td>${meas.map((m) => `<td>${m[k] ?? "—"}</td>`).join("")}<td>${v.length > 1 ? r1(v[v.length - 1] - v[0]) : ""}</td></tr>`; }).join("")}</table>` : `<p class="muted">Sin mediciones.</p>`}</div>
@@ -305,11 +362,26 @@ async function feedbackView(c, w) {
   return `<div class="card"><div class="card-t">Retroalimentación · Semana ${w.n}</div><p class="muted small">Aparece como mensaje grande en la pantalla de inicio del cliente durante esa semana.</p>
   <label>Link del video (YouTube no listado, Drive, Loom…)<input id="fbV" value="${esc(fb.videoUrl || "")}"></label>
   <label>Puntos clave (uno por línea)<textarea id="fbP" rows="5">${esc((fb.points || []).join("\n"))}</textarea></label>
-  <label>Mensaje (opcional)<textarea id="fbT" rows="3">${esc(fb.text || "")}</textarea></label>
+  <label>Mensaje (opcional)<textarea id="fbT" rows="4">${esc(fb.text || "")}</textarea></label>
+  <div class="row gap"><button type="button" class="btn small" data-a="fbDictate" id="fbDic">🎙 Dictar mensaje</button><button type="button" class="btn small ghost" data-a="fbPoints">Sacar puntos clave del mensaje</button><span class="muted small">Habla como si le grabaras un audio; después ordenas los puntos.</span></div>
   ${ciW?.foco ? `<p class="small">Foco que propuso en su check-in: <b>${esc(ciW.foco)}</b></p>` : ""}
   <label>Foco de la semana (la primera línea es la acción que le preguntamos en el próximo check-in)<textarea id="fbG" rows="3">${esc(goals.join("\n"))}</textarea></label>
   <button class="btn primary" data-a="fbSave" data-w="${w.key}">Publicar al cliente</button></div>`;
 }
+let FBREC = null;
+act("fbDictate", async () => {
+  const { listen, speechSupported } = await import("./voice.js");
+  if (FBREC) { FBREC.stop(); FBREC = null; $("#fbDic").textContent = "🎙 Dictar mensaje"; return; }
+  if (!speechSupported()) return toast("Este navegador no permite dictar (usa Chrome)");
+  const ta = $("#fbT"), base = ta.value ? ta.value.trim() + " " : "";
+  $("#fbDic").textContent = "■ Detener";
+  FBREC = listen({ onText: (fin, int) => { ta.value = base + fin + (int ? " " + int : ""); }, onEnd: () => { FBREC = null; const b = $("#fbDic"); if (b) b.textContent = "🎙 Dictar mensaje"; }, onError: () => toast("No se pudo usar el micrófono") });
+});
+act("fbPoints", () => {
+  const t = $("#fbT").value.trim(); if (!t) return toast("Primero escribe o dicta el mensaje");
+  const pts = t.split(/(?<=[.!?])\s+|\n+|,\s*(?:y |además |también |otra cosa )/i).map((x) => x.trim().replace(/^(y|además|también|otra cosa)[, ]+/i, "")).filter((x) => x.split(/\s+/).length >= 4).map((x) => x[0].toUpperCase() + x.slice(1).replace(/[.,;]+$/, ""));
+  const cur = $("#fbP").value.trim(); $("#fbP").value = (cur ? cur + "\n" : "") + pts.join("\n"); toast(`${pts.length} puntos agregados: revísalos y edítalos`);
+});
 act("fbSave", async (el) => {
   const fb = { week: el.dataset.w, videoUrl: $("#fbV").value.trim(), points: $("#fbP").value.split("\n").map((x) => x.trim()).filter(Boolean), text: $("#fbT").value.trim(), at: Date.now() };
   await db.set(`clients/${CW.cid}/feedbacks/${fb.week}`, { ...fb, answered: true });
@@ -329,23 +401,26 @@ async function dataView(c) {
     <div class="row gap">${acc?.ok ? `<button class="btn" data-a="accSet" data-v="0">Quitar acceso</button><button class="btn primary" data-a="copyInvite">Copiar invitación para WhatsApp</button>` : `<button class="btn primary" data-a="accSet" data-v="1">Dar acceso</button>`}</div>`}</div>
   <form class="card" id="dataF"><div class="card-t">Asesoría</div><div class="grid3">
   <label>Tipo de asesoría<select name="service"><option value="">— Definir —</option>${Object.entries(SERVICES).map(([k, l]) => `<option value="${k}" ${c.service === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-  ${f("modalidad", "Modalidad (ej: Liviana, Completa)")}
+  ${f("startDate", "Inicio del servicio (define el inicio de cada semana)", "date")}${f("endDate", "Fin del servicio (si tiene)", "date")}
   <label>Día de check-in<select name="checkinDay"><option value="">—</option>${[1, 2, 3, 4, 5, 6, 0].map((d) => `<option value="${d}" ${c.checkinDay !== "" && c.checkinDay != null && +c.checkinDay === d ? "selected" : ""}>${DAYS[d]}</option>`).join("")}</select></label>
-  <label class="chkrow"><input type="checkbox" name="checkinForm" ${c.checkinForm ? "checked" : ""}> Hace el check-in por Google Forms</label>
-  ${f("endDate", "Fin del servicio (si tiene)", "date")}${f("city", "Ciudad / país (zona horaria)")}
-  <label class="span2">Planilla anterior (link)<input name="sheetUrl" value="${esc(c.sheetUrl || "")}"></label>${c.sheetUrl ? `<a class="btn small" target="_blank" href="${esc(c.sheetUrl)}">Abrir planilla</a>` : ""}</div>
+  ${f("city", "Ciudad / país (zona horaria)")}
+  ${f("payDate", "Próximo pago", "date")}<label>Se renueva cada<select name="payEvery">${[["", "—"], ["30", "1 mes"], ["90", "3 meses"], ["180", "6 meses"]].map(([v, l]) => `<option value="${v}" ${String(c.payEvery ?? "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+  ${c.sheetUrl ? `<label>Planilla anterior<a class="btn small" target="_blank" href="${esc(c.sheetUrl)}">Abrir planilla</a></label>` : ""}</div>
+  ${c.payDate ? `<div class="note small"><b>Así le llega el recordatorio de pago</b> (le aparece en el inicio 3 días antes y el mismo día):<div class="paycard mt">${payMsg(c)}</div></div>` : ""}
   <label>Pendientes (uno por línea · empieza con <b>!</b> si es urgente) — aparecen en amarillo o rojo<textarea name="todo" rows="3">${esc((c.todo || []).join("\n"))}</textarea></label>
   <label>Notas internas (solo las ves tú)<textarea name="notes" rows="3">${esc(c.notes || "")}</textarea></label>
   <div class="card-t mt">Información personal</div><div class="grid3">
   ${f("name", "Nombre")}${f("email", "Correo (con el que crea su cuenta)", "email", legacy ? "readonly" : "")}${f("birth", "Fecha de nacimiento", "date")}
   <label>Sexo<select name="sex"><option value="">—</option><option value="M" ${c.sex === "M" ? "selected" : ""}>Masculino</option><option value="F" ${c.sex === "F" ? "selected" : ""}>Femenino</option></select></label>
-  ${f("height", "Estatura (cm)", "number")}${f("startDate", "Inicio de la asesoría (define el inicio de cada semana)", "date")}${f("goal", "Objetivo")}</div>
-  <div class="card-t mt">Etapa y objetivos diarios</div><div class="grid3">
-  <label>Etapa (si no hay etapas definidas)<select name="phase">${Object.keys(PHASES).map((p) => `<option ${c.phase === p ? "selected" : ""}>${p}</option>`).join("")}</select></label>
+  ${f("height", "Estatura (cm)", "number")}</div>
+  <label>Objetivos (del formulario de ingreso)<textarea name="goal" rows="2">${esc(c.goal || "")}</textarea></label>
+  <div class="card-t mt">Objetivos diarios</div>
+  ${(() => { const a = applyStage(c); return a.stage ? `<p class="small">Vigentes hoy por su etapa <b style="color:${phaseColor(a.phase)}">${esc(a.phase)}</b> (semanas ${a.stage.from}–${a.stage.to}): <b>${a.kcal || "—"} kcal</b> · C ${a.cho || "—"} · L ${a.fat || "—"} · P ${a.prot || "—"} · ${(a.steps || 0).toLocaleString("es-CL")} pasos. Se cambian en <a href="#coach/c/${c.id}/etapas">Etapas</a>; los de abajo se usan solo cuando no hay etapa.</p>` : `<p class="muted small">No tiene etapas: se usan estos. Para planificar por semanas usa <a href="#coach/c/${c.id}/etapas">Etapas</a>.</p>`; })()}
+  <div class="grid3"><label>Etapa (si no hay etapas definidas)<select name="phase">${Object.keys(PHASES).map((p) => `<option ${c.phase === p ? "selected" : ""}>${p}</option>`).join("")}</select></label>
   ${f("kcal", "Calorías", "number")}${f("cho", "CHO (g)", "number")}${f("fat", "Lípidos (g)", "number")}${f("prot", "Proteína (g)", "number")}
   ${f("steps", "Pasos", "number")}${f("water", "Agua (ml)", "number")}${f("sleep", "Sueño (h)", "number", 'step="0.5"')}${f("rest", "Descanso entre series por defecto (s)", "number")}</div>
-  <p class="muted small">Agua sugerida según peso (35 ml/kg): <b id="wSug">—</b> <button type="button" class="btn tiny" data-a="waterSug">Usar</button></p>
-  <div class="card-t mt">Plan de alimentación</div>${`<label>Link al PDF del plan (Drive)<input name="planUrl" value="${esc(c.plan?.pdfUrl || "")}"></label><label>Notas del plan<textarea name="planNotes" rows="3">${esc(c.plan?.notes || "")}</textarea></label>`}
+  <p class="muted small">Agua: si la dejas en blanco es <b>automática</b> (40 ml por kg del último peso registrado): hoy sería <b id="wSug">—</b>.</p>
+  <div class="card-t mt">Plan de alimentación</div><label>Link al PDF del plan (respaldo en Drive; el plan se arma en “Plan alimentación”)<input name="planUrl" value="${esc(c.plan?.pdfUrl || "")}"></label>
   ${c.service === "entrenamiento" ? `<div class="card-t mt">Guía de macros (solo entrenamiento · el cliente ve rangos en vez de un plan)</div><p class="muted small">Gramos por kg de peso. Si dejas en blanco calorías y macros de arriba, su meta diaria es el punto medio de estos rangos.</p>
   <div class="grid3">${[["prot", "Proteína"], ["cho", "Carbohidratos"], ["fat", "Grasas"]].map(([k, l]) => { const v = c.ranges?.[k] || DEFAULT_RANGES[k]; return `<label>${l} (g/kg)<span class="row gap"><input type="number" step="0.1" data-rng="${k}" data-i="0" value="${v[0]}"><span>a</span><input type="number" step="0.1" data-rng="${k}" data-i="1" value="${v[1]}"></span></label>`; }).join("")}</div>` : ""}
   <details><summary class="card-t">Pauta por porciones (opcional · descuenta porciones al registrar)</summary><div class="grid4">${Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => `<label>${g}<input type="number" step="0.5" data-pauta="${esc(g)}" value="${c.pauta?.[g] ?? ""}"></label>`).join("")}</div></details>
@@ -355,15 +430,14 @@ async function dataView(c) {
 document.addEventListener("rendered", async () => {
   const el = $("#wSug"); if (!el || !CW) return;
   const days = await getDays(addDays(ymd(), -14), ymd(), CW.cid); const w = Object.values(days).map((d) => d.weight).filter(Boolean).pop();
-  el.textContent = w ? Math.round((w * 35) / 100) * 100 + " ml" : "sin pesajes"; el.dataset.v = w ? Math.round((w * 35) / 100) * 100 : "";
+  el.textContent = w ? waterAuto(w) + " ml" : "sin pesajes"; el.dataset.v = w ? waterAuto(w) : "";
 });
 act("waterSug", () => { const v = $("#wSug").dataset.v; if (v) $('#dataF [name="water"]').value = v; });
 act("dataSave", async () => {
-  const fd = Object.fromEntries(new FormData($("#dataF")));
-  const n = ["height", "kcal", "cho", "fat", "prot", "steps", "water", "sleep", "rest", "checkinDay"];
+  const fd = Object.fromEntries(new FormData($("#dataF"))), c0 = await getClient(CW.cid);
+  const n = ["height", "kcal", "cho", "fat", "prot", "steps", "water", "sleep", "rest", "checkinDay", "payEvery"];
   const data = {};
   for (const [k, v] of Object.entries(fd)) if (!["planUrl", "planNotes", "dates", "email", "todo", "checkinForm"].includes(k)) data[k] = n.includes(k) ? num(v) : v;
-  data.checkinForm = !!fd.checkinForm;
   data.todo = (fd.todo || "").split("\n").map((x) => x.trim()).filter(Boolean);
   // Correo: mueve su permiso de acceso al correo nuevo
   const old = await getClient(CW.cid), ne = emailKey(fd.email), oe = emailKey(old.email);
@@ -373,7 +447,7 @@ act("dataSave", async () => {
     if (ne) await db.set("access/" + ne, { cid: CW.cid, name: fd.name, ok: !!acc?.ok, at: Date.now() });
     data.email = ne;
   }
-  data.plan = { pdfUrl: fd.planUrl, notes: fd.planNotes };
+  data.plan = { ...(c0.plan || {}), pdfUrl: fd.planUrl };
   data.dates = fd.dates.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => ({ date: l.slice(0, 10), label: l.slice(11) }));
   data.pauta = {}; $$("[data-pauta]").forEach((i) => { if (i.value !== "") data.pauta[i.dataset.pauta] = num(i.value); });
   if ($("[data-rng]")) { data.ranges = {}; $$("[data-rng]").forEach((i) => { (data.ranges[i.dataset.rng] ||= [null, null])[+i.dataset.i] = num(i.value); }); }
@@ -419,9 +493,9 @@ act("importFile", async (el) => {
 
 // ================================================================ CLIENTE DE EJEMPLO (para ver cómo se ve la app con semanas llenas)
 act("exampleClient", () => sheet("Clientes de ejemplo", `<p class="muted small">Crea un cliente ficticio con 4 semanas de registros, entrenamientos, check-in y retroalimentación, para ver cómo se ve la app. Después toca “Ver como cliente”.</p>
-  ${Object.entries(SERVICES).map(([k, l]) => `<button class="btn big" data-a="exampleMake" data-s="${k}">${k === "completa" ? "Asesoría 1-1 (todo)" : l}</button>`).join("")}`));
+  ${Object.entries(SERVICES).map(([k, l]) => `<button class="btn big" data-a="exampleMake" data-s="${k}">${l}</button>`).join("")}`));
 act("exampleMake", async (el) => {
-  const sv = el.dataset.s, label = { completa: "Ejemplo · Asesoría 1-1", entrenamiento: "Ejemplo · Solo entrenamiento", nutricion: "Ejemplo · Solo nutrición" }[sv];
+  const sv = el.dataset.s, label = { completa: "Ejemplo · Coaching 1-1", entrenamiento: "Ejemplo · Entrenamiento", nutricion: "Ejemplo · Nutrición" }[sv];
   const old = (await db.list("clients")).filter((c) => c.example && c.service === sv && !c.archived);
   for (const o of old) await db.set("clients/" + o.id, { archived: true });
   closeSheet(); toast("Creando cliente de ejemplo…");
@@ -448,9 +522,13 @@ async function library() {
   <label>Link al manual de uso (opcional)<input id="obM" value="${esc(ob.manualUrl || "")}"></label>
   <div class="row gap"><button class="btn primary" data-a="obSave">Guardar</button><button class="btn" data-a="obOpen">Ver cómo se ve</button></div></div>`;
   return `<h1>Biblioteca</h1>${obCard}${svcTable}
-  <div class="card"><div class="card-t">Base de ejercicios (${ex.length})</div><p class="muted small">Al escribir un ejercicio en una rutina, se completan solos su video, reemplazos y salto de carga.</p>
-  <table class="tbl"><tr><th>Ejercicio</th><th>Grupo / patrón</th><th>Video</th><th>Salto (kg)</th><th>Reemplazos (Nombre | link; …)</th><th>Tips (los ven tus clientes de nutrición)</th><th></th></tr>
-  ${ex.map((e, k) => `<tr><td><input value="${esc(e.name)}" data-a-change="libEx" data-k="${k}" data-f="name"></td><td><input value="${esc(e.group || "")}" data-a-change="libEx" data-k="${k}" data-f="group"></td><td><input value="${esc(e.video || "")}" data-a-change="libEx" data-k="${k}" data-f="video"></td><td><input type="number" step="0.5" value="${e.inc || ""}" data-a-change="libEx" data-k="${k}" data-f="inc" style="width:70px"></td><td><input value="${esc((e.alts || []).map((a) => a.name + (a.video ? " | " + a.video : "")).join("; "))}" data-a-change="libEx" data-k="${k}" data-f="alts"></td><td><textarea rows="1" data-a-change="libEx" data-k="${k}" data-f="tips">${esc(e.tips || "")}</textarea></td><td><button class="icon-btn" data-a="libExDel" data-k="${k}">✕</button></td></tr>`).join("")}</table>
+  <div class="card"><div class="row between"><div class="card-t">Base de ejercicios (${ex.length}) · ${ex.filter((e) => e.video).length} con video · ${ex.filter((e) => e.tips).length} con tips</div><button class="btn tiny" data-a="libGuess">Asignar grupo muscular automáticamente</button></div>
+  <p class="muted small">Al escribir un ejercicio en una rutina se completan solos su video, sus tips y sus reemplazos. Las variantes (agarre en V, recto, sentado…) pueden copiar los tips de la principal.</p>
+  <div class="scroll-x"><table class="tbl libt"><tr><th>Ejercicio</th><th>Grupo muscular</th><th>Video</th><th>Tips</th><th>Link del video</th><th>Tips de ejecución (uno por línea)</th><th></th></tr>
+  ${[...MUSCLES, ""].map((g) => { const items = ex.map((e, k) => ({ e, k })).filter(({ e }) => (e.group || "") === g); return items.length ? `<tr class="svg"><td colspan="7">${g || "Sin grupo"} (${items.length})</td></tr>` + items.sort((a, b) => a.e.name.localeCompare(b.e.name, "es")).map(({ e, k }) => `<tr><td><input value="${esc(e.name)}" data-a-change="libEx" data-k="${k}" data-f="name"></td>
+    <td><select data-a-change="libEx" data-k="${k}" data-f="group"><option value="">—</option>${MUSCLES.map((m) => `<option ${e.group === m ? "selected" : ""}>${m}</option>`).join("")}</select></td>
+    <td class="center">${e.video ? '<span class="g">✓</span>' : '<span class="muted">—</span>'}</td><td class="center">${e.tips ? '<span class="g">✓</span>' : '<span class="muted">—</span>'}</td>
+    <td><input value="${esc(e.video || "")}" data-a-change="libEx" data-k="${k}" data-f="video"></td><td><textarea rows="1" data-a-change="libEx" data-k="${k}" data-f="tips">${esc(e.tips || "")}</textarea></td><td><button class="icon-btn" data-a="libExDel" data-k="${k}">✕</button></td></tr>`).join("") : ""; }).join("")}</table></div>
   <button class="btn" data-a="libExAdd">＋ Ejercicio</button></div>
   <div class="card"><div class="card-t">Guías para clientes</div>${gd.map((g, k) => `<div class="row gap"><input value="${esc(g.title)}" data-a-change="libG" data-k="${k}" data-f="title" placeholder="Título"><input class="grow" value="${esc(g.url)}" data-a-change="libG" data-k="${k}" data-f="url" placeholder="Link (PDF en Drive)"><input class="grow" value="${esc(g.desc || "")}" data-a-change="libG" data-k="${k}" data-f="desc" placeholder="Descripción"><button class="icon-btn" data-a="libGDel" data-k="${k}">✕</button></div>`).join("")}<button class="btn" data-a="libGAdd">＋ Guía</button></div>
   <div class="card"><div class="card-t">Base de alimentos para el registro</div><p class="muted small">El registro usa el <b>aporte real por 100 g</b>: 600 alimentos de la <b>Tabla de Composición de Alimentos INTA 2018</b> (lo que no trae, del USDA), más 5.076 productos envasados chilenos verificados de Open Food Facts y los que escaneen o creen tus clientes. Cada alimento tiene su grupo de intercambio, así igual se descuentan porciones de la pauta.${fd?.items?.length ? ` Además tienes ${fd.items.length} alimentos propios agregados.` : ""}</p>
@@ -467,6 +545,10 @@ act("libEx", async (el) => {
   else e[f] = f === "inc" ? num(el.value) : el.value;
   await libSave("exercises", items); toast("Guardado");
 });
+const MUSCLES = ["Pecho", "Espalda", "Hombros", "Bíceps", "Tríceps", "Antebrazos", "Cuádriceps", "Isquiotibiales", "Glúteos", "Aductores", "Abductores", "Pantorrillas", "Abdomen", "Cardio", "Otro"];
+const GUESS = [[/pantorr|gemel|calf/i, "Pantorrillas"], [/abduct/i, "Abductores"], [/aduct/i, "Aductores"], [/abdom|crunch|plancha|core/i, "Abdomen"], [/hip thrust|gl[uú]te|patada|kickback/i, "Glúteos"], [/leg curl|curl femoral|femoral|rdl|rumano|isquio|nordic/i, "Isquiotibiales"], [/leg ext|extensi[oó]n de cu[aá]d|sentadilla|squat|prensa|hack|zancada|estocada|bulgar/i, "Cuádriceps"], [/tr[ií]cep|dip|fondos|press franc/i, "Tríceps"], [/b[ií]cep|curl|preacher|martillo/i, "Bíceps"], [/elevaci|lateral|militar|deltoid|face pull|hombro|overhead/i, "Hombros"], [/jal[oó]n|remo|dominad|pull ?up|pull ?over|espalda|row/i, "Espalda"], [/press|pec ?fly|pecfly|apertura|pecho|chest|banca|cruce/i, "Pecho"], [/bici|trote|cinta|el[ií]ptic|cardio/i, "Cardio"]];
+export const guessMuscle = (n) => (GUESS.find(([re]) => re.test(n || "")) || [])[1] || "";
+act("libGuess", async () => { const items = (await db.get("library/exercises"))?.items || []; let n = 0; items.forEach((e) => { if (!e.group) { const g = guessMuscle(e.name); if (g) { e.group = g; n++; } } }); await libSave("exercises", items); toast(`${n} ejercicios con grupo asignado (revísalos)`); refresh(); });
 act("libExAdd", async () => { const items = (await db.get("library/exercises"))?.items || []; items.push({ id: uid(), name: "", group: "", video: "", alts: [] }); await libSave("exercises", items); refresh(); });
 act("libExDel", async (el) => { const items = (await db.get("library/exercises"))?.items || []; items.splice(+el.dataset.k, 1); await libSave("exercises", items); refresh(); });
 act("libG", async (el) => { const items = (await db.get("library/guides"))?.items || []; items[+el.dataset.k][el.dataset.f] = el.value; await libSave("guides", items); toast("Guardado"); });
@@ -499,29 +581,85 @@ function parseCsv(t) {
 }
 
 
-// ---------- Etapas nutricionales (calendario)
+// ---------- Etapas: calendario para pintar semanas + cálculo por fórmula
+let STB = { brush: "Mantención", month: null };
+const validSt = (c) => (c.stages || []).filter((x) => +x.from >= 1 && +x.to >= +x.from).sort((a, b) => a.from - b.from);
+async function lastWeight(cid) { const d = await getDays(addDays(ymd(), -45), ymd(), cid); return Object.keys(d).sort().map((k) => weightCorr(d[k])).filter(Boolean).pop() || null; }
 async function stagesView(c) {
-  const st = [...(c.stages || [])].sort((a, b) => a.from - b.from);
-  const now = weekInfo(c, ymd()).n;
-  const inp = (k, i, v, w = 80, type = "number") => `<input type="${type}" data-a-change="stF" data-i="${i}" data-k="${k}" value="${esc(v ?? "")}" style="width:${w}px">`;
-  return `<div class="card"><div class="card-t">Calendario nutricional · semana actual ${now}</div>${stagesBar(c, now)}</div>
-  <div class="card"><p class="muted small">Define cada etapa por número de semana. Los bloques duran lo que necesiten; no hay descargas automáticas. Mientras dure una etapa, sus objetivos reemplazan a los de "Datos y objetivos" (deja en blanco lo que no cambie). El cliente lo ve en su Timeline y sus metas cambian solas al pasar de etapa.</p>
-  <table class="tbl"><tr><th>Etapa</th><th>Desde sem.</th><th>Hasta sem.</th><th>Kcal</th><th>CHO</th><th>Lípidos</th><th>Proteína</th><th>Pasos</th><th>Agua (ml)</th><th>Ajuste del plan</th><th>Nota para el cliente</th><th></th></tr>
-  ${st.map((x, i) => `<tr><td><div class="row"><span class="dotc" style="background:${phaseColor(x.phase)}"></span><select data-a-change="stF" data-i="${i}" data-k="phase">${Object.keys(PHASES).map((p) => `<option ${p === x.phase ? "selected" : ""}>${p}</option>`).join("")}</select></div></td>
-    <td>${inp("from", i, x.from, 64)}</td><td>${inp("to", i, x.to, 64)}</td><td>${inp("kcal", i, x.kcal)}</td><td>${inp("cho", i, x.cho, 64)}</td><td>${inp("fat", i, x.fat, 64)}</td><td>${inp("prot", i, x.prot, 64)}</td><td>${inp("steps", i, x.steps, 80)}</td><td>${inp("water", i, x.water, 80)}</td>
+  const st = validSt(c), now = weekInfo(c, ymd()).n, kg = (await lastWeight(c.id)) || c.weightStart || null;
+  const def = (await db.get("library/phases")) || {}, pctDef = (p) => def.pct?.[p] ?? PHASE_PCT[p] ?? 0;
+  const maint = c.kcalMaint || null;
+  if (!STB.month) STB.month = ymd().slice(0, 7);
+  const nextM = (m) => { const [y, mm] = m.split("-").map(Number); return `${mm === 12 ? y + 1 : y}-${String(mm === 12 ? 1 : mm + 1).padStart(2, "0")}`; };
+  const inp = (k, i, v, w = 70, ph = "", step = "any") => `<input type="number" step="${step}" data-a-change="stF" data-i="${i}" data-k="${k}" value="${esc(v ?? "")}" placeholder="${esc(ph)}" style="width:${w}px">`;
+  return `<div class="card"><div class="row between"><div class="card-t">Calendario de etapas · semana actual ${now}</div><span class="muted small">Elige una etapa y toca los días: se pinta la semana completa de ese día.</span></div>
+  <div class="chips">${Object.keys(PHASES).map((p) => `<button class="chip ${STB.brush === p ? "on" : ""}" style="${STB.brush === p ? `background:${phaseColor(p)};border-color:${phaseColor(p)}` : `box-shadow:inset 3px 0 0 ${phaseColor(p)}`}" data-a="stBrush" data-p="${esc(p)}">${p}</button>`).join("")}<button class="chip ${STB.brush === "" ? "on" : ""}" data-a="stBrush" data-p="">Borrar</button></div>
+  <div class="st-cals"><div>${monthCal(c, { month: STB.month, nav: "stMonth", act: "stPaint", selWeek: now })}</div><div>${monthCal(c, { month: nextM(STB.month), act: "stPaint", selWeek: now })}</div></div></div>
+  <div class="card"><div class="card-t">Base del cálculo</div><div class="grid4">
+    <label>Mantención actual (kcal/día)<input type="number" value="${maint ?? ""}" placeholder="${c.kcal || ""}" data-a-change="stBase" data-k="kcalMaint"></label>
+    <label>Peso para el cálculo<input disabled value="${kg ? r1(kg) + " kg (último registrado)" : "sin pesajes"}"></label>
+    <label>Proteína por defecto (g/kg)<input type="number" step="0.1" value="${c.protKg ?? 2}" data-a-change="stBase" data-k="protKg"></label>
+    <label>Grasa por defecto (g/kg)<input type="number" step="0.1" value="${c.fatKg ?? 0.8}" data-a-change="stBase" data-k="fatKg"></label></div>
+    <p class="muted small">Kcal de cada etapa = mantención × (1 + %). Proteína y grasa por kilo de peso; los carbohidratos completan las calorías. Si la mantención cambia (más pasos, más actividad), anota la nueva solo en esa etapa. Agua: automática, ${40} ml por kg del último peso${kg ? ` = <b>${waterAuto(kg)} ml</b>` : ""}.</p>
+    <details><summary class="small">% por defecto de cada etapa (aplica a todos tus clientes)</summary><div class="grid4">${Object.keys(PHASES).map((p) => `<label>${p}<input type="number" step="1" value="${pctDef(p)}" data-a-change="stPctDef" data-p="${esc(p)}"></label>`).join("")}</div></details></div>
+  <div class="card scroll-x"><table class="tbl stt"><tr><th>Etapa</th><th>Semanas</th><th>% vs mant.</th><th>Mant. de la etapa</th><th>P g/kg</th><th>G g/kg</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Pasos</th><th>Cardio</th><th>Ajuste del plan</th><th>Nota para el cliente</th></tr>
+  ${st.map((x, i) => { const t = stageCalc(c, x, kg, pctDef); return `<tr><td><span class="dotc" style="background:${phaseColor(x.phase)}"></span><b>${esc(x.phase)}</b></td>
+    <td class="small">S${x.from}–S${x.to}<br><span class="muted">${fmtDate(addDays(c.startDate || ymd(), (x.from - 1) * 7))} – ${fmtDate(addDays(c.startDate || ymd(), x.to * 7 - 1))}</span></td>
+    <td>${inp("pct", i, x.pct, 58, pctDef(x.phase))}</td><td>${inp("maint", i, x.maint, 76, maint || c.kcal || "")}</td><td>${inp("protKg", i, x.protKg, 54, c.protKg ?? 2, "0.1")}</td><td>${inp("fatKg", i, x.fatKg, 54, c.fatKg ?? 0.8, "0.1")}</td>
+    ${["kcal", "cho", "fat", "prot"].map((k) => `<td>${inp(k, i, x[k], 66, t[k] ?? "")}</td>`).join("")}
+    <td>${inp("steps", i, x.steps, 76, c.steps || "")}</td><td><input value="${esc(x.cardio || "")}" data-a-change="stF" data-i="${i}" data-k="cardio" placeholder="ej: 3×25 min" style="width:96px"></td>
     <td><button class="btn tiny" data-a="stAdj" data-i="${i}">${adjTxt(x.adj) ? esc(adjTxt(x.adj)) : "Sin cambios"}</button></td>
-    <td>${inp("note", i, x.note, 220, "text")}</td><td><button class="icon-btn" data-a="stDel" data-i="${i}">✕</button></td></tr>`).join("")}</table>
-  <button class="btn" data-a="stAdd">＋ Agregar etapa</button></div>`;
+    <td><input value="${esc(x.note || "")}" data-a-change="stF" data-i="${i}" data-k="note" style="width:200px" placeholder="La ve en su Timeline y en su plan"></td></tr>`; }).join("") || `<tr><td colspan="14" class="muted">Pinta semanas en el calendario para crear etapas.</td></tr>`}</table>
+  <p class="muted small">En gris va lo que calcula la fórmula; escribe un número solo si quieres fijarlo a mano. La nota la ve el cliente en su Timeline y arriba de su plan de alimentación.</p></div>`;
 }
-const stSave = async (fn) => { const c = await getClient(CW.cid); const st = [...(c.stages || [])].sort((a, b) => a.from - b.from); fn(st); await db.set("clients/" + CW.cid, { stages: st }); refresh(); };
-act("stF", (el) => stSave((st) => { const k = el.dataset.k; st[+el.dataset.i][k] = ["phase", "note"].includes(k) ? el.value : num(el.value); }));
-act("stAdj", async (el) => {
-  const c = await getClient(CW.cid), st = [...(c.stages || [])].sort((a, b) => a.from - b.from), x = st[+el.dataset.i]; if (!x) return;
-  const groups = Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => g);
-  sheet(`Ajuste del plan · ${x.phase} (sem. ${x.from}–${x.to})`, `<p class="muted small">Porciones que sumas o restas a la pauta en esta etapa (ej. <b>-1</b> Cereales, <b>-0.5</b> Aceites y grasas). En el plan del cliente, los alimentos de ese grupo bajan su gramaje en la misma proporción. Si dejaste en blanco las calorías y macros de la etapa, se recalculan solas.</p>
-  <div class="grid3">${groups.map((g) => `<label>${esc(g)}<small class="muted"> · pauta ${c.pauta?.[g] ?? 0}</small><input type="number" step="0.25" data-adj="${esc(g)}" value="${x.adj?.[g] ?? ""}" placeholder="0"></label>`).join("")}</div>
-  <button class="btn primary big" data-a="stAdjOk" data-i="${el.dataset.i}">Guardar ajuste</button>`, { wide: true });
+const PHASE_PCT = { "Break de dieta": 0, "Déficit leve": -10, "Déficit moderado": -20, "Déficit agresivo": -25, "Mini cut": -30, "Mantención": 0, "Recomposición corporal": -5, "Dieta reversa": 5, "Superávit / Volumen": 10 };
+function stageCalc(c, x, kg, pctDef) {
+  const m = +x.maint || +c.kcalMaint || +c.kcal || null; if (!m) return {};
+  const pct = x.pct !== "" && x.pct != null ? +x.pct : pctDef(x.phase), kcal = Math.round(m * (1 + pct / 100));
+  if (!kg) return { kcal };
+  const prot = Math.round((+x.protKg || +c.protKg || 2) * kg), fat = Math.round((+x.fatKg || +c.fatKg || 0.8) * kg);
+  return { kcal, prot, fat, cho: Math.max(0, Math.round((kcal - prot * 4 - fat * 9) / 4)) };
+}
+// Guarda las etapas y deja calculados sus objetivos (los usa la app del cliente)
+async function stStore(c, st) {
+  const kg = (await lastWeight(CW.cid)) || c.weightStart || null, def = (await db.get("library/phases")) || {}, pctDef = (p) => def.pct?.[p] ?? PHASE_PCT[p] ?? 0;
+  st.forEach((x) => { x.auto = stageCalc(c, x, kg, pctDef); if (kg) x.auto.water = waterAuto(kg); });
+  await db.set("clients/" + CW.cid, { stages: st }); resetAlerts(); refresh();
+}
+const stSave = async (fn) => { const c = await getClient(CW.cid); const st = validSt(c); fn(st); await stStore(c, st); };
+act("stBrush", (el) => { STB.brush = el.dataset.p; refresh(); });
+act("stMonth", (el) => { STB.month = el.dataset.m; refresh(); });
+act("stPaint", async (el) => {
+  const c = await getClient(CW.cid), n = +el.dataset.w, old = validSt(c), map = {};
+  old.forEach((x) => { for (let k = +x.from; k <= +x.to; k++) map[k] = x.phase; });
+  if (STB.brush) map[n] = STB.brush; else delete map[n];
+  const ns = Object.keys(map).map(Number).sort((a, b) => a - b), runs = [];
+  for (const k of ns) { const l = runs[runs.length - 1]; if (l && l.phase === map[k] && l.to === k - 1) l.to = k; else runs.push({ phase: map[k], from: k, to: k }); }
+  const st = runs.map((r) => { const prev = old.find((x) => x.phase === r.phase && r.from >= +x.from && r.from <= +x.to) || old.find((x) => x.phase === r.phase && r.to >= +x.from && r.to <= +x.to); const { from, to, phase, auto, ...rest } = prev || {}; return { ...rest, phase: r.phase, from: r.from, to: r.to }; });
+  await stStore(c, st);
 });
-act("stAdjOk", (el) => { const adj = {}; $$("[data-adj]").forEach((i) => { if (num(i.value)) adj[i.dataset.adj] = num(i.value); }); closeSheet(); stSave((st) => { st[+el.dataset.i].adj = adj; }); });
-act("stAdd", () => stSave((st) => { const last = st[st.length - 1]; const from = last ? +last.to + 1 : 1; st.push({ phase: "Mantención", from, to: from + 3 }); }));
-act("stDel", async (el) => { if (await confirmBox("¿Eliminar esta etapa?")) stSave((st) => st.splice(+el.dataset.i, 1)); });
+act("stBase", async (el) => { await db.set("clients/" + CW.cid, { [el.dataset.k]: num(el.value) }); const c = await getClient(CW.cid); await stStore(c, validSt(c)); });
+act("stPctDef", async (el) => { const d = (await db.get("library/phases")) || {}; await db.set("library/phases", { pct: { ...(d.pct || {}), [el.dataset.p]: num(el.value) ?? 0 } }, false); const c = await getClient(CW.cid); await stStore(c, validSt(c)); });
+act("stF", (el) => stSave((st) => { const k = el.dataset.k; st[+el.dataset.i][k] = ["phase", "note", "cardio"].includes(k) ? el.value : num(el.value); }));
+// Ajuste del plan con los macros de la pauta en vivo
+const pautaMacros = (p) => { const t = { kcal: 0, cho: 0, fat: 0, prot: 0 }; for (const [g, n] of Object.entries(p || {})) { const G = GROUPS[g]; if (G) { t.kcal += n * G[0]; t.cho += n * G[1]; t.fat += n * G[2]; t.prot += n * G[3]; } } return t; };
+let ADJ = null;
+act("stAdj", async (el) => {
+  const c = await getClient(CW.cid), st = validSt(c), x = st[+el.dataset.i]; if (!x) return;
+  ADJ = { i: +el.dataset.i, pauta: c.pauta || {}, adj: { ...(x.adj || {}) }, target: x.kcal || x.auto?.kcal || null, x };
+  const groups = Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => g);
+  sheet(`Ajuste del plan · ${x.phase} (semanas ${x.from}–${x.to})`, `<p class="muted small">Porciones que sumas o restas a la pauta en esta etapa (ej. <b>-1</b> Cereales, <b>-0,25</b> Aceites y grasas). En el plan del cliente, los alimentos de ese grupo cambian su gramaje en la misma proporción.</p>
+  <div id="adjM"></div>
+  <div class="grid3">${groups.map((g) => `<label>${esc(g)}<small class="muted"> · pauta ${ADJ.pauta[g] ?? 0}</small><input type="number" step="0.25" data-adj="${esc(g)}" data-a-input="stAdjLive" value="${ADJ.adj[g] ?? ""}" placeholder="0"></label>`).join("")}</div>
+  <button class="btn primary big" data-a="stAdjOk">Guardar ajuste</button>`, { wide: true });
+  adjLive();
+});
+function adjLive() {
+  const adj = {}; $$("[data-adj]").forEach((i) => { if (num(i.value)) adj[i.dataset.adj] = num(i.value); });
+  const base = pautaMacros(ADJ.pauta), np = { ...ADJ.pauta }; for (const [g, d] of Object.entries(adj)) np[g] = Math.max(0, (+np[g] || 0) + d);
+  const now = pautaMacros(np), tg = ADJ.x.auto || {};
+  const col = (l, k, u = "g") => `<td><b>${r0(now[k])}</b> ${u}<br><small class="${now[k] - base[k] > 0 ? "g" : now[k] - base[k] < 0 ? "r" : "muted"}">${now[k] - base[k] ? (now[k] - base[k] > 0 ? "+" : "") + r0(now[k] - base[k]) : "sin cambio"}</small>${tg[k] ? `<br><small class="muted">objetivo ${tg[k]}</small>` : ""}</td>`;
+  $("#adjM").innerHTML = `<table class="tbl"><tr><th>Pauta actual</th><th>Kcal</th><th>CHO</th><th>Lípidos</th><th>Proteína</th></tr><tr><td class="muted small">${r0(base.kcal)} kcal · C ${r0(base.cho)} · L ${r0(base.fat)} · P ${r0(base.prot)}</td>${col("Kcal", "kcal", "kcal")}${col("CHO", "cho")}${col("Lip", "fat")}${col("Prot", "prot")}</tr></table>`;
+}
+act("stAdjLive", () => adjLive());
+act("stAdjOk", () => { const adj = {}; $$("[data-adj]").forEach((i) => { if (num(i.value)) adj[i.dataset.adj] = num(i.value); }); closeSheet(); stSave((st) => { st[ADJ.i].adj = adj; }); });

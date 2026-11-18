@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.18.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.19.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -79,6 +79,17 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Si hay foco anterior (primera línea de `weeklyGoals`, o el `foco` del check-in pasado): "Tu foco de la semana pasada" con `accion` (Lo logré / A medias / No lo logré) + `accionDet`; se guarda `accionFoco`.
 - Ya no se pregunta lo que la app sabe: entrenos hechos (se guarda `entrenos` "4/4" automático) y días con registro. Se quitaron progCarga, progTec, top2/top3, motivación nutricional, "contribuyen", comentarios genéricos, tiempo de respuesta y servicio general. Nuevas: `confianza` (qué ejercicio domina sin el coach y cuál no), `momentoDificil`.
 - Panel: recuadro destacado con seguimiento, progreso, barreras, orgullo, próxima semana y foco; las respuestas de preguntas antiguas salen en "Otras respuestas (versión anterior)" (`CHECKIN_OLD`). En Retroalimentación, "Foco de la semana" viene prellenado con el foco que propuso el cliente.
+
+## Panel v1.19 (revisión con Felipe, 18-nov)
+- Servicios se llaman **Coaching 1-1 / Entrenamiento / Nutrición**; la barra lateral agrupa a los clientes por servicio.
+- **Timeline semanal**: arriba un calendario del mes con los días pintados por etapa (`monthCal` en data.js; tocar un día cambia la semana), entrenamientos, peso promedio y días con registro (en lista). Gráfico **peso vs métrica elegida** (calorías, CHO, grasa, proteína, pasos, agua, sueño, cardio) de 56 días con media móvil de 7 (`dualChart` en ui.js). Colores con criterio (`judge`): pasarse en pasos/agua/sueño/proteína no es malo; calorías sobre la meta es malo en déficit/mantención y bajo la meta en superávit. **Peso corregido** = si se pesó sin ir al baño se restan 0,12 kg (mediana 128 g/día y 1,1 deposiciones/día, Rose et al. 2015). Fila de **cafeína PM** (se pregunta al registrar el sueño: `day.cafPM`). Timeline por semanas en orden 1 → N con scroll.
+- **Etapas**: calendario de 2 meses donde se elige una etapa (incluye **Break de dieta**) y se pintan semanas completas; las etapas se rearman solas como tramos seguidos. Fórmula: kcal = mantención (del cliente `kcalMaint` o de la etapa `maint`) × (1 + % de la etapa; % por defecto editables en `library/phases`), proteína y grasa en g/kg (`protKg`/`fatKg`), CHO completa. Se guarda calculado en `stage.auto` (lo usa `applyStage` si no hay número a mano). **Agua automática** = 40 ml × kg del último peso (`waterAuto`), si no hay meta a mano. El ajuste del plan muestra en vivo kcal/macros de la pauta y su cambio.
+- **Rutinas**: editor por serie (reps y RIR por serie), descanso, **tempo** (excéntrica-pausa-concéntrica-pausa, `ex.tempo`), link de video (cualquiera), tips uno por línea (el cliente los ve en punteo), **reemplazos con link y tips propios**. Se quitó "salto de carga". El cliente ve tempo y descanso en "Lo que tienes que hacer hoy"; al usar un reemplazo se cargan sus tips.
+- **Biblioteca de ejercicios**: agrupada por grupo muscular (`MUSCLES`), con ✓ de video y tips, botón para asignar grupo automáticamente (`guessMuscle`). Joaquín va a mandar cues de Tracked y un Excel de otra base de ejercicios.
+- **Alimentación** (coach): resumen semanal con porciones promedio por grupo vs pauta, lo más comido y lo que quedó fuera de la pauta.
+- **Plan de alimentación** (editor y reemplazos del cliente): usa la **base de porciones de intercambio de Joaquín** (`js/intercambio.js`, 426 alimentos de su "Base de Datos NT": 1 porción = lo que aporta los macros del grupo) + alimentos propios de Biblioteca. El registro diario sigue con INTA + Open Food Facts.
+- **Datos**: inicio y fin del servicio arriba, sin "modalidad" ni "check-in por formulario"; objetivos del formulario de ingreso; muestra los objetivos vigentes por etapa; **próximo pago** (`payDate`, `payEvery`): aviso al coach 3 días antes y tarjeta amable al cliente en el inicio (`payMsg` en data.js; vista previa en Datos); **cumpleaños**: aviso el día antes y el mismo día.
+- **Retroalimentación**: botón para dictar el mensaje (Web Speech, Chrome) y "Sacar puntos clave del mensaje" (separa frases). **Progreso**: gráfico de fuerza estimada (1RM con RIR) por ejercicio.
 
 ## Datos (Firestore)
 - `users/{uid}`

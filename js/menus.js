@@ -1,6 +1,7 @@
 // Plan de alimentación por opciones (pautas alternativas), reemplazos por grupo, lista de compras
 // y escala de hambre con carita que cambia al deslizar.
 import { has } from "./features.js";
+import { INTERCAMBIO } from "./intercambio.js";
 import { db } from "./db.js";
 import { S, refresh } from "./state.js";
 import { act, toast, sheet, closeSheet, confirmBox, $, $$ } from "./ui.js";
@@ -33,9 +34,13 @@ const fmtG = (g) => (g >= 1000 ? `${r1(g / 1000).toLocaleString("es-CL")} kg` : 
 const porTxt = (p) => `${r1(p).toLocaleString("es-CL")} porc.`;
 const itemLine = (it) => [it.por && it.gp ? porTxt(it.por) : "", it.g ? r0(it.g) + " g" : "", homeMeasure(it.g, it.medida, it.medidaG)].filter(Boolean).join(" · ");
 
+// El plan se arma con la base de PORCIONES DE INTERCAMBIO de Joaquín (1 porción = lo que aporta los macros del grupo)
+// + los alimentos propios que haya subido en Biblioteca.
+const IC = INTERCAMBIO.map(([name, cat, medida, g, kcal, cho, fat, prot]) => ({ name, cat, portion: cat ? g : null, medida: cat ? medida : "", medidaG: cat ? g : null, kcal, cho, fat, prot, ic: true }));
 async function foodIndex() {
-  const base = await getFoodBase(), m = new Map();
-  for (const f of base) if (!m.has(nk(f.name))) m.set(nk(f.name), f);
+  const m = new Map();
+  for (const f of IC) m.set(nk(f.name), f);
+  for (const f of (await db.get("library/foods"))?.items || []) if (!m.has(nk(f.name))) m.set(nk(f.name), f);
   return m;
 }
 
@@ -61,8 +66,7 @@ act("pvSwap", async (el) => {
   const mn = S.client.menus[PV.k], it = mn.meals[+el.dataset.i].items[+el.dataset.j];
   const gInfo = GROUPS[it.cat];
   if (!it.cat || !gInfo || !gInfo[4] || !it.por) return sheet(it.name, `<p class="muted">Este alimento no pertenece a un grupo de intercambio, así que no tiene reemplazos directos. Si quieres cambiarlo, pregúntale a tu coach.</p>`);
-  const base = await getFoodBase();
-  const list = base.filter((f) => f.cat === it.cat && f.portion > 0).sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const list = [...(await foodIndex()).values()].filter((f) => f.cat === it.cat && f.portion > 0).sort((a, b) => a.name.localeCompare(b.name, "es"));
   const rows = list.map((f) => { const g = it.por * f.portion, hm = homeMeasure(g, f.medida, f.medidaG), same = nk(f.name) === nk(it.name);
     return `<div class="li row between sw-row ${same ? "same" : ""}" data-n="${esc(nk(f.name))}"><span>${esc(f.name)}${same ? ' <span class="badge g">en tu plan</span>' : ""}</span><span class="sw-q"><b>${r0(g)} g</b>${hm ? `<small>${esc(hm)}</small>` : ""}</span></div>`; }).join("");
   sheet("Reemplazos", `<div class="sw-head"><b>${esc(it.name)}</b><span class="muted small">${porTxt(it.por)} de <b>${esc(it.cat)}</b> · ${r0(gInfo[0] * it.por)} kcal</span></div>

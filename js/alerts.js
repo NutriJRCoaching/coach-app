@@ -5,7 +5,8 @@ import { ymd, addDays, weekInfo, diffDays, fmtDate, DAYS } from "./util.js";
 import { getRoutines, getSessions, getDays } from "./data.js";
 import { weekPlan } from "./data.js";
 
-export const SERVICES = { completa: "Entrenamiento + nutrición", entrenamiento: "Solo entrenamiento", nutricion: "Solo nutrición" };
+export const SERVICES = { completa: "Coaching 1-1", entrenamiento: "Entrenamiento", nutricion: "Nutrición" };
+export const SERVICE_GROUPS = [["completa", "Coaching 1-1"], ["entrenamiento", "Entrenamiento"], ["nutricion", "Nutrición"], ["", "Sin definir"]];
 const trains = (c) => ["completa", "entrenamiento"].includes(c.service);
 const eats = (c) => ["completa", "nutricion"].includes(c.service);
 export const emailKey = (e) => String(e || "").trim().toLowerCase();
@@ -46,7 +47,6 @@ export function alertsFor(c, x) {
     if (!c.pauta || !Object.keys(c.pauta).length) add("y", "Falta la pauta por porciones");
   }
   if (c.service === "entrenamiento" && !c.ranges) add("i", "Guía de macros por defecto (1,6–2,2 g/kg de proteína)");
-  if (!c.water && c.service !== "entrenamiento") add("y", "Falta la meta de agua");
   if (!c.steps) add("y", "Falta la meta de pasos");
   // Planificación (etapas / bloque)
   const w = c.startDate ? weekInfo(c, today) : null;
@@ -61,6 +61,9 @@ export function alertsFor(c, x) {
     if (d < 0) add("r", `Su servicio terminó el ${fmtDate(c.endDate)}`);
     else if (d <= 7) add("y", `Su servicio termina el ${fmtDate(c.endDate)} (${d} días)`);
   }
+  // Cumpleaños (aviso el día antes y el mismo día) y pagos
+  if (c.birth) { const md = c.birth.slice(5), tm = addDays(today, 1).slice(5); if (md === today.slice(5)) add("y", "🎂 Hoy está de cumpleaños"); else if (md === tm) add("y", "🎂 Mañana está de cumpleaños"); }
+  if (c.payDate) { const d = diffDays(c.payDate, today); if (d < 0) add("r", `Pago vencido desde el ${fmtDate(c.payDate)}`); else if (d === 0) add("r", "Hoy le toca pagar"); else if (d <= 3) add("y", `Le toca pagar el ${fmtDate(c.payDate)}`); }
   // Pendientes anotados a mano ("!" al inicio = urgente)
   (c.todo || []).forEach((t) => { const u = t.startsWith("!"); add(u ? "r" : "y", u ? t.slice(1).trim() : t); });
 

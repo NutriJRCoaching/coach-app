@@ -84,6 +84,33 @@ export function lineChart(labels, series, { h = 180, unit = "" } = {}) {
   return `<svg viewBox="0 0 ${W} ${H}" class="chart">${g}</svg>`;
 }
 
+// Dos variables en paralelo: a = eje izquierdo (ej. peso), b = eje derecho (ej. calorías)
+export function dualChart(labels, a, b, { h = 220 } = {}) {
+  const W = 640, H = h, L = 42, R = 50, B = 22, n = labels.length;
+  const rng = (vals) => { const v = vals.filter((x) => x != null); if (!v.length) return null; let mn = Math.min(...v), mx = Math.max(...v); if (mn === mx) { mn -= 1; mx += 1; } const p = (mx - mn) * 0.15; return [mn - p, mx + p]; };
+  const ra = rng(a.vals.concat(a.trend || [])), rb = rng(b.vals.concat(b.trend || []));
+  if (!ra && !rb) return `<div class="muted small center pad">Aún no hay datos</div>`;
+  const x = (i) => L + (n <= 1 ? 0 : (i / (n - 1)) * (W - L - R));
+  const y = (v, r) => 8 + (1 - (v - r[0]) / (r[1] - r[0])) * (H - B - 8);
+  let g = "";
+  for (let k = 0; k <= 3; k++) {
+    const yy = 8 + (k / 3) * (H - B - 8);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" class="grid"/>`;
+    if (ra) g += `<text x="${L - 6}" y="${yy + 4}" class="ax" text-anchor="end" fill="${a.color}">${Math.round((ra[1] - (k / 3) * (ra[1] - ra[0])) * 10) / 10}</text>`;
+    if (rb) g += `<text x="${W - R + 6}" y="${yy + 4}" class="ax" fill="${b.color}">${Math.round(rb[1] - (k / 3) * (rb[1] - rb[0])).toLocaleString("es-CL")}</text>`;
+  }
+  const step = Math.max(1, Math.ceil(n / 7));
+  labels.forEach((l, i) => { if (i % step === 0 || i === n - 1) g += `<text x="${x(i)}" y="${H - 4}" class="ax" text-anchor="middle">${esc(l)}</text>`; });
+  const path = (vals, r) => { let d = "", pen = false; vals.forEach((v, i) => { if (v == null) { pen = false; return; } d += `${pen ? "L" : "M"}${x(i)},${y(v, r)}`; pen = true; }); return d; };
+  for (const [s, r] of [[b, rb], [a, ra]]) {
+    if (!r) continue;
+    s.vals.forEach((v, i) => { if (v != null) g += `<circle cx="${x(i)}" cy="${y(v, r)}" r="2.6" fill="${s.color}" opacity=".45"><title>${esc(labels[i])}: ${Math.round(v * 10) / 10} ${s.unit || ""}</title></circle>`; });
+    if (s.trend) g += `<path d="${path(s.trend, r)}" fill="none" stroke="${s.color}" stroke-width="2.6" stroke-linejoin="round"/>`;
+    if (s.goal != null) g += `<line x1="${L}" x2="${W - R}" y1="${y(s.goal, r)}" y2="${y(s.goal, r)}" stroke="${s.color}" stroke-dasharray="5 4" opacity=".6"/>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart">${g}</svg>`;
+}
+
 // Selector de opciones tipo "chips"
 export function chips(name, options, value, act) {
   return `<div class="chips">${options.map(([v, l, cls]) => `<button type="button" class="chip ${cls || ""} ${String(v) === String(value) ? "on" : ""}" data-a="${act}" data-name="${name}" data-v="${esc(v)}">${esc(l)}</button>`).join("")}</div>`;
