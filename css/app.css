@@ -240,7 +240,7 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .goal small { display: block; color: var(--acc); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; margin-bottom: 4px; }
 .goal div { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 18px; font-size: 14.5px; }
 .goal span b { margin-right: 6px; color: var(--acc); }
-.sh, .set { grid-template-columns: 34px 1fr 64px 44px 78px !important; }
+.sh, .set { grid-template-columns: 30px 1fr 88px 42px 74px !important; }
 .techb { font-size: 12px !important; font-weight: 700; white-space: nowrap; width: auto !important; padding: 0 6px; }
 .techgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .techgrid .techb { height: 48px; font-size: 15px !important; }
 .sug span.why { opacity: .8; font-style: italic; }
@@ -367,3 +367,8 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .fi .imac { display: flex; gap: 8px; margin-top: 2px; } .fi .imac i { font-style: normal; font-weight: 600; font-size: 11px; }
 .imac .mc { color: var(--y); } .imac .ml { color: var(--b); } .imac .mp { color: var(--g); }
 .scan-load { font-size: 13px; opacity: .8; }
+/* Reps del plan pegadas al casillero de reps (como etiqueta a la izquierda) */
+.repbox { display: flex; align-items: stretch; margin: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surf2); }
+.repbox .rt { display: grid; place-items: center; min-width: 36px; padding: 0 4px; font-size: 12px; font-weight: 800; color: var(--exc, var(--acc)); background: color-mix(in srgb, var(--exc, var(--acc)) 16%, var(--surf)); border-right: 1px solid var(--line); white-space: nowrap; }
+.repbox input { border: 0 !important; border-radius: 0; min-width: 0; width: 100%; background: transparent; }
+.set.done .repbox { border-color: var(--g); }

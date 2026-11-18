@@ -99,7 +99,7 @@ function setRow(ex, i, j) {
   const grp = ex.sides && j % 2 === 0 ? `<div class="sgrp"><b>Serie ${j / 2 + 1}</b><span id="diff-${i}-${j / 2}">${pairDiff(ex, j / 2)}</span></div>` : "";
   return `${grp}<div class="set ${st.done ? "done" : ""} ${ex.sides ? "sided" : ""}" id="set-${i}-${j}"><span class="sn">${ex.sides ? `<small class="side ${j % 2 ? "d" : "i"}">– ${j % 2 ? "Der." : "Izq."}</small>` : `<b>${j + 1}</b>`}</span>
   <input type="number" inputmode="decimal" step="0.5" value="${st.w}" placeholder="${ref?.w ?? ""}" data-a-change="setVal" data-j="${j}" data-k="w">
-  <input type="number" inputmode="numeric" value="${st.r}" placeholder="${ref?.r ?? (parseInt(t.reps) || "")}" data-a-change="setVal" data-j="${j}" data-k="r">
+  <label class="repbox ${t.reps ? "" : "free"}">${t.reps ? `<span class="rt" title="Reps de tu plan">${esc(t.reps)}</span>` : ""}<input type="number" inputmode="numeric" value="${st.r}" placeholder="${ref?.r ?? (parseInt(t.reps) || "")}" data-a-change="setVal" data-j="${j}" data-k="r"></label>
   <button class="rirb ${st.rir === "" ? "" : "rir" + st.rir}" data-a="rirPick" data-j="${j}">${st.rir === "" ? "–" : st.rir}</button>
   <button class="techb ${st.tech || ""}" data-a="techPick" data-j="${j}">${TECH_L[st.tech || ""]}</button>
   <div class="setinfo" id="si-${i}-${j}">${setInfo(ex, j)}</div></div>`;
@@ -355,9 +355,16 @@ export async function summaryView(id) {
   ${s.comment ? `<div class="card note">${esc(s.comment)}</div>` : ""}
   <div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
     ${audio?.data ? `<audio controls src="${audio.data}"></audio><button class="btn primary big" data-a="audioShare">Enviar audio por WhatsApp</button><button class="btn ghost block" data-a="audioRec">Grabar de nuevo</button>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>
-  <div class="pad-x"><button class="btn primary big" data-a="shareImg">Compartir con tu coach</button><a class="btn block" href="#entreno">Volver</a>
+  <div class="pad-x"><button class="btn primary big" data-a="shareImg">Compartir con tu coach</button><a class="btn block" href="#entreno">Volver</a><button class="btn ghost block red" data-a="sessDelete">Eliminar este entrenamiento</button>
   <p class="muted small center">Se abre el menú para compartir: elige WhatsApp y el chat de tu coach. Después de la primera vez, su chat aparece arriba como acceso directo.</p></div>`;
 }
+// Borrar una sesión ya terminada (ej. una de prueba): se elimina con su audio y el día vuelve a quedar pendiente
+act("sessDelete", async () => {
+  const s = S.session; if (!s) return;
+  if (!(await confirmBox(`Se elimina "${s.routineName}" del ${fmtDate(s.date)} con todas sus series y su audio. No se puede deshacer. ¿Eliminar?`, "Eliminar"))) return;
+  await db.del(`${P()}/sessions/${s.id}`); db.del(`${P()}/audios/${s.id}`).catch?.(() => {});
+  S.session = null; toast("Entrenamiento eliminado"); go("entreno");
+});
 // ---------- Audio de retroalimentación (se guarda para el coach; máx. 3 min)
 let REC = null;
 act("audioRec", async () => {
