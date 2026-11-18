@@ -1,6 +1,7 @@
 // Íconos simples en SVG (trazo), estilo línea
 const s = (d, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ic" ${extra}>${d}</svg>`;
 export const I = {
+  search: s('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
   home: s('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>'),
   food: s('<path d="M12 7c-2-3-7-2-7 3 0 5 4 11 7 11s7-6 7-11c0-5-5-6-7-3z"/><path d="M12 7c0-2 1-4 3-4"/>'),
   dumbbell: s('<path d="M6 7v10M3 9v6M18 7v10M21 9v6M6 12h12"/>'),

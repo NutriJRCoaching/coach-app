@@ -53,6 +53,7 @@ act("shiftDay", (el) => { S.date = addDays(S.date, +el.dataset.n); refresh(); })
 const mini = (v, goal, cls = "") => `<div class="minibar ${cls}"><i style="width:${goal ? Math.min(100, (v / goal) * 100) : 0}%"></i></div>`;
 const done = (v, goal, tol = 0.05) => (!goal || !v ? "" : v >= goal * (1 - tol) ? `<span class="badge g">✓ Cumplido</span>` : `<span class="badge y">Faltan ${goal - v >= 1000 ? (Math.round((goal - v) / 100) / 10).toLocaleString("es-CL") + (goal > 5000 ? " mil" : " L") : Math.round(goal - v)}</span>`);
 const status = (v, goal, tol = 0.1) => { if (!goal) return ""; if (!v) return ""; const d = (v - goal) / goal; return Math.abs(d) <= tol ? `<span class="badge g">En meta</span>` : d < 0 ? `<span class="badge y">Bajo</span>` : `<span class="badge r">Alto</span>`; };
+const pctTxt = (v, goal) => (goal && v ? `<div class="muted small">Llevas el <b class="pctv">${Math.round((v / goal) * 100)} %</b></div>` : "");
 const fmtH = (h) => `${Math.floor(h)}h ${pad(Math.round((h % 1) * 60))}m`;
 
 // ================================================================ INICIO: lo que hay que registrar hoy
@@ -75,11 +76,11 @@ async function home() {
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   <div class="grid2">
-    <a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div></a>
+    <a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div>${pctTxt(tot.kcal, c.kcal)}</a>
     <a class="card tile" href="#comida"><div class="card-t">${I.macros}Macros</div>
       ${[["C", tot.cho, c.cho, "y"], ["L", tot.fat, c.fat, "b"], ["P", tot.prot, c.prot, "g"]].map(([l, v, g, cl]) => `<div class="mrow"><b>${l}</b>${mini(v, g, cl)}<span>${r0(v)}/${g || "–"}${g && v >= g * 0.95 ? " ✓" : ""}</span></div>`).join("")}</a>
-    <a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div><div class="foot"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>
-    <div class="card tile" data-a="stepsEdit"><div class="card-t">${I.steps}Pasos ${done(day.steps, c.steps)}</div><div class="big">${(day.steps || 0).toLocaleString("es-CL")}</div><div class="foot grow">${mini(day.steps || 0, c.steps || 8000, "g")}</div><div class="muted small">Meta ${(c.steps || 8000).toLocaleString("es-CL")}</div></div>
+    <a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div>${pctTxt(water, waterGoal)}<div class="foot"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>
+    <div class="card tile" data-a="stepsEdit"><div class="card-t">${I.steps}Pasos ${done(day.steps, c.steps)}</div><div class="big">${(day.steps || 0).toLocaleString("es-CL")}</div><div class="foot grow">${mini(day.steps || 0, c.steps || 8000, "g")}</div><div class="muted small">${day.steps ? `Llevas el <b class="pctv">${Math.round((day.steps / (c.steps || 8000)) * 100)} %</b> · ` : ""}Meta ${(c.steps || 8000).toLocaleString("es-CL")}</div></div>
     <a class="card tile" href="#sueno"><div class="card-t">${I.moon}Sueño</div><div class="big" style="color:${sl != null ? sleepColor(sl) : "inherit"}">${sl != null ? fmtH(sl) : "—"}</div><div class="muted small">${day.sleep?.quality ? "Calidad " + day.sleep.quality + "/5" : "Registrar"} · meta ${c.sleep || 8} h</div></a>
     <a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? [day.weightFast === false ? "Sin ayuno" : "Ayunas ✓", day.weightBath === false ? "sin baño" : day.weightBath ? "baño ✓" : ""].filter(Boolean).join(" · ") : "En ayunas"}</div></a>
     <div class="card tile"><div class="card-t">${I.run}Cardio <span class="badge ${Object.keys(cardioDone).length >= (c.cardio?.perWeek || 0) && c.cardio?.perWeek ? "g" : ""}">${Object.keys(cardioDone).length}/${c.cardio?.perWeek || 0}</span></div>
@@ -240,14 +241,17 @@ act("delPhoto", async (el) => { if (!(await confirmBox("¿Eliminar foto?"))) ret
 
 
 // ---------- Agregar alimento
-let FS = { meal: "", tab: "buscar", q: "", sel: null, results: [] };
-act("addFood", (el) => { rescueScanned(); FS = { meal: el.dataset.m, tab: "buscar", q: "", sel: null, results: [] }; openFoodSheet(); });
+// Agregar alimento: pantalla completa, buscador siempre arriba (así lo que aparece no queda tapado por el teclado)
+let FS = { meal: "", tab: "frec", q: "", sel: null, results: [] };
+const FTABS = [["frec", "Frecuentes"], ["fav", "Favoritos"], ["recetas", "Recetas"], ["voz", "🎤 Por voz"], ["rapido", "Añadir rápido"], ["supl", "Suplementos"], ["crear", "Crear"]];
+act("addFood", (el) => { rescueScanned(); FS = { meal: el.dataset.m, tab: "frec", q: "", sel: null, results: [] }; openFoodSheet(); });
 async function openFoodSheet() {
-  const tabs = [["voz", "🎤 Por voz"], ["buscar", "Buscar"], ["rapido", "Añadir rápido"], ["fav", "Favoritos"], ["recetas", "Recetas"], ["supl", "Suplementos"], ["crear", "Crear"]];
-  const b = sheet(FS.meal, `<div class="seg scroll">${tabs.map(([k, l]) => `<button class="${FS.tab === k ? "on" : ""}" data-a="foodTab" data-t="${k}">${l}</button>`).join("")}</div><div id="fsb"></div>`);
+  sheet(FS.meal, `<div class="fs-top"><div class="row gap"><div class="fsearch grow">${I.search}<input id="fq" type="search" placeholder="Buscar alimento o marca…" value="${esc(FS.q)}" data-a-input="foodSearch" autocomplete="off" enterkeyhint="search"></div><button class="btn" data-a="scan" title="Escanear código de barras">▥</button></div>
+    <div class="seg scroll" id="ftabs">${ftabsHtml()}</div></div><div id="fsb"></div>`, { full: true });
   await renderFoodTab();
 }
-act("foodTab", (el) => { FS.tab = el.dataset.t; FS.sel = null; openFoodSheet(); });
+const ftabsHtml = () => FTABS.map(([k, l]) => `<button class="${FS.tab === k ? "on" : ""}" data-a="foodTab" data-t="${k}">${l}</button>`).join("");
+act("foodTab", (el) => { FS.tab = el.dataset.t; FS.sel = null; FS.q = ""; const q = $("#fq"); if (q) q.value = ""; $("#ftabs").innerHTML = ftabsHtml(); renderFoodTab(); });
 async function renderFoodTab() {
   const box = $("#fsb"); if (!box) return;
   if (FS.sel) return (box.innerHTML = foodDetail(FS.sel), syncFood());
@@ -255,9 +259,11 @@ async function renderFoodTab() {
   if (FS.tab === "voz") {
     box.innerHTML = voiceTab(); if (FS.vitems?.length) drawVoice();
   } else if (FS.tab === "buscar") {
-    box.innerHTML = `<div class="row gap"><input id="fq" placeholder="Buscar alimento…" value="${esc(FS.q)}" data-a-input="foodSearch" autocomplete="off"><button class="btn" data-a="scan" title="Escanear código">▥</button></div>
-    <div id="fres"></div><button class="btn ghost small block" data-a="offSearch">¿No aparece? Buscar en internet (Open Food Facts)</button>`;
-    $("#fq").focus(); showResults(custom);
+    box.innerHTML = `<div id="fres"></div><button class="btn ghost small block" data-a="offSearch">¿No aparece? Buscar en internet (Open Food Facts)</button>`;
+    showResults(custom);
+  } else if (FS.tab === "frec") {
+    box.innerHTML = `<p class="muted small">Lo que más has registrado en el último mes. Tócalo y queda con la cantidad de la última vez.</p><div id="frecL"></div>`;
+    drawFrequent();
   } else if (FS.tab === "rapido") {
     box.innerHTML = `<label>Nombre<input id="qN" placeholder="Ej: avena"></label><label>Gramos consumidos<input id="qG" type="number" inputmode="decimal" placeholder="Opcional"></label>
     <div class="grid4"><label>Kcal<input id="qK" type="number" inputmode="decimal" data-a-input="qCheck"></label><label>CHO<input id="qC" type="number" inputmode="decimal" data-a-input="qCheck"></label><label>Lípidos<input id="qF" type="number" inputmode="decimal" data-a-input="qCheck"></label><label>Proteína<input id="qP" type="number" inputmode="decimal" data-a-input="qCheck"></label></div>
@@ -298,8 +304,36 @@ async function showResults(custom) {
   FS.results = q ? pool.map((f) => [score(f), f]).filter(([s]) => s >= 0).sort((a, b) => a[0] - b[0]).slice(0, 50).map(([, f]) => f) : pool.filter((f) => f.src !== "base").slice(0, 15);
   box.innerHTML = FS.results.map(resRow).join("") || (q ? `<p class="muted small pad">Sin resultados en tu base. Prueba “Añadir rápido” o Open Food Facts.</p>` : `<p class="muted small pad">Escribe para buscar en tu base de alimentos.</p>`);
 }
-act("foodSearch", (el) => { FS.q = el.value; showResults(); });
-act("selFood", (el) => { FS.sel = FS.results.find((f) => String(f.id) === el.dataset.id); const mi = medidaInfo(FS.sel); FS.unit = mi ? "med" : "g"; FS.qty = mi ? 1 : 100; FS.selG = mi ? Math.round(mi.each) : 100; renderFoodTab(); });
+act("foodSearch", (el) => {
+  FS.q = el.value; FS.sel = null;
+  if (FS.q.trim()) { if (FS.tab !== "buscar") { FS.prevTab = FS.tab; FS.tab = "buscar"; $("#ftabs").innerHTML = ftabsHtml(); return renderFoodTab(); } return showResults(); }
+  FS.tab = FS.prevTab || "frec"; $("#ftabs").innerHTML = ftabsHtml(); renderFoodTab();
+});
+// Frecuentes: lo más registrado en los últimos 30 días
+async function drawFrequent() {
+  const box = $("#frecL"); if (!box) return;
+  const days = await getDays(addDays(ymd(), -30), ymd()), cnt = new Map();
+  for (const d of Object.keys(days).sort()) for (const items of Object.values(days[d].meals || {})) for (const it of items) { const k = it.name.toLowerCase(); const c = cnt.get(k) || { n: 0 }; cnt.set(k, { n: c.n + 1, it }); }
+  FS.freq = [...cnt.values()].sort((a, b) => b.n - a.n).slice(0, 25).map((x) => x.it);
+  box.innerHTML = FS.freq.map((it, k) => `<div class="fi" data-a="frecPick" data-k="${k}"><span>${esc(it.name)}<small>${it.per100 === false ? "" : r0(it.g) + " g · "}${r0(itemMacros(it).kcal)} kcal la última vez</small></span><span class="add">＋</span></div>`).join("") || `<p class="muted center pad">Aún no hay registros. Busca arriba tu primer alimento.</p>`;
+}
+act("frecPick", async (el) => {
+  const it = FS.freq[+el.dataset.k]; if (!it) return;
+  if (it.per100 === false) return addItems([{ ...it, t: undefined }].map(({ t, ...x }) => x));
+  const base = await getFoodBase(), mine = await db.list(P() + "/foods");
+  const f = [...mine, ...base].find((x) => x.id === it.fid) || { id: "fr-" + it.name, name: it.name, kcal: it.kcal, cho: it.cho, fat: it.fat, prot: it.prot, cat: it.cat || "", portion: it.por || null, src: "recent" };
+  pickFood(f, it.g);
+});
+// Elige un alimento: con medida casera parte en 1 unidad; en gramos parte vacío (salvo que venga de "Frecuentes")
+function pickFood(f, grams) {
+  FS.sel = f; const mi = medidaInfo(f);
+  if (grams) { FS.unit = "g"; FS.qty = grams; FS.selG = grams; }
+  else if (mi) { FS.unit = "med"; FS.qty = 1; FS.selG = r1(mi.each); }
+  else if (f.portion) { FS.unit = "por"; FS.qty = 1; FS.selG = f.portion; }
+  else { FS.unit = "g"; FS.qty = ""; FS.selG = 0; }
+  renderFoodTab();
+}
+act("selFood", (el) => pickFood(FS.results.find((f) => String(f.id) === el.dataset.id)));
 const unitOpts = (f) => { const mi = medidaInfo(f); return [["g", "Gramos", 1], ...(mi ? [["med", mi.label, mi.each]] : []), ...(f.portion ? [["por", "Porción de intercambio", f.portion]] : [])]; };
 function foodDetail(f) {
   const opts = unitOpts(f), u = opts.find((o) => o[0] === FS.unit) || opts[0];
@@ -307,15 +341,16 @@ function foodDetail(f) {
   ${(() => { const w = foodCheck(f); return w.length ? `<div class="warnbox">⚠ Ojo, estos datos parecen raros: ${w.map(esc).join("; ")}. Revisa la etiqueta${f.src !== "base" ? " y corrígelo con ✎" : ""} o avísale a tu coach.</div>` : ""; })()}
   <div class="card-t mt">¿Cómo lo vas a registrar?</div>
   <div class="seg">${opts.map(([k, l]) => `<button class="${u[0] === k ? "on" : ""}" data-a="dUnit" data-u="${k}">${esc(l)}</button>`).join("")}</div>
-  <div class="qtyrow"><button class="btn" data-a="dStep" data-n="-1">−</button><label class="grow"><span>${u[0] === "g" ? "Gramos" : "Cantidad (" + esc(u[1]) + ")"}</span><input id="dQ" type="number" inputmode="decimal" step="${u[0] === "g" ? 1 : 0.25}" value="${FS.qty}" data-a-input="dSync"></label><button class="btn" data-a="dStep" data-n="1">＋</button></div>
+  <div class="qtyrow"><button class="btn" data-a="dStep" data-n="-1">−</button><label class="grow"><span>${u[0] === "g" ? "Gramos" : "Cantidad (" + esc(u[1]) + ")"}</span><input id="dQ" type="number" inputmode="decimal" step="${u[0] === "g" ? 1 : 0.25}" value="${FS.qty}" placeholder="–" data-a-input="dSync"></label><button class="btn" data-a="dStep" data-n="1">＋</button></div>
   <p class="muted small center" id="dEq">${u[0] === "g" ? "" : `≈ ${r0(FS.selG)} g · 1 ${esc(u[1])} ≈ ${r0(u[2])} g`}</p>
   <div id="dMac" class="macros4"></div>
   <div class="row gap"><button class="btn" data-a="favToggle">${f.fav ? "♥" : "♡"}</button><button class="btn primary big grow" data-a="foodAdd">Añadir a ${esc(FS.meal)}</button></div>`;
 }
-function qtyToG() { const o = unitOpts(FS.sel).find((x) => x[0] === FS.unit) || ["g", "", 1]; FS.selG = r1((FS.qty || 0) * o[2]); const e = $("#dEq"); if (e && FS.unit !== "g") e.textContent = `≈ ${r0(FS.selG)} g · 1 ${o[1]} ≈ ${r0(o[2])} g`; syncFood(); }
-act("dUnit", (el) => { FS.unit = el.dataset.u; FS.qty = FS.unit === "g" ? Math.round(FS.selG || 100) : 1; qtyToG(); renderFoodTab(); });
+function qtyToG() { const o = unitOpts(FS.sel).find((x) => x[0] === FS.unit) || ["g", "", 1]; FS.selG = r1((+FS.qty || 0) * o[2]); const e = $("#dEq"); if (e && FS.unit !== "g") e.textContent = `≈ ${r0(FS.selG)} g · 1 ${o[1]} ≈ ${r0(o[2])} g`; syncFood(); }
+// Al cambiar de unidad no se convierte el número: medida/porción parte en 1 y gramos queda vacío para anotarlo
+act("dUnit", (el) => { FS.unit = el.dataset.u; FS.qty = FS.unit === "g" ? "" : 1; qtyToG(); renderFoodTab(); setTimeout(() => FS.unit === "g" && $("#dQ")?.focus(), 50); });
 act("dStep", (el) => { const st = FS.unit === "g" ? 10 : 0.5; FS.qty = Math.max(0, r1((num($("#dQ").value) || 0) + st * +el.dataset.n)); $("#dQ").value = FS.qty; qtyToG(); });
-act("dSync", (el) => { FS.qty = num(el.value) || 0; qtyToG(); });
+act("dSync", (el) => { FS.qty = el.value === "" ? "" : num(el.value) || 0; qtyToG(); });
 function syncFood() {
   const f = FS.sel, m = itemMacros({ ...f, g: FS.selG });
   const el = $("#dMac"); if (el) el.innerHTML = [["Kcal", m.kcal], ["CHO", m.cho], ["Lípidos", m.fat], ["Proteína", m.prot]].map(([l, v]) => `<div><b>${r1(v)}</b><small>${l}</small></div>`).join("");
@@ -368,7 +403,7 @@ act("vAdd", async () => {
   if (!items.length) return toast("No hay alimentos para añadir");
   FS.vitems = []; FS.vtext = ""; await addItems(items);
 });
-act("foodBack", () => { FS.sel = null; openFoodSheet(); });
+act("foodBack", () => { FS.sel = null; renderFoodTab(); });
 act("foodAdd", async () => {
   const f = FS.sel; if (!FS.selG) return toast("Indica los gramos");
   if (f.code && ["off", "bc", "offcl"].includes(f.src)) saveBarcode(f);
@@ -415,7 +450,7 @@ act("createFood", async () => {
     kcal: (num($("#nK").value) || 0) * f, cho: (num($("#nC").value) || 0) * f, fat: (num($("#nF").value) || 0) * f, prot: (num($("#nP").value) || 0) * f };
   const id = uid(); await db.set(`${P()}/foods/${id}`, food); toast("Creado");
   if (food.code) db.set(BC(food.code), { name, brand: food.brand, code: food.code, portion: food.portion, kcal: food.kcal, cho: food.cho, fat: food.fat, prot: food.prot, by: S.cid, at: Date.now() });
-  FS.sel = { ...food, id }; FS.selG = por || 100; FS.tab = food.type === "supl" ? "supl" : "buscar"; openFoodSheet();
+  FS.tab = food.type === "supl" ? "supl" : "frec"; $("#ftabs").innerHTML = ftabsHtml(); pickFood({ ...food, id });
 });
 act("editItem", async (el) => {
   const m = el.dataset.m, i = +el.dataset.i, d = await getDay(S.date), it = d.meals[m][i];
@@ -491,21 +526,21 @@ async function saveBarcode(f) {
 }
 async function lookupCode(code) {
   const mine = (await db.list(P() + "/foods")).find((f) => f.code === code);
-  if (mine) { FS.sel = mine; FS.selG = mine.portion || 100; return renderFoodTab(); }
+  if (mine) return pickFood(mine);
   const shared = await db.get(BC(code));
-  if (shared) { FS.sel = { ...shared, id: "bc-" + code, src: "bc" }; FS.selG = shared.portion || 100; saveBarcode(shared); toast("Encontrado en la base de IMA ✓"); return renderFoodTab(); }
+  if (shared) { saveBarcode(shared); toast("Encontrado en la base de IMA ✓"); return pickFood({ ...shared, id: "bc-" + code, src: "bc" }); }
   const cl = (await getOffCL()).find((f) => f.code === String(code));
-  if (cl) { FS.sel = { ...cl, src: "off" }; FS.selG = cl.medidaG || 100; saveBarcode(cl); toast("Encontrado ✓"); return renderFoodTab(); }
+  if (cl) { saveBarcode(cl); toast("Encontrado ✓"); return pickFood({ ...cl, src: "off" }); }
   if (!navigator.onLine) return toast("Sin conexión: no se puede buscar el código");
   try {
     const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,nutriments,serving_quantity`).then((r) => r.json());
-    if (r.status !== 1) { toast("Producto no encontrado. Puedes crearlo."); FS.tab = "crear"; await openFoodSheet(); $("#nCode").value = code; return; }
-    FS.sel = offToFood(r.product, code); FS.selG = FS.sel.portion || 100; saveBarcode(FS.sel); toast("Guardado en la base de alimentos ✓"); renderFoodTab();
+    if (r.status !== 1) { toast("Producto no encontrado. Puedes crearlo."); FS.tab = "crear"; FS.sel = null; $("#ftabs").innerHTML = ftabsHtml(); await renderFoodTab(); $("#nCode").value = code; return; }
+    const f = offToFood(r.product, code); saveBarcode(f); toast("Guardado en la base de alimentos ✓"); pickFood(f);
   } catch { toast("No se pudo consultar Open Food Facts"); }
 }
 function offToFood(p, code) {
   const n = p.nutriments || {};
-  return { id: "off-" + (code || uid()), src: "off", name: p.product_name || "Producto", brand: p.brands || "", code, portion: +p.serving_quantity || null,
+  return { id: "off-" + (code || uid()), src: "off", name: p.product_name || "Producto", brand: p.brands || "", code, portion: +p.serving_quantity || null, medida: +p.serving_quantity ? "1 porción (etiqueta)" : "", medidaG: +p.serving_quantity || null,
     kcal: +n["energy-kcal_100g"] || 0, cho: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0, prot: +n.proteins_100g || 0 };
 }
 act("offSearch", async () => {

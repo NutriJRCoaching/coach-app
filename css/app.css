@@ -373,3 +373,15 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .repbox input { border: 0 !important; border-radius: 0; min-width: 0; width: 100%; background: transparent; }
 .set.done .repbox { border-color: var(--g); }
 .warnbox { margin: 8px 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--y); background: color-mix(in srgb, var(--y) 10%, var(--surf)); font-size: 12.5px; }
+/* Agregar alimento a pantalla completa (buscador arriba) */
+.sheet-bg.full { align-items: stretch; }
+.sheet.full { max-height: none; height: 100dvh; border-radius: 0; }
+.sheet.full .sheet-b { flex: 1; padding-top: 0; }
+.fs-top { position: sticky; top: 0; z-index: 3; background: var(--surf); padding: 6px 0 2px; }
+.fsearch { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--acc); border-radius: 99px; padding: 0 14px; background: var(--surf2); }
+.fsearch .ic { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.fsearch input { border: 0 !important; outline: 0 !important; background: transparent; padding: 11px 0; font-size: 16px; }
+.fs-top .seg { margin: 8px 0 4px; }
+.pctv { color: var(--txt); }
+@media (min-width: 900px) { .sheet.full { height: 90vh; border-radius: 18px; } .sheet-bg.full { align-items: center; } }
+#dQ::-webkit-inner-spin-button, #dQ::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; } #dQ { -moz-appearance: textfield; text-align: center; font-size: 22px; font-weight: 800; }

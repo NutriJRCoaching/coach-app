@@ -23,10 +23,10 @@ export function toast(msg, ms = 2200) {
 }
 
 // Hoja inferior (móvil) / modal (escritorio)
-export function sheet(title, html, { wide = false, onClose } = {}) {
+export function sheet(title, html, { wide = false, full = false, onClose } = {}) {
   closeSheet();
-  const w = document.createElement("div"); w.className = "sheet-bg"; w.id = "sheet";
-  w.innerHTML = `<div class="sheet ${wide ? "wide" : ""}"><div class="sheet-h"><b>${esc(title)}</b><button class="icon-btn" data-a="closeSheet" aria-label="Cerrar">✕</button></div><div class="sheet-b">${html}</div></div>`;
+  const w = document.createElement("div"); w.className = "sheet-bg" + (full ? " full" : ""); w.id = "sheet";
+  w.innerHTML = `<div class="sheet ${wide ? "wide" : ""} ${full ? "full" : ""}"><div class="sheet-h"><b>${esc(title)}</b><button class="icon-btn" data-a="closeSheet" aria-label="Cerrar">✕</button></div><div class="sheet-b">${html}</div></div>`;
   w.addEventListener("click", (e) => { if (e.target === w) closeSheet(); });
   w._onClose = onClose;
   document.body.appendChild(w); requestAnimationFrame(() => w.classList.add("open"));

@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.12.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.12.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -50,6 +50,13 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
   - `days/{fecha}`: `meals` (`{"Comida 1": [items]}`, cada item con `t` = hora, que ya no se muestra), `water`, `steps`, `weight`, `weightFast` y `weightBath` (true/false), `sleep`, `mealCount`
   - Otras subcolecciones: `sessions`, `routines`, `foods`, `checkins`, `exnotes`, `photos`, `audios`, `settings` (`reminders`, `push`, `pushlog`)
 - Reglas: el cliente escribe sus subcolecciones, salvo `routines` y `feedbacks`. El doc del cliente solo lo escribe el coach.
+
+## Agregar alimento (v1.12.1, inspirado en FatSecret)
+- Pantalla completa (`sheet(..., { full: true })`) con el **buscador fijo arriba**; al escribir pasa solo a resultados y al borrar vuelve a la pestaña anterior.
+- Pestañas: Frecuentes (lo más registrado en 30 días; al tocarlo queda con los gramos de la última vez), Favoritos, Recetas, Por voz, Añadir rápido, Suplementos, Crear.
+- `pickFood`: con medida casera parte en 1 unidad; al cambiar a **Gramos el campo queda vacío ("–")**, no se convierte el número.
+- Inicio: calorías, agua y pasos muestran "Llevas el X %".
+- Idea pendiente: mostrar alimentos del plan de alimentación del cliente en el agregador (hoy el plan es PDF + porciones, sin lista de alimentos).
 
 ## Base de alimentos (v1.12)
 - Búsqueda: genéricos (INTA) primero, después marcas; varias palabras deben aparecer todas (nombre o marca).
