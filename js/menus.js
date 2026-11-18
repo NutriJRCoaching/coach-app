@@ -171,13 +171,11 @@ export function stressFaceSvg(v, size = 64) {
   const brow = (ex, d) => (wy > 0.6 ? `<path d="M${ex - 8},${r1(38 + d * wy)} L${ex + 8},${r1(38 - d * wy)}" stroke="${c}" stroke-width="4" stroke-linecap="round"/>` : "");
   return `<svg class="face" width="${size}" height="${size}" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="${c}" stroke-width="6"/>${brow(44, 1)}${brow(76, -1)}${eye(44)}${eye(76)}<path d="M42,80 Q60,${r1(80 + 20 * s)} 78,80" stroke="${c}" stroke-width="6" fill="none" stroke-linecap="round"/></svg>`;
 }
-// Tarjeta ancha del inicio (debajo de Cardio y Digestión)
-export const stressCard = (v) => `<div class="card tile wide stress-tile"><div class="st-row"><div id="sf">${stressFaceSvg(v)}</div>
-  <div class="grow"><div class="card-t" style="margin:0">Estrés de hoy</div><div class="st-l" id="sl" style="color:${v == null ? "var(--muted)" : stressColor(v)}">${v == null ? "Desliza para registrarlo" : `${v} · ${STRESS[v - 1]}`}</div></div></div>
-  <input type="range" class="hrange srange ${v == null ? "unset" : ""}" min="1" max="10" step="0.05" value="${v ?? 5}" data-a-input="sMove" data-a-change="sSave">
-  <div class="row between small muted"><span>Tranquilo</span><span>Estresado</span></div></div>`;
-act("sMove", (el) => { const v = +el.value, l = $("#sl"); el.classList.remove("unset"); $("#sf").innerHTML = stressFaceSvg(v); l.textContent = `${Math.round(v)} · ${STRESS[Math.round(v) - 1]}`; l.style.color = stressColor(v); });
-act("sSave", async (el) => { const v = Math.round(+el.value); el.value = v; const { setDay } = await import("./data.js"); await setDay(S.date, { stress: v }); toast("Estrés guardado"); });
+// Tarjeta ancha y compacta del inicio (debajo de Cardio y Digestión): carita chica a la izquierda de la barra
+export const stressCard = (v) => `<div class="card tile wide stress-tile"><div class="row between"><div class="card-t" style="margin:0">Estrés de hoy</div><span class="st-l" id="sl" style="color:${v == null ? "var(--muted)" : stressColor(v)}">${v == null ? "Desliza" : `${v} · ${STRESS[v - 1]}`}</span></div>
+  <div class="st-row"><div id="sf">${stressFaceSvg(v, 30)}</div><input type="range" class="hrange srange ${v == null ? "unset" : ""}" min="1" max="10" step="0.05" value="${v ?? 5}" data-a-input="sMove" data-a-change="sSave"></div></div>`;
+act("sMove", (el) => { const v = +el.value, l = $("#sl"); el.classList.remove("unset"); $("#sf").innerHTML = stressFaceSvg(v, 30); l.textContent = `${Math.round(v)} · ${STRESS[Math.round(v) - 1]}`; l.style.color = stressColor(v); });
+act("sSave", async (el) => { const v = Math.round(+el.value); el.value = v; const { setDay } = await import("./data.js"); await setDay(S.date, { stress: v }); });
 
 // ================================================================ COACH: editor de opciones
 let MW = null; // copia de trabajo

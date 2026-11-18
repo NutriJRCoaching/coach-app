@@ -424,9 +424,9 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .hz-card { padding: 0; border: 0; background: none; } .hz-card .hz { margin: 0; }
 .srange { background: linear-gradient(90deg, hsl(160 55% 74%), hsl(120 50% 74%), hsl(50 60% 74%), hsl(25 60% 76%), hsl(4 55% 76%)); }
 /* Estrés del día (inicio) y descanso pasado (v1.15) */
-.stress-tile .st-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.tile.stress-tile { padding: 10px 14px; min-height: 0; } .stress-tile .st-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; } .stress-tile .st-row .hrange { flex: 1; margin: 0; height: 10px; }
 .stress-tile .face { display: block; }
-.st-l { font-weight: 800; font-size: 16px; margin-top: 2px; transition: color .2s; }
-.stress-tile .hrange { margin: 4px 0 2px; }
+.st-l { font-weight: 700; font-size: 12.5px; transition: color .2s; }
+.stress-tile .hrange::-webkit-slider-thumb { width: 24px; height: 24px; }
 .sessbar .rest-btn.over { background: var(--y); color: #111; }
 .restbar.over { border-color: var(--y); } .restbar.over b { color: var(--y); }

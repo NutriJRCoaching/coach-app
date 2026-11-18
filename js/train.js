@@ -307,7 +307,7 @@ function restAlarm() {
 act("restAdj", (el) => { if (!S.rest) return; S.rest.end += +el.dataset.n * 1000; if (S.rest.fired && restLeft() > 0) { S.rest.fired = false; refresh(); } });
 export function restBar() {
   if (!S.rest || S.route[0] === "sesion") return "";
-  return `<div class="restbar ${S.rest.fired ? "over" : ""}"><button data-a="restAdj" data-n="-15">−15</button><div><small>${S.rest.fired ? "Después del descanso" : "Descanso"}</small><b id="restT">${fmtRest()}</b></div><button data-a="restAdj" data-n="15">+15</button><button data-a="restStop">✕</button></div>`;
+  return `<div class="restbar ${S.rest.fired ? "over" : ""}"><div>${S.rest.fired ? "" : "<small>Descanso</small>"}<b id="restT">${fmtRest()}</b></div><button data-a="restStop">✕</button></div>`;
 }
 setInterval(() => {
   const c = $("#clock"); if (c && S.session) c.textContent = timeSince(S.session.startedAt);

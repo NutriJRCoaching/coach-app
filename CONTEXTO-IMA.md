@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.15.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.15.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -82,12 +82,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## Estrés del día (v1.15)
 - Lo que Joaquín pidió originalmente con la "barra deslizable con caras" era para el **estrés**.
-- Tarjeta ancha en el **inicio**, debajo de Cardio y Digestión (antes estaba en la pantalla de peso). "Estrés de hoy", 1 = muy tranquilo … 10 = al límite. Se guarda sola al soltar la barra (`day.stress`).
+- Tarjeta ancha y **compacta** en el **inicio**, debajo de Cardio y Digestión (antes estaba en la pantalla de peso): título "Estrés de hoy" con el nivel a la derecha, y abajo la carita chica (30 px) a la izquierda de la barra. 1 = muy tranquilo … 10 = al límite. Se guarda sola al soltar la barra (`day.stress`), **sin aviso** de "guardado": solo queda marcada.
 - Diseño elegido: **estilo A** (cara de línea sobre negro, `stressFaceSvg` en menus.js); el color va de menta a coral y la cara cambia (ojos cerrados y sonrisa → cejas de preocupación y boca hacia abajo).
 - El coach la ve en el Timeline semanal (fila "Estrés (1–10)").
 
 ## Descanso entre series (v1.15)
-- Al terminar el descanso sigue contando hacia arriba: "+0:12" = segundos después del descanso (botón y barra en amarillo, "Después del descanso"). Se apaga con ✕, al iniciar otro descanso o solo a los 10 min. Si con +15 vuelve a quedar tiempo, vuelve a ser descanso normal.
+- Al terminar el descanso sigue contando hacia arriba: "+0:12" = segundos después del descanso (botón y barra en amarillo, sin texto). La barra flotante ya no tiene los botones −15/+15, solo el tiempo y ✕. Se apaga con ✕, al iniciar otro descanso o solo a los 10 min.
 - Al terminar sigue igual: alarma en la app + notificación que vibra si la app está en segundo plano. Lo de pantalla completa fuera de la app quedó descartado por ahora.
 
 ## Reglas de colores y cumplimiento (v1.11)
