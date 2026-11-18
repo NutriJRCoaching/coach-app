@@ -385,3 +385,39 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .pctv { color: var(--txt); }
 @media (min-width: 900px) { .sheet.full { height: 90vh; border-radius: 18px; } .sheet-bg.full { align-items: center; } }
 #dQ::-webkit-inner-spin-button, #dQ::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; } #dQ { -moz-appearance: textfield; text-align: center; font-size: 22px; font-weight: 800; }
+
+/* ---------- Plan por opciones, reemplazos y lista de compras (v1.13) */
+.pmeal .pmh { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+.ptime { font-size: 12px; font-weight: 700; color: var(--acc); background: var(--acc-s); padding: 2px 8px; border-radius: 99px; }
+.fi small, .sw-q small { display: block; color: var(--muted); font-size: 11.5px; }
+.pgrp { color: var(--dim) !important; font-size: 10.5px !important; text-transform: uppercase; letter-spacing: .04em; }
+.swap { color: var(--muted); font-size: 16px; }
+.sw-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.sw-row.same { background: var(--g-s); border-radius: 8px; padding-left: 6px; padding-right: 6px; }
+.sw-q { text-align: right; white-space: nowrap; }
+#swL { margin-top: 8px; }
+.shop-g { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; margin: 12px 0 2px; }
+.shop-i { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); margin: 0; font-size: 13.5px; color: var(--txt); cursor: pointer; }
+.shop-i input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--acc); }
+.shop-i > span:nth-child(2) { flex: 1; }
+.shop-i.done > span { opacity: .4; text-decoration: line-through; }
+.shop-d { min-width: 22px; text-align: center; }
+.me-t input, .me-t select { padding: 6px 8px; font-size: 13px; }
+.pills-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+.span2 { grid-column: span 2; }
+
+/* ---------- Escala de hambre con carita */
+.hbtn { padding: 0; min-width: 34px; color: var(--dim); }
+.hbtn .face { display: block; }
+.hz { background: var(--hc); border-radius: 18px; padding: 14px 16px 10px; margin: 0 0 12px; text-align: center; transition: background .25s; color: #3b3644; }
+.hz-t { font-weight: 700; font-size: 14px; }
+.hz-face { display: flex; justify-content: center; margin: 6px 0 2px; }
+.hz-face .face { filter: drop-shadow(0 4px 10px rgba(0,0,0,.08)); }
+.hz-l { font-weight: 700; font-size: 15px; margin-bottom: 8px; min-height: 20px; }
+.hz .muted { color: #6d6577; }
+.hrange { -webkit-appearance: none; appearance: none; width: 100%; height: 12px; padding: 0; border: 0; border-radius: 99px; outline: none;
+  background: linear-gradient(90deg, hsl(4 62% 76%), hsl(26 62% 76%), hsl(70 62% 74%), hsl(150 50% 72%), hsl(195 55% 74%), hsl(262 50% 78%)); }
+.hrange:focus { outline: none; }
+.hrange::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 3px solid rgba(59,54,68,.25); box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: grab; }
+.hrange::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 3px solid rgba(59,54,68,.25); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.hrange.unset::-webkit-slider-thumb { opacity: .55; }

@@ -9,13 +9,14 @@ import { trainView, sessionView, surveyView, summaryView, restBar } from "./trai
 import { I } from "./icons.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
+import { menusHtml, shoppingView, hungerBtn, openHunger } from "./menus.js";
 
 const P = () => "clients/" + S.cid;
 
 export function clientTabs() {
   const r = S.route[0];
   const t = [["inicio", "Inicio", I.home], ["comida", "Comida", I.food], ["entreno", "Entreno", I.dumbbell], ["progreso", "Progreso", I.chart], ["mas", "Más", I.menu]];
-  const active = { sesion: "entreno", encuesta: "entreno", resumen: "entreno", peso: "progreso", sueno: "progreso", fotos: "progreso", medidas: "progreso", timeline: "progreso", plan: "mas", checkin: "mas", guias: "mas", equipo: "mas", info: "mas", ajustes: "mas", agua: "comida" }[r] || r;
+  const active = { sesion: "entreno", encuesta: "entreno", resumen: "entreno", peso: "progreso", sueno: "progreso", fotos: "progreso", medidas: "progreso", timeline: "progreso", plan: "mas", compras: "mas", checkin: "mas", guias: "mas", equipo: "mas", info: "mas", ajustes: "mas", agua: "comida" }[r] || r;
   return `${restBar()}<nav class="tabs">${t.map(([k, l, i]) => `<a href="#${k}" class="${active === k ? "on" : ""}">${i}${l}</a>`).join("")}</nav>`;
 }
 
@@ -25,7 +26,7 @@ export async function clientView() {
   if (["inicio", "comida", "agua", "peso", "sueno", undefined, ""].includes(r)) S.rtNames = Object.fromEntries((await getRoutines(S.cid)).map((x) => [x.id, x.name]));
   const views = { inicio: home, comida: food, agua: waterView, entreno: trainView, sesion: () => sessionView(a), encuesta: () => surveyView(a), resumen: () => summaryView(a),
     progreso: progress, timeline: timelineView, peso: weightView, sueno: sleepView, fotos: photosView, medidas: measuresView,
-    mas: more, plan: planView, checkin: checkinView, guias: guidesView, equipo: equipView, info: infoView, ajustes: settingsView };
+    mas: more, plan: planView, compras: () => shoppingView(head), checkin: checkinView, guias: guidesView, equipo: equipView, info: infoView, ajustes: settingsView };
   return (views[r] || home)();
 }
 
@@ -196,7 +197,7 @@ async function food() {
     const items = day.meals?.[m] || [], mt = items.reduce((t, it) => { const x = itemMacros(it); for (const k in t) t[k] += x[k]; return t; }, { kcal: 0, cho: 0, fat: 0, prot: 0 });
     const ph = photos.filter((p) => p.meal === m);
     return `<div class="card meal ${items.length ? "" : "empty"}"><div class="mh"><div><b>${m}</b><small>${r0(mt.kcal)} kcal · C ${r0(mt.cho)} · L ${r0(mt.fat)} · P ${r0(mt.prot)}</small></div>
-    <div class="row"><button class="icon-btn" data-a="mealMenu" data-m="${m}">⋯</button><button class="icon-btn add" data-a="addFood" data-m="${m}">${I.plus}</button></div></div>
+    <div class="row">${hungerBtn(day, m)}<button class="icon-btn" data-a="mealMenu" data-m="${m}">⋯</button><button class="icon-btn add" data-a="addFood" data-m="${m}">${I.plus}</button></div></div>
     ${items.map((it, i) => `<div class="fi" data-a="editItem" data-m="${m}" data-i="${i}">${(() => { const x = itemMacros(it); return `<span>${esc(it.name)}<small>${r0(it.g)} g${it.por ? ` · ${r1(it.g / it.por)} porc.` : ""}</small><small class="imac"><i class="mc">C ${r1(x.cho)}</i><i class="ml">L ${r1(x.fat)}</i><i class="mp">P ${r1(x.prot)}</i></small></span><span>${r0(x.kcal)} kcal</span>`; })()}</div>`).join("")}
     ${day.mealNotes?.[m] ? `<div class="note">📝 ${esc(day.mealNotes[m])}</div>` : ""}
     ${ph.length ? `<div class="thumbs">${ph.map((p) => `<img src="${p.data}" data-a="viewPhoto" data-id="${p.id}">`).join("")}</div>` : ""}</div>`;
@@ -206,6 +207,7 @@ async function food() {
   <a class="btn big block" href="#plan">Ver mi plan de alimentación</a>`;
 }
 
+act("hunger", async (el) => { const m = el.dataset.m, day = await getDay(S.date); openHunger(m, day, async (v) => { const d = await getDay(S.date); await setDay(S.date, { hunger: { ...(d.hunger || {}), [m]: v } }); }); });
 act("addMeal", async () => { const d = await getDay(S.date); await setDay(S.date, { mealCount: mealList(d).filter((m) => m.startsWith("Comida ")).length + 1 }); refresh(); });
 act("mealMenu", (el) => {
   const m = el.dataset.m;
@@ -701,10 +703,11 @@ async function more() {
   <p class="muted small center">${navigator.onLine ? "Conectado · todo sincronizado" : "Sin conexión · tus datos se guardan y se suben al volver la señal"}${DEMO ? " · MODO DEMO" : ""}</p>`;
 }
 async function planView() {
-  const p = S.client.plan || {};
-  return `${head("Mi plan de alimentación", "mas")}<div class="card">${p.pdfUrl ? `<a class="btn primary big block" target="_blank" href="${esc(p.pdfUrl)}">Abrir mi plan (PDF)</a>` : `<p class="muted">Tu coach aún no sube tu plan.</p>`}
-  ${p.notes ? `<div class="pre">${esc(p.notes)}</div>` : ""}</div>
-  ${S.client.pauta ? `<div class="card"><div class="card-t">Porciones por día</div>${Object.entries(S.client.pauta).filter(([, v]) => +v > 0).map(([g, v]) => `<div class="li row between"><span>${esc(g)}</span><b>${v}</b></div>`).join("")}</div>` : ""}`;
+  const p = S.client.plan || {}, opts = menusHtml(S.client);
+  return `${head("Mi plan de alimentación", "mas")}${opts}
+  ${p.pdfUrl || p.notes || !opts ? `<div class="card">${p.pdfUrl ? `<a class="btn ${opts ? "" : "primary"} big block" target="_blank" href="${esc(p.pdfUrl)}">Abrir mi plan (PDF)</a>` : opts ? "" : `<p class="muted">Tu coach aún no sube tu plan.</p>`}
+  ${p.notes ? `<div class="pre">${esc(p.notes)}</div>` : ""}</div>` : ""}
+  ${S.client.pauta ? `<details class="card"><summary class="card-t">Porciones por día</summary>${Object.entries(S.client.pauta).filter(([, v]) => +v > 0).map(([g, v]) => `<div class="li row between"><span>${esc(g)}</span><b>${v}</b></div>`).join("")}</details>` : ""}`;
 }
 
 // ---------- Check-in semanal (igual al de la planilla)

@@ -1,9 +1,9 @@
 // Service worker: guarda la app en el celular para que abra sin conexión.
 // Cada vez que publiques cambios, sube el número de versión.
-const VERSION = "v40";
+const VERSION = "v41";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "css/app.css", "icons/icon-192.png?v=ima2", "icons/icon-512.png?v=ima2", "icons/logo.png?v=ima2", "icons/badge-96.png?v=ima2", "js/seed-jr.js",
   "js/app.js", "js/config.js", "js/db.js", "js/util.js", "js/ui.js", "js/state.js", "js/data.js", "js/foods.js", "js/realfoods.js", "js/icons.js",
-  "js/client.js", "js/train.js", "js/coach.js", "js/demo.js", "js/voice.js", "js/push.js", "js/offchile.js"];
+  "js/client.js", "js/train.js", "js/coach.js", "js/demo.js", "js/voice.js", "js/push.js", "js/offchile.js", "js/menus.js"];
 
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL))); });
 // La versión nueva espera hasta que el usuario toque "Actualizar"

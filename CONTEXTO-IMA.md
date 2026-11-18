@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.12.2**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.13.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -34,6 +34,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 | js/data.js | Helpers de datos, `weekPlan`, `setVerdict` / `suggest` (progresión), `setProgress`, `mealList`, etapas (`applyStage`), CHECKIN |
 | js/coach.js | Panel coach: clientes, timeline, etapas, entrenamientos (con audio y progreso), rutinas, alimentación, check-ins, feedback, biblioteca |
 | js/voice.js | Registro de comidas por voz o texto: separa los alimentos, cantidades, medidas caseras y gramos estimados |
+| js/menus.js | **Plan por opciones** (editor del coach + vista del cliente), **reemplazos** por grupo, **lista de compras** y **escala de hambre** con carita (`faceSvg`) |
 | js/push.js | Token de FCM para avisos con la app cerrada; `refreshPush` lo renueva al abrir la app (los tokens caducan) |
 | js/realfoods.js | **600 alimentos**: 514 de la Tabla de Composición de Alimentos **INTA 2018** + 86 del USDA que la tabla no trae. [nombre, grupo, kcal, CHO disponibles, lip, prot por 100 g, g por porción de intercambio, medida, g de la medida, fuente]. Carnes/pescados crudos dicen "(crudo)" |
 | js/offchile.js | **5.076 productos envasados chilenos** de Open Food Facts (ODbL), verificados (kcal cuadran con macros). Se carga al buscar/escanear; el escáner lo revisa antes de ir a internet (funciona sin señal) |
@@ -46,8 +47,8 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - `users/{uid}`
 - `library/exercises`, `library/foods`
 - `barcodes/{code}` (compartida)
-- `clients/{cid}` (metas, `schedule`, `startDate`, `stages`)
-  - `days/{fecha}`: `meals` (`{"Comida 1": [items]}`, cada item con `t` = hora, que ya no se muestra), `water`, `steps`, `weight`, `weightFast` y `weightBath` (true/false), `sleep`, `mealCount`
+- `clients/{cid}` (metas, `schedule`, `startDate`, `stages`, `pauta`, `plan` {pdfUrl, notes}, `menus`)
+  - `days/{fecha}`: `meals` (`{"Comida 1": [items]}`, cada item con `t` = hora, que ya no se muestra), `water`, `steps`, `weight`, `weightFast` y `weightBath` (true/false), `sleep`, `mealCount`, `hunger` (`{"Comida 1": {a: 1–10 antes, d: 1–10 después}}`)
   - Otras subcolecciones: `sessions`, `routines`, `foods`, `checkins`, `exnotes`, `photos`, `audios`, `settings` (`reminders`, `push`, `pushlog`)
 - Reglas: el cliente escribe sus subcolecciones, salvo `routines` y `feedbacks`. El doc del cliente solo lo escribe el coach.
 
@@ -57,7 +58,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - `pickFood`: con medida casera parte en 1 unidad; al cambiar a **Gramos el campo queda vacío ("–")**, no se convierte el número.
 - Ojo: los ids de la base (`r0`, `r1`…) cambiaron con la base INTA; los registros viejos guardan `fid` antiguos. Siempre buscar alimentos por **nombre** (Frecuentes ya lo hace).
 - Inicio: calorías, agua y pasos muestran "Llevas el X %".
-- Idea pendiente: mostrar alimentos del plan de alimentación del cliente en el agregador (hoy el plan es PDF + porciones, sin lista de alimentos).
+- Idea pendiente: mostrar los alimentos de las opciones del plan (`menus`) como atajo en el agregador.
 
 ## Base de alimentos (v1.12)
 - Búsqueda: genéricos (INTA) primero, después marcas; varias palabras deben aparecer todas (nombre o marca).
@@ -65,6 +66,18 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - El coach corrige un alimento de la base subiendo un CSV en Biblioteca con **el mismo nombre** (reemplaza al de la base).
 - FatSecret descartado: lo gratis solo trae datos de EE.UU. (Chile es de pago) y su API exige un servidor con IP fija.
 - La tabla INTA 2018 escaneada no trae plátano, pera, uva, piña ni sandía (salen del USDA).
+
+## Plan de alimentación por opciones (v1.13)
+- `menus` en el doc del cliente: `[{id, name, note, meals: [{name, time, note, items: [{name, cat, por, gp, g, medida, medidaG}]}]}]`. `gp` = g por porción de intercambio del alimento (de la base), `g` = por × gp. Alimentos sin grupo de intercambio van solo en gramos.
+- **Coach**: pestaña "Plan alimentación" del cliente. Copia de trabajo local (`MW`) que se publica con "Guardar y publicar". Opciones con duplicar/eliminar; tiempos de comida con hora sugerida, subir/bajar; buscador de alimentos (datalist de la base) que completa grupo, gramos y medida. Muestra kcal/macros por intercambio y porciones de la opción vs la `pauta` (verde igual, amarillo faltan, rojo sobran). Por defecto: Desayuno, Colación, Almuerzo, Once, Cena.
+- **Cliente** ("Mi plan"): pestañas por opción, comidas con hora, cada alimento con porciones · gramos · medida casera. Al tocarlo: hoja con **todos los alimentos del mismo grupo** y los gramos equivalentes a esas porciones (filtro de búsqueda). El PDF, las notas y la pauta siguen abajo.
+- **Lista de compras** (`#compras`): el cliente elige cuántos días de cada opción; suma los gramos por alimento, agrupa por grupo de intercambio, ≈ medida casera, check para tachar (guardado en localStorage del celular), compartir como texto.
+- `homeMeasure(g, medida, medidaG)` convierte gramos a medida casera multiplicando la cantidad que trae la medida ("1 ½ taza", "5 unidades") y usa plural.
+
+## Escala de hambre (v1.13)
+- Carita en cada comida (junto a ⋯). Abre una hoja con dos deslizadores 1–10: "¿Con cuánta hambre llegaste?" y "¿Cómo quedaste después de comer?". La carita cambia de forma al deslizar (cejas preocupadas → ojos cerrados tranquilos con sonrisa en 6–7 → mejillas infladas y boca ondulada en 10) y el color pastel (coral → verde menta → lavanda).
+- Niveles: Muerto de hambre, Mucha hambre, Con hambre, Un poco de hambre, Ni hambre ni lleno, Satisfecho, Tranquilo en su punto, Lleno, Muy lleno, A punto de reventar.
+- El coach lo ve en Alimentación ("Hambre 3 → 7" junto a cada comida).
 
 ## Reglas de colores y cumplimiento (v1.11)
 - **Barras de macros**: color fijo por macro (Calorías rojo, CHO amarillo, Lípidos azul, Proteína verde; igual en inicio y en comida) y un ✓ cuando llegan al 95 % de la meta. Joaquín descartó los colores según % de cumplimiento.
@@ -85,7 +98,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **"Loom" dentro de IMA** para retroalimentación en video al cliente: grabador con burbuja de cámara, guardado en Google Drive, contador de vistas, comentarios con minuto, subtítulos y velocidad.
 - **App Android (Capacitor) para leer los pasos desde Health Connect** (hoy se anotan a mano).
 - **Tips de ejecución por ejercicio** desde su hoja "Programa y tips".
-- **Plan de alimentación** en porciones de intercambio y más alimentos.
+- **Plan de alimentación**: verificar en el celular las opciones, reemplazos y lista de compras (v1.13). Idea: mostrar la escala de hambre como gráfico semanal en el panel.
 - **Planificación desde el lado del coach.**
 
 ## Forma de trabajar con Joaquín

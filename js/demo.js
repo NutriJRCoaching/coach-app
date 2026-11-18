@@ -24,6 +24,19 @@ export async function seedDemo(L) {
     plan: { pdfUrl: "", notes: "Pauta día de entrenamiento. Prioriza la proteína en cada comida." },
     pauta: { "Cereales": 9, "Verduras generales": 3, "Verduras libre consumo": 2, "Frutas": 3, "Lácteos bajos en grasa": 2, "Carnes magras": 7, "Huevo": 2, "Legumbres": 1, "Aceites y grasas": 3, "Alimentos ricos en lípidos": 1 }
   };
+  // Opciones del plan (pautas alternativas) con alimentos de ejemplo
+  const pi = (name, cat, por, gp, medida = "", medidaG = null) => ({ name, cat, por, gp, g: Math.round(por * gp * 10) / 10, medida, medidaG });
+  client.menus = [
+    { id: "m1", name: "Día de entrenamiento", meals: [
+      { name: "Desayuno", time: "08:00", items: [pi("Avena", "Cereales", 2, 40), pi("Leche descremada", "Lácteos medios en grasa", 1, 180, "1 taza", 200), pi("Huevo entero", "Huevo", 2, 48, "1 unidad", 50), pi("Plátano", "Frutas", 1, 60)] },
+      { name: "Almuerzo", time: "13:30", items: [pi("Arroz cocido", "Cereales", 3, 100), pi("Pollo pechuga deshuesada (crudo)", "Carnes magras", 4, 50, "1 filete", 150), pi("Lechuga", "Verduras libre consumo", 1, 50), pi("Tomate", "Verduras generales", 1, 120), pi("Aceite de oliva", "Aceites y grasas", 1, 5)] },
+      { name: "Once", time: "18:00", items: [pi("Marraqueta", "Cereales", 2, 50), pi("Pechuga de pollo cocida (fiambre)", "Carnes magras", 1, 62, "1 lámina", 20), pi("Palta", "Alimentos ricos en lípidos", 1, 90)] },
+      { name: "Cena", time: "21:00", items: [pi("Porotos cocidos", "Legumbres", 1, 100), pi("Pollo pechuga deshuesada (crudo)", "Carnes magras", 2, 50, "1 filete", 150), pi("Manzana", "Frutas", 1, 100)] }] },
+    { id: "m2", name: "Día de descanso", meals: [
+      { name: "Desayuno", time: "09:00", items: [pi("Marraqueta", "Cereales", 1, 50), pi("Huevo entero", "Huevo", 2, 48, "1 unidad", 50), pi("Yogurt light", "Lácteos bajos en grasa", 1, 130, "1 pote", 125)] },
+      { name: "Almuerzo", time: "14:00", items: [pi("Papa cocida", "Cereales", 2, 150), pi("Pollo pechuga deshuesada (crudo)", "Carnes magras", 4, 50, "1 filete", 150), pi("Aceite de oliva", "Aceites y grasas", 1, 5)] },
+      { name: "Cena", time: "20:30", items: [pi("Arroz cocido", "Cereales", 2, 100), pi("Pollo pechuga deshuesada (crudo)", "Carnes magras", 3, 50, "1 filete", 150), pi("Naranja", "Frutas", 1, 120)] }] }
+  ];
   const w = weekInfo(client, today);
   client.feedback = { week: w.key, videoUrl: "", points: ["Buen progreso en press inclinado: +2,5 kg manteniendo técnica", "Faltó registrar la once 3 días", "Esta semana subimos a 9.000 pasos"], text: "" };
   set("clients/" + cid, client);
