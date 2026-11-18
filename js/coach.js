@@ -112,7 +112,8 @@ async function tlView(c0, w) {
     ["Pasos", (r) => r.x.steps, c.steps, (v) => r0(v).toLocaleString("es-CL"), (r) => r.x.steps],
     ["Agua (ml)", (r) => r.water, c.water, r0, (r) => sum(r.x.water || [], (y) => y.ml)],
     ["Sueño (h)", (r) => r.sl, c.sleep, r1, (r) => r.sl],
-    ["Cardio (min)", (r) => r.cardio, null, r0, (r) => sum(r.x.cardio || [], (y) => y.min)]
+    ["Cardio (min)", (r) => r.cardio, null, r0, (r) => sum(r.x.cardio || [], (y) => y.min)],
+    ["Estrés (1–10)", (r) => r.x.stress, null, r1, (r) => r.x.stress]
   ];
   return `<div class="card"><div class="card-t">Etapa de esta semana: <span style="color:${phaseColor(c.phase)}">${esc(c.phase || "—")}</span></div>${stagesBar(c0, w.n)}</div><div class="grid-cards">
   <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.planned.length}</div>${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}">${s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("")}</div>

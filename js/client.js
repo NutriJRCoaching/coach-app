@@ -9,7 +9,7 @@ import { trainView, sessionView, surveyView, summaryView, restBar } from "./trai
 import { I } from "./icons.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
-import { menusHtml, shoppingView, hungerBtn, openHunger } from "./menus.js";
+import { menusHtml, shoppingView, hungerBtn, openHunger, stressCard } from "./menus.js";
 
 const P = () => "clients/" + S.cid;
 
@@ -599,6 +599,7 @@ async function weightView() {
   <div class="wq"><span>¿En ayunas?</span>${chips("fast", [["1", "Sí", "g"], ["0", "No", "r"]], WQ.fast ?? (d.weightFast === false ? "0" : d.weight ? "1" : ""), "wQ")}</div>
   <div class="wq"><span>¿Después de ir al baño?</span>${chips("bath", [["1", "Sí", "g"], ["0", "No", "r"]], WQ.bath ?? (d.weightBath === false ? "0" : d.weightBath ? "1" : ""), "wQ")}</div>
   <button class="btn primary big" data-a="wSave">${d.weight ? "Actualizar" : "Guardar"}</button><div class="muted small">Lo ideal: en ayunas y después de ir al baño.</div></div>
+  ${stressCard(d.stress ?? null)}
   <div class="card stats3"><div><b>${a1 ? r1(a1) : "—"}</b><small>Promedio semana</small></div><div><b class="${a1 && a0 ? (a1 - a0 > 0 ? "up" : "down") : ""}">${a1 && a0 ? (a1 - a0 > 0 ? "+" : "") + r1(a1 - a0) + " kg" : "—"}</b><small>vs semana anterior</small></div><div><b>${regs}/7</b><small>Días registrados</small></div></div>
   <div class="card"><div class="card-t">Tendencia (90 días)</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals, color: "var(--muted)", dots: true, w: 1 }, { vals: tr, color: "var(--acc)" }], { unit: " kg" })}
   <div class="muted small">Puntos: pesajes diarios · Línea roja: tendencia (suaviza las subidas y bajadas del día a día).</div></div>`;

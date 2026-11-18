@@ -421,3 +421,5 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .hrange::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 3px solid rgba(59,54,68,.25); box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: grab; }
 .hrange::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 3px solid rgba(59,54,68,.25); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
 .hrange.unset::-webkit-slider-thumb { opacity: .55; }
+.hz-card { padding: 0; border: 0; background: none; } .hz-card .hz { margin: 0; }
+.srange { background: linear-gradient(90deg, hsl(160 55% 74%), hsl(120 50% 74%), hsl(50 60% 74%), hsl(25 60% 76%), hsl(4 55% 76%)); }

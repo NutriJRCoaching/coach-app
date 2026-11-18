@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.13.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.14.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -48,7 +48,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - `library/exercises`, `library/foods`
 - `barcodes/{code}` (compartida)
 - `clients/{cid}` (metas, `schedule`, `startDate`, `stages`, `pauta`, `plan` {pdfUrl, notes}, `menus`)
-  - `days/{fecha}`: `meals` (`{"Comida 1": [items]}`, cada item con `t` = hora, que ya no se muestra), `water`, `steps`, `weight`, `weightFast` y `weightBath` (true/false), `sleep`, `mealCount`, `hunger` (`{"Comida 1": {a: 1–10 antes, d: 1–10 después}}`)
+  - `days/{fecha}`: `meals` (`{"Comida 1": [items]}`, cada item con `t` = hora, que ya no se muestra), `water`, `steps`, `weight`, `weightFast` y `weightBath` (true/false), `sleep`, `mealCount`, `hunger` (`{"Comida 1": {a: 1–10 antes, d: 1–10 después}}`), `stress` (1–10)
   - Otras subcolecciones: `sessions`, `routines`, `foods`, `checkins`, `exnotes`, `photos`, `audios`, `settings` (`reminders`, `push`, `pushlog`)
 - Reglas: el cliente escribe sus subcolecciones, salvo `routines` y `feedbacks`. El doc del cliente solo lo escribe el coach.
 
@@ -78,6 +78,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Carita en cada comida (junto a ⋯). Abre una hoja con dos deslizadores 1–10: "¿Con cuánta hambre llegaste?" y "¿Cómo quedaste después de comer?". La carita cambia de forma al deslizar (cejas preocupadas → ojos cerrados tranquilos con sonrisa en 6–7 → mejillas infladas y boca ondulada en 10) y el color pastel (coral → verde menta → lavanda).
 - Niveles: Muerto de hambre, Mucha hambre, Con hambre, Un poco de hambre, Ni hambre ni lleno, Satisfecho, Tranquilo en su punto, Lleno, Muy lleno, A punto de reventar.
 - El coach lo ve en Alimentación ("Hambre 3 → 7" junto a cada comida).
+
+## Estrés del día (v1.14)
+- Lo que Joaquín pidió originalmente con la "barra deslizable con caras" era para el **estrés**, en la **pantalla de peso**; la de hambre se quedó porque igual le gustó.
+- Tarjeta debajo del pesaje: "¿Cómo está tu nivel de estrés hoy?", 1 = muy tranquilo … 10 = al límite. Se guarda sola al soltar la barra (`day.stress`), sin depender del peso.
+- Carita `stressFaceSvg`: ojos cerrados y sonrisa en calma → ojos abiertos, cejas de preocupación, boca en zigzag y gota de sudor. Colores menta → arena → coral suave.
+- El coach la ve en el Timeline semanal (fila "Estrés (1–10)").
 
 ## Reglas de colores y cumplimiento (v1.11)
 - **Barras de macros**: color fijo por macro (Calorías rojo, CHO amarillo, Lípidos azul, Proteína verde; igual en inicio y en comida) y un ✓ cuando llegan al 95 % de la meta. Joaquín descartó los colores según % de cumplimiento.
