@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.14.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.14.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -74,8 +74,9 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Lista de compras** (`#compras`): el cliente elige cuántos días de cada opción; suma los gramos por alimento, agrupa por grupo de intercambio, ≈ medida casera, check para tachar (guardado en localStorage del celular), compartir como texto.
 - `homeMeasure(g, medida, medidaG)` convierte gramos a medida casera multiplicando la cantidad que trae la medida ("1 ½ taza", "5 unidades") y usa plural.
 
-## Escala de hambre (v1.13)
-- Carita en cada comida (junto a ⋯). Abre una hoja con dos deslizadores 1–10: "¿Con cuánta hambre llegaste?" y "¿Cómo quedaste después de comer?". La carita cambia de forma al deslizar (cejas preocupadas → ojos cerrados tranquilos con sonrisa en 6–7 → mejillas infladas y boca ondulada en 10) y el color pastel (coral → verde menta → lavanda).
+## Escala de hambre (v1.13 · QUITADA de las comidas en v1.14.1)
+- Joaquín pidió sacarla de cada comida (no era para eso). El código (`faceSvg`, `openHunger`, `hungerBtn`) sigue en menus.js por si se reutiliza; los datos `day.hunger` ya guardados quedan.
+- Antes: carita en cada comida (junto a ⋯). Abría una hoja con dos deslizadores 1–10: "¿Con cuánta hambre llegaste?" y "¿Cómo quedaste después de comer?". La carita cambia de forma al deslizar (cejas preocupadas → ojos cerrados tranquilos con sonrisa en 6–7 → mejillas infladas y boca ondulada en 10) y el color pastel (coral → verde menta → lavanda).
 - Niveles: Muerto de hambre, Mucha hambre, Con hambre, Un poco de hambre, Ni hambre ni lleno, Satisfecho, Tranquilo en su punto, Lleno, Muy lleno, A punto de reventar.
 - El coach lo ve en Alimentación ("Hambre 3 → 7" junto a cada comida).
 
@@ -84,6 +85,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Tarjeta debajo del pesaje: "¿Cómo está tu nivel de estrés hoy?", 1 = muy tranquilo … 10 = al límite. Se guarda sola al soltar la barra (`day.stress`), sin depender del peso.
 - Carita `stressFaceSvg`: ojos cerrados y sonrisa en calma → ojos abiertos, cejas de preocupación, boca en zigzag y gota de sudor. Colores menta → arena → coral suave.
 - El coach la ve en el Timeline semanal (fila "Estrés (1–10)").
+- 18-nov: no le convence el diseño de las caritas. Se le mostraron 3 estilos: A línea sobre negro, B forma abstracta que cambia (sin cara, redonda y suave → con puntas), C cara simple sobre cuadrado de color. Pendiente que elija.
 
 ## Reglas de colores y cumplimiento (v1.11)
 - **Barras de macros**: color fijo por macro (Calorías rojo, CHO amarillo, Lípidos azul, Proteína verde; igual en inicio y en comida) y un ✓ cuando llegan al 95 % de la meta. Joaquín descartó los colores según % de cumplimiento.
@@ -99,6 +101,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - El audio fallaba porque Android no deja compartir `audio/webm;codecs=opus`: ahora el archivo va con tipo limpio (`audio/x-m4a` .m4a o `audio/webm` .weba) y se comparte con un toque (el permiso para compartir se pierde si se espera a que termine de guardar).
 
 ## Pendientes / ideas acordadas
+- **Temporizador de descanso fuera de la app / con el celular bloqueado**: una web no puede ponerse a pantalla completa sobre otras apps ni sobre la pantalla de bloqueo, y con la pantalla apagada el navegador puede congelar los temporizadores (el aviso de fin de descanso no es confiable). Opciones conversadas: (1) audio de fondo durante el descanso que suena al terminar (funciona bloqueado, pero pausa la música del cliente); (2) app Android nativa (Capacitor, misma que para Health Connect) con alarma a pantalla completa estilo despertador. En iPhone solo con app nativa en App Store (99 USD/año).
 - **Verificar en el celular** (v1.11): que llegue la notificación de prueba y los avisos con la app cerrada; que el audio se comparta a WhatsApp.
 - **Criterio completo de progresión de cargas.** Actualmente: técnica primero; bajar el peso si hay fallo o faltan 2 o más reps; unilaterales con el mismo peso en ambos lados.
 - **"Loom" dentro de IMA** para retroalimentación en video al cliente: grabador con burbuja de cámara, guardado en Google Drive, contador de vistas, comentarios con minuto, subtítulos y velocidad.
