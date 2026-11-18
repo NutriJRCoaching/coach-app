@@ -31,9 +31,27 @@ export async function getFoodBase() {
   // Registro con aporte REAL por 100 g (USDA en español) + alimentos que agregue el coach
   const lib = await db.get("library/foods");
   const extra = (lib?.items || []).map((f, i) => ({ ...f, id: f.id || "l" + i, src: "base" }));
-  return (foodCache = [...extra, ...REAL_FOODS.map(realToFood)]);
+  // Si el coach sube un alimento con el mismo nombre que uno de la base, su versión reemplaza a la de la base
+  const key = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(), mine = new Set(extra.map((f) => key(f.name)));
+  return (foodCache = [...extra, ...REAL_FOODS.map(realToFood).filter((f) => !mine.has(key(f.name)))]);
 }
 export const resetFoodCache = () => (foodCache = null);
+// Productos envasados de Chile (Open Food Facts): se cargan recién al buscar o escanear
+let offCache = null;
+export async function getOffCL() {
+  if (offCache) return offCache;
+  const { OFF_CL } = await import("./offchile.js");
+  return (offCache = OFF_CL.map(([code, name, brand, kcal, cho, fat, prot, sq]) => ({ id: "cl-" + code, code, name, brand, kcal, cho, fat, prot, portion: null, medida: sq ? "1 porción (etiqueta)" : "", medidaG: sq || null, src: "offcl", fuente: "Open Food Facts (etiqueta)" })));
+}
+// ¿Los datos tienen sentido? Calorías vs macros y proteína razonable para el grupo
+export function foodCheck(f) {
+  const k = +f.kcal || 0, calc = 4 * (+f.cho || 0) + 4 * (+f.prot || 0) + 9 * (+f.fat || 0), out = [];
+  if (k > 40 && Math.abs(calc - k) / k > 0.2) out.push(`las calorías (${Math.round(k)}) no cuadran con los macros (≈${Math.round(calc)} kcal)`);
+  const lim = { "Cereales": 14, "Frutas": 4, "Verduras generales": 6, "Verduras libre consumo": 5, "Azúcar": 2 }[f.cat];
+  if (lim && +f.prot > lim) out.push(`${Math.round(f.prot * 10) / 10} g de proteína por 100 g es mucho para ${f.cat.toLowerCase()}`);
+  if ((+f.prot || 0) + (+f.cho || 0) + (+f.fat || 0) > 102) out.push("los macros suman más de 100 g por cada 100 g");
+  return out;
+}
 
 // ---------- Semana de entrenamiento: qué toca y en qué estado está
 // schedule: { "1": routineId, "2": routineId, ... } (0=domingo)

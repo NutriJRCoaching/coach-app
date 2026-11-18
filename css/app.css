@@ -372,3 +372,4 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .repbox .rt { display: grid; place-items: center; min-width: 36px; padding: 0 4px; font-size: 12px; font-weight: 800; color: var(--exc, var(--acc)); background: color-mix(in srgb, var(--exc, var(--acc)) 16%, var(--surf)); border-right: 1px solid var(--line); white-space: nowrap; }
 .repbox input { border: 0 !important; border-radius: 0; min-width: 0; width: 100%; background: transparent; }
 .set.done .repbox { border-color: var(--g); }
+.warnbox { margin: 8px 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--y); background: color-mix(in srgb, var(--y) 10%, var(--surf)); font-size: 12.5px; }

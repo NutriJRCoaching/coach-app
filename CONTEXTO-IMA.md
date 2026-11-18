@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.11.3**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.12.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -35,7 +35,9 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 | js/coach.js | Panel coach: clientes, timeline, etapas, entrenamientos (con audio y progreso), rutinas, alimentación, check-ins, feedback, biblioteca |
 | js/voice.js | Registro de comidas por voz o texto: separa los alimentos, cantidades, medidas caseras y gramos estimados |
 | js/push.js | Token de FCM para avisos con la app cerrada; `refreshPush` lo renueva al abrir la app (los tokens caducan) |
-| js/realfoods.js | 250 alimentos USDA en español: [nombre, grupo, kcal, cho, lip, prot por 100 g, g por porción de intercambio, medida, gramos] |
+| js/realfoods.js | **600 alimentos**: 514 de la Tabla de Composición de Alimentos **INTA 2018** + 86 del USDA que la tabla no trae. [nombre, grupo, kcal, CHO disponibles, lip, prot por 100 g, g por porción de intercambio, medida, g de la medida, fuente]. Carnes/pescados crudos dicen "(crudo)" |
+| js/offchile.js | **5.076 productos envasados chilenos** de Open Food Facts (ODbL), verificados (kcal cuadran con macros). Se carga al buscar/escanear; el escáner lo revisa antes de ir a internet (funciona sin señal) |
+| scripts/base-alimentos/ | Transcripción de la tabla INTA, scripts para regenerar ambas bases y LEEME con el proceso |
 | js/seed-jr.js | Rutina de Joaquín (Lun–Sáb, LD/PG; serie 1 8 reps @RIR1, serie 2 6 reps @RIR1) |
 | scripts/reminders.mjs + .github/workflows/reminders.yml | "Reloj" de avisos cada 15 min (GitHub Actions + firebase-admin + FCM). Necesita el secreto `FIREBASE_SERVICE_ACCOUNT` y la variable `PUSH_ON=1` (ya configurados). Borra tokens caducados y solo marca un aviso como enviado si llegó. Ojo: GitHub corre el cron más o menos cada hora, no cada 15 min |
 | firestore.rules | Plantilla (las reglas reales están publicadas en la consola con el correo del coach, incluida `barcodes`) |
@@ -48,6 +50,13 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
   - `days/{fecha}`: `meals` (`{"Comida 1": [items]}`, cada item con `t` = hora, que ya no se muestra), `water`, `steps`, `weight`, `weightFast` y `weightBath` (true/false), `sleep`, `mealCount`
   - Otras subcolecciones: `sessions`, `routines`, `foods`, `checkins`, `exnotes`, `photos`, `audios`, `settings` (`reminders`, `push`, `pushlog`)
 - Reglas: el cliente escribe sus subcolecciones, salvo `routines` y `feedbacks`. El doc del cliente solo lo escribe el coach.
+
+## Base de alimentos (v1.12)
+- Búsqueda: genéricos (INTA) primero, después marcas; varias palabras deben aparecer todas (nombre o marca).
+- Ficha del alimento muestra la **fuente** y un aviso si los datos parecen raros (`foodCheck` en data.js: kcal vs macros ±20 %, proteína alta para cereales/frutas/verduras).
+- El coach corrige un alimento de la base subiendo un CSV en Biblioteca con **el mismo nombre** (reemplaza al de la base).
+- FatSecret descartado: lo gratis solo trae datos de EE.UU. (Chile es de pago) y su API exige un servidor con IP fija.
+- La tabla INTA 2018 escaneada no trae plátano, pera, uva, piña ni sandía (salen del USDA).
 
 ## Reglas de colores y cumplimiento (v1.11)
 - **Barras de macros**: color fijo por macro (Calorías rojo, CHO amarillo, Lípidos azul, Proteína verde; igual en inicio y en comida) y un ✓ cuando llegan al 95 % de la meta. Joaquín descartó los colores según % de cumplimiento.

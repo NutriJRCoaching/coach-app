@@ -41,7 +41,7 @@ export async function seedDemo(L) {
 
   // Días anteriores con registros
   const foods = REAL_FOODS.map(realToFood);
-  const F = (n) => foods.find((f) => f.name === n);
+  const F = (n) => foods.find((f) => f.name === n) || foods[0];
   const it = (n, g) => { const f = F(n); return { name: f.name, g, kcal: f.kcal, cho: f.cho, fat: f.fat, prot: f.prot, cat: f.cat, por: f.portion }; };
   const q = (name, kcal, cho, fat, prot) => ({ name, g: 0, kcal, cho, fat, prot, per100: false, quick: true });
   let wgt = 74.6;
@@ -55,9 +55,9 @@ export async function seedDemo(L) {
       day.sleep = { bed: ["22:45", "23:10", "23:40", "00:15"][i % 4], wake: ["07:00", "07:15", "06:50", "08:00"][i % 4], awake: [0, 10, 0, 20][i % 3], quality: 2 + (i % 4) };
       day.water = [{ ml: 500, t: "09:10" }, { ml: 750, t: "12:30" }, { ml: 500, t: "16:00" }, { ml: 750, t: "20:00" }].slice(0, 2 + (i % 3));
       if (i % 5 !== 2) day.meals = {
-        Desayuno: [it("Avena (hojuelas, cruda)", 60), it("Plátano", 120), it("Leche descremada", 300)],
-        Almuerzo: [it("Arroz blanco cocido", 200), it("Pechuga de pollo a la plancha", 150), it("Lechuga", 100), it("Tomate", 120)],
-        Once: i % 3 ? [it("Pan blanco (marraqueta/hallulla)", 100), it("Jamón de pavo", 60), it("Quesillo / queso fresco", 60)] : [],
+        Desayuno: [it("Avena (hojuelas)", 60), it("Plátano", 120), it("Leche descremada", 300)],
+        Almuerzo: [it("Arroz blanco cocido", 200), it("Pechuga de pollo a la plancha (pesada cocida)", 150), it("Lechuga", 100), it("Tomate", 120)],
+        Once: i % 3 ? [it("Pan marraqueta", 100), it("Jamón de pavo", 60), it("Quesillo", 60)] : [],
         Cena: [it("Fideos cocidos", 220), it("Carne molida 5% grasa cocida", 130)],
         Colaciones: [it("Manzana", 150), q("Yogurt protein (etiqueta)", 120, 10, 2, 20)]
       };

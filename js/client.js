@@ -4,7 +4,7 @@ import { db, DEMO } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
@@ -256,7 +256,7 @@ async function renderFoodTab() {
     box.innerHTML = voiceTab(); if (FS.vitems?.length) drawVoice();
   } else if (FS.tab === "buscar") {
     box.innerHTML = `<div class="row gap"><input id="fq" placeholder="Buscar alimento…" value="${esc(FS.q)}" data-a-input="foodSearch" autocomplete="off"><button class="btn" data-a="scan" title="Escanear código">▥</button></div>
-    <div id="fres"></div><button class="btn ghost small block" data-a="offSearch">Buscar en Open Food Facts (productos envasados)</button>`;
+    <div id="fres"></div><button class="btn ghost small block" data-a="offSearch">¿No aparece? Buscar en internet (Open Food Facts)</button>`;
     $("#fq").focus(); showResults(custom);
   } else if (FS.tab === "rapido") {
     box.innerHTML = `<label>Nombre<input id="qN" placeholder="Ej: avena"></label><label>Gramos consumidos<input id="qG" type="number" inputmode="decimal" placeholder="Opcional"></label>
@@ -290,8 +290,12 @@ async function showResults(custom) {
   const base = await getFoodBase();
   const shared = (await db.list("barcodes").catch(() => [])).map((f) => ({ ...f, id: "bc-" + f.id, src: "bc" }));
   const mineList = (custom || await db.list(P() + "/foods")).filter((f) => f.type !== "receta"), codes = new Set(mineList.map((f) => f.code).filter(Boolean));
-  const pool = [...mineList, ...shared.filter((f) => !codes.has(f.code)), ...base];
-  FS.results = q ? pool.filter((f) => norm(f.name).includes(q) || norm(f.brand || "").includes(q)).slice(0, 40) : pool.filter((f) => f.src !== "base").slice(0, 15);
+  const off = q ? await getOffCL() : [], seenCodes = new Set([...codes, ...shared.map((f) => f.code)]);
+  const pool = [...mineList, ...shared.filter((f) => !codes.has(f.code)), ...base, ...off.filter((f) => !seenCodes.has(f.code))];
+  // Orden: primero lo que empieza con lo buscado, y los alimentos genéricos antes que las marcas
+  const words = q.split(/\s+/).filter(Boolean);
+  const score = (f) => { const n = norm(f.name), b = norm(f.brand || ""), all = n + " " + b; if (!words.every((w) => all.includes(w))) return -1; return ({ custom: 0, base: 0, bc: 1, offcl: 2 }[f.src] ?? 1) * 3 + (n.startsWith(q) ? 0 : n.split(/[\s(/]+/).some((w) => w.startsWith(words[0])) ? 1 : 2); };
+  FS.results = q ? pool.map((f) => [score(f), f]).filter(([s]) => s >= 0).sort((a, b) => a[0] - b[0]).slice(0, 50).map(([, f]) => f) : pool.filter((f) => f.src !== "base").slice(0, 15);
   box.innerHTML = FS.results.map(resRow).join("") || (q ? `<p class="muted small pad">Sin resultados en tu base. Prueba “Añadir rápido” o Open Food Facts.</p>` : `<p class="muted small pad">Escribe para buscar en tu base de alimentos.</p>`);
 }
 act("foodSearch", (el) => { FS.q = el.value; showResults(); });
@@ -299,7 +303,8 @@ act("selFood", (el) => { FS.sel = FS.results.find((f) => String(f.id) === el.dat
 const unitOpts = (f) => { const mi = medidaInfo(f); return [["g", "Gramos", 1], ...(mi ? [["med", mi.label, mi.each]] : []), ...(f.portion ? [["por", "Porción de intercambio", f.portion]] : [])]; };
 function foodDetail(f) {
   const opts = unitOpts(f), u = opts.find((o) => o[0] === FS.unit) || opts[0];
-  return `<button class="btn ghost small" data-a="foodBack">‹ Volver</button><div class="row between"><h3>${esc(f.name)}</h3>${f.src !== "base" ? `<button class="btn tiny" data-a="foodRename">✎ Nombre</button>` : ""}</div><div class="muted small">${esc(f.brand || "")}${f.cat ? `Grupo: ${esc(f.cat)}` : ""} · por 100 g: ${r0(f.kcal)} kcal · C ${r1(f.cho)} · L ${r1(f.fat)} · P ${r1(f.prot)}</div>
+  return `<button class="btn ghost small" data-a="foodBack">‹ Volver</button><div class="row between"><h3>${esc(f.name)}</h3>${f.src !== "base" ? `<button class="btn tiny" data-a="foodRename">✎ Nombre</button>` : ""}</div><div class="muted small">${f.brand ? esc(f.brand) + " · " : ""}${f.cat ? `Grupo: ${esc(f.cat)} · ` : ""}por 100 g: ${r0(f.kcal)} kcal · C ${r1(f.cho)} · L ${r1(f.fat)} · P ${r1(f.prot)}${f.fuente ? `<br>Fuente: ${esc(f.fuente)}` : ""}</div>
+  ${(() => { const w = foodCheck(f); return w.length ? `<div class="warnbox">⚠ Ojo, estos datos parecen raros: ${w.map(esc).join("; ")}. Revisa la etiqueta${f.src !== "base" ? " y corrígelo con ✎" : ""} o avísale a tu coach.</div>` : ""; })()}
   <div class="card-t mt">¿Cómo lo vas a registrar?</div>
   <div class="seg">${opts.map(([k, l]) => `<button class="${u[0] === k ? "on" : ""}" data-a="dUnit" data-u="${k}">${esc(l)}</button>`).join("")}</div>
   <div class="qtyrow"><button class="btn" data-a="dStep" data-n="-1">−</button><label class="grow"><span>${u[0] === "g" ? "Gramos" : "Cantidad (" + esc(u[1]) + ")"}</span><input id="dQ" type="number" inputmode="decimal" step="${u[0] === "g" ? 1 : 0.25}" value="${FS.qty}" data-a-input="dSync"></label><button class="btn" data-a="dStep" data-n="1">＋</button></div>
@@ -366,7 +371,7 @@ act("vAdd", async () => {
 act("foodBack", () => { FS.sel = null; openFoodSheet(); });
 act("foodAdd", async () => {
   const f = FS.sel; if (!FS.selG) return toast("Indica los gramos");
-  if (f.code && (f.src === "off" || f.src === "bc")) saveBarcode(f);
+  if (f.code && ["off", "bc", "offcl"].includes(f.src)) saveBarcode(f);
   await addItems([{ name: f.name, g: FS.selG, kcal: f.kcal, cho: f.cho, fat: f.fat, prot: f.prot, cat: f.cat || "", por: f.portion || null, fid: f.id }]);
 });
 async function addItems(items) {
@@ -489,6 +494,8 @@ async function lookupCode(code) {
   if (mine) { FS.sel = mine; FS.selG = mine.portion || 100; return renderFoodTab(); }
   const shared = await db.get(BC(code));
   if (shared) { FS.sel = { ...shared, id: "bc-" + code, src: "bc" }; FS.selG = shared.portion || 100; saveBarcode(shared); toast("Encontrado en la base de IMA ✓"); return renderFoodTab(); }
+  const cl = (await getOffCL()).find((f) => f.code === String(code));
+  if (cl) { FS.sel = { ...cl, src: "off" }; FS.selG = cl.medidaG || 100; saveBarcode(cl); toast("Encontrado ✓"); return renderFoodTab(); }
   if (!navigator.onLine) return toast("Sin conexión: no se puede buscar el código");
   try {
     const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,nutriments,serving_quantity`).then((r) => r.json());

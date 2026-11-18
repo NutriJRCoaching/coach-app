@@ -1,0 +1,547 @@
+9;Leche materna;1;70;1.0;6.9;0;4.4
+9;Leche de burra;1;41;1.6;6.7;0;0.9
+9;Leche de cabra con vit. D;1;69;3.6;4.5;0;4.1
+9;Leche fluida entera;1;64;3.3;4.7;0;3.7
+9;Leche fluida entera;2;58;3.2;5.6;0;2.5
+10;Leche entera con sabor;1;80;2.4;10.5;0.5;2.9
+10;Leche semidescremada;3;42;2.6;5.1;0;1.3
+10;Leche semidescremada con sabor;1;76;3.0;11.4;0.7;1.9
+10;Leche semidescremada sabor chocolate;4;52;3.2;5.6;;1.8
+10;Leche semidescremada sabor frutilla;4;54;3.1;6.0;;1.9
+11;Leche semidescremada sin lactosa;4;44;3.1;4.6;;1.3
+11;Leche descremada;4;32;3.3;4.7;;0.1
+11;Leche descremada;1;42;3.4;5.0;0;1.0
+11;Leche en polvo 26% MG;2;489;28.6;36.7;0;25.3
+11;Leche en polvo 26% MG con vit. D;1;496;26.3;38.4;0;26.7
+12;Leche en polvo 18% MG extra calcio;2;454;29.1;42.7;0;17.9
+12;Leche en polvo 12% MG;2;406;34.6;41.8;0;11.1
+12;Leche en polvo descremada;1;358;35.1;52.2;0;0.7
+12;Leche en polvo descremada extra calcio;4;349;31.0;52.8;;1.5
+12;Leche en polvo Purita Cereal;4;454;19.4;51.2;1.7;19.1
+13;Leche condensada;1;321;7.9;54.4;0;8.7
+13;Leche evaporada;1;134;6.8;10.0;0;7.6
+13;Quesillo;1;103;12.5;2.7;0;4.5
+13;Quesillo 0% MG;4;85;13.9;4.4;;1.3
+13;Quesillo sin sal;4;151;13.0;4.5;;9.0
+14;Queso de cabra;1;364;21.6;0.1;0;29.8
+14;Queso chanco;3;356;20.8;5.1;0;28.0
+14;Queso cheddar;1;404;22.9;3.1;0;33.3
+14;Queso crema;1;350;6.2;5.5;0;34.4
+14;Queso crema;3;218;12.0;7.3;0;15.6
+15;Queso fresco;3;228;16.9;1.6;;17.1
+15;Queso fresco;4;177;12.6;4.5;;12.1
+15;Queso fresco light;3;193;13.8;3.2;;13.9
+15;Queso gouda;1;356;24.9;2.2;0;27.4
+15;Queso gouda;3;341;24.8;4.8;0;24.7
+16;Queso mantecoso;3;394;24.7;8.0;;29.2
+16;Queso mozzarella;3;199;13.5;2.3;0;15.1
+16;Queso parmesano;3;476;47.1;5.5;;29.5
+16;Queso parmesano;1;420;28.4;13.9;0;27.8
+16;Queso pategrás;3;394;25.7;2.3;0;31.2
+17;Queso reggianito;3;339;33.1;5.9;0;20.3
+17;Queso suizo;1;393;27.0;1.5;0;31.0
+17;Queso untable;3;303;20.0;3.3;0;25.0
+17;Ricotta;1;174;11.3;3.0;0;13.0
+18;Yogurt natural;1;61;3.5;4.7;0;3.3
+18;Yogurt con sabor;2;101;4.4;14.9;0.1;2.7
+18;Yogurt light;1;56;5.7;7.7;0;0.2
+18;Yogurt sin lactosa;3;53;3.0;9.3;0;0.4
+19;Yogurt con frutas;2;114;4.1;18.2;0.3;2.8
+19;Yogurt con frutas bajo en grasa;1;105;4.9;18.6;0;1.4
+19;Yogurt con fruta sin lactosa;3;56;3.0;10.1;0;0.4
+19;Tofu;1;78;9.0;2.0;0.9;4.2
+19;Tofu;3;95;10.4;8.0;;2.4
+21;Huevo entero;1;143;12.6;0.7;0;9.5
+21;Huevo entero;3;149;12.4;0.3;;10.9
+21;Clara de huevo;1;52;10.9;0.7;0;0.2
+21;Yema de huevo;1;322;15.9;3.6;0;26.5
+21;Huevo de codorniz;1;158;13.1;0.4;0;11.1
+23;Pollo cocido;1;176;27.3;0;0;6.7
+23;Pollo pierna;2;199;22.4;1.5;0;11.5
+23;Pollo pechuga;2;130;22.3;1.7;0;3.8
+23;Pollo pechuga deshuesada;3;114;22.2;1.9;;1.9
+23;Pato cocido;1;201;23.5;0;0;11.2
+24;Pavo pierna;2;123;22.0;1.2;0;3.3
+24;Pavo rostizado;1;189;28.6;0.1;0;7.4
+24;Carne de cerdo;1;293;25.1;0;0;20.7
+24;Cazuela de cerdo;2;264;20.6;4.4;0;18.2
+24;Lomito de cerdo;3;90;15.3;0.3;;3.0
+25;Pierna de cerdo marinada;3;164;16.6;0.2;;10.7
+25;Chuleta de cerdo centro marinada;3;284;13.7;0.9;;25.0
+25;Chuleta de cerdo vetada marinada;3;312;14.7;0.2;;28.1
+25;Costillar de cerdo;3;210;17.5;0.1;;15.5
+25;Costillar de cerdo marinado;3;209;17.2;0.2;;15.5
+26;Filete de cerdo;2;129;21.4;0.2;0;4.7
+26;Pulpa de cerdo;2;132;21.2;1.8;0;4.4
+26;Cazuela de cordero;2;152;20.6;0.2;0;7.6
+26;Chuleta de cordero;2;201;18.8;5.3;0;11.6
+26;Pulpa de cordero;2;144;20.4;4.7;0;4.8
+27;Conejo;2;109;19.4;0.8;0;3.1
+27;Conejo;1;136;20.1;0;0;5.6
+27;Conejo horneado;1;197;29.1;0;0;8.1
+28;Filete de vacuno;2;124;21.2;1.1;0;3.9
+28;Guachalomo;2;128;23.2;0.2;0;3.8
+28;Lomo centro marinado (vacuno);3;116;20.4;0.3;;3.7
+28;Lomo liso;2;145;23.0;0.6;0;5.6
+28;Lomo vetado;2;137;21.8;1.3;0;4.9
+29;Asiento de picana;2;123;21.4;2.4;0;3.1
+29;Plateada;2;134;20.3;0.9;0;5.5
+29;Pollo ganso;2;116;22.2;1.1;0;2.5
+29;Posta negra;2;130;23.6;1.8;0;3.1
+29;Posta rosada;2;127;21.2;4.3;0;2.8
+30;Cazuela de vacuno;2;145;22.3;0.8;0;5.8
+30;Carne de vacuno;1;138;23.6;1.6;0;3.1
+30;Carne molida de vacuno 5% MG;1;174;27.3;0.6;0;6.4
+30;Carne molida de vacuno 10% MG;1;176;20.0;0;0;10.0
+31;Guatita;1;98;14.5;0;0;4.0
+31;Contre de pollo cocido;1;146;27.1;1.1;;3.7
+31;Corazón de pollo cocido;1;185;26.4;0.1;0;7.9
+31;Riñón de vacuno cocido;1;144;25.5;1.0;0;3.4
+31;Criadillas de vacuno;2;66;13.1;0.6;0;1.2
+32;Arrollado de huaso;3;403;27.4;0.5;;32.4
+32;Proteína de soya (carne vegetal);4;350;50.0;28.0;3.0;2.0
+32;Charqui de vacuno;3;382;75.6;1.8;;8.0
+32;Choricillo cocido;3;212;15.2;0.4;;16.6
+32;Chorizo;3;405;13.7;5.0;;36.7
+33;Hígado de cordero cocido;1;220;30.6;2.5;0;8.8
+33;Hígado de pollo cocido;1;167;24.5;0.9;0;6.5
+33;Hígado de vacuno cocido;1;191;29.1;5.1;0;5.3
+33;Lengua de vacuno;3;244;20.1;8.1;;14.6
+33;Lengua de vacuno cocida;1;284;19.3;0;0;22.3
+34;Ubre;2;162;11.2;1.0;0;12.6
+34;Jamón de cerdo;1;180;16.5;4.2;0;10.3
+34;Jamón de cerdo extramagro;3;113;20.1;1.3;;3.1
+34;Jamón crudo;2;312;20.5;0;0;25.5
+34;Jamón de pavo;1;124;19.6;2.9;0;3.8
+35;Jamón de pavo ahumado;1;118;16.3;3.0;0;4.0
+35;Jamón de pavo acaramelado;3;83;17.9;0.4;0;1.1
+35;Jamón picado;1;263;16.3;1.8;0;20.7
+36;Longaniza;3;397;14.0;2.1;;36.9
+36;Longaniza;1;346;14.3;0.6;0;31.3
+36;Mortadela;1;311;16.4;3.1;0;25.4
+36;Nugget de pollo;3;248;10.7;17.8;;14.9
+36;Paté;2;429;11.5;1.3;0;42.0
+37;Paté;1;462;11.4;4.7;0;43.8
+37;Pechuga de pavo ahumada;3;89;16.7;1.2;0;1.9
+37;Pechuga de pavo cocida;3;93;15.4;2.7;0;2.3
+37;Pechuga de pavo cocida;1;126;22.2;1.4;0;3.5
+37;Pechuga de pollo cocida (fiambre);3;101;17.8;2.2;;2.3
+38;Pepperoni;1;504;19.3;1.2;0;46.3
+38;Pernil;3;206;21.3;0.9;;13.0
+38;Prieta;3;253;9.1;6.1;;21.4
+38;Prieta;1;379;14.6;1.3;0;34.5
+38;Queso de cabeza;3;359;15.5;6.8;;30.0
+39;Queso de cabeza;2;205;15.8;0;0;15.7
+39;Salame;4;426;14.5;0.7;;40.6
+39;Salame;1;261;12.6;1.9;0;22.2
+39;Seso cocido;1;151;11.7;1.5;0;10.5
+39;Tocino;1;517;29.1;0.8;0;44.2
+40;Turín;2;299;15.9;3.5;0;24.6
+40;Vienesa;4;250;12.0;2.5;;21.3
+40;Vienesa de pavo;1;235;15.4;1.6;0;18.1
+40;Vienesa de pollo;4;226;15.3;3.5;;16.7
+42;Almeja;1;74;12.8;2.6;0;1.0
+42;Almeja en conserva al agua;2;121;20.0;2.8;0;3.3
+42;Caracol de mar;2;106;16.0;5.5;0;2.2
+42;Cholga en agua;2;74;14.2;2.5;0;0.8
+42;Cholga en conserva en aceite;2;132;21.3;1.9;0;4.4
+43;Chorito en conserva en aceite;2;100;16.0;1.9;0;3.1
+43;Chorito en agua;2;72;10.0;4.0;0;1.8
+43;Chorito;1;86;11.9;3.7;0;2.2
+43;Erizo;2;123;14.4;4.9;0;5.1
+43;Jibia;3;181;35.0;9.8;0;0.2
+44;Loco;2;113;21.7;5.5;0;0.5
+44;Macha en conserva al agua;2;118;21.3;2.8;0;2.4
+44;Navajuela;2;80;14.2;5.0;0;0.4
+44;Ostra;1;81;9.5;5.0;0;2.3
+44;Piure;2;57;8.8;3.3;0;0.9
+45;Camarón;1;85;20.1;0;;0.5
+45;Camarón congelado;2;110;23.7;0;0;1.7
+45;Centolla;3;87;17.4;0.2;;1.8
+45;Centollón;3;71;14.5;0;;1.5
+45;Jaiba;2;115;18.3;3.8;0;2.9
+46;Atún en conserva al agua;4;120;28.0;0;;1.4
+46;Atún en conserva al agua;1;131;29.6;0;0;0.5
+46;Atún en conserva en aceite;1;198;29.1;0;0;8.2
+46;Cojinova;2;187;17.2;0.6;0;12.9
+46;Congrio colorado;2;77;15.5;3.2;0;0.2
+47;Congrio dorado;2;73;16.5;0.5;0;0.5
+47;Congrio negro;2;71;15.8;1.5;0;0.2
+47;Corvina;2;97;20.5;2.7;0;0.5
+47;Jurel;2;122;21.9;0.1;0;3.8
+47;Jurel;1;105;20.3;0;0;2.0
+48;Jurel en conserva al agua;2;155;23.8;0.3;0;6.5
+48;Jurel en conserva en aceite;2;280;22.0;0.7;0;21.0
+48;Lenguado;2;85;18.9;1.4;0;0.4
+48;Lenguado;1;70;12.4;0;0;1.9
+48;Merluza o pescada;1;89;18.6;0;0;1.1
+49;Mero;2;239;12.2;1.3;0;20.5
+49;Pejegallo;2;89;21.3;0.3;0;0.3
+49;Pejerrey;2;103;16.4;2.9;0;2.9
+49;Reineta;2;105;19.3;0.9;0;2.7
+49;Roncador;2;88;18.2;1.4;0;1.1
+50;Salmón coho fresco;3;290;19.1;0.3;;23.6
+50;Salmón;1;146;21.6;0;0;5.9
+50;Salmón filete sin piel;3;165;20.6;0.3;;9.0
+50;Sardina en conserva en aceite;2;309;21.2;0.6;0;24.6
+50;Sardina española;2;169;17.1;2.3;0;10.2
+51;Sierra;2;156;22.1;6.3;0;4.7
+51;Trucha congelada;3;189;19.5;1.1;0;11.9
+51;Trucha de cultivo;2;131;19.6;0.5;0;5.6
+51;Trucha filete;3;198;17.9;1.1;;13.6
+51;Trucha fresca de mar;1;104;16.7;0;0;3.6
+52;Kanikama (carne de pescado procesada);3;118;7.3;19.4;;1.3
+52;Ovas (masago);1;33;5.6;2.6;0;1.1
+52;Paté de trucha ahumada;3;288;3.4;16.5;0;23.2
+54;Arveja seca;2;345;22.4;38.4;;2.2
+54;Harina de arveja;2;333;23.6;38.2;;1.2
+54;Arvejas;1;81;5.4;8.7;5.7;0.4
+54;Arvejas en conserva;1;69;4.4;9.3;3.4;0.4
+55;Garbanzo cocido;1;163;8.8;20.4;6.8;2.6
+55;Garbanzo crudo;1;378;20.5;50.8;12.2;6.0
+55;Harina de garbanzo;1;387;22.4;47.0;10.8;6.7
+56;Habas;1;72;5.6;7.5;4.2;0.6
+56;Haba seca;1;341;26.1;57.7;1.6;1.5
+56;Lenteja cocida;1;116;9.0;12.2;7.9;0.4
+56;Lenteja cruda;1;352;24.6;52.6;10.7;1.1
+56;Harina de lenteja;2;340;32.8;43.0;;1.0
+57;Poroto cocido;1;139;9.7;19.1;4.9;0.4
+57;Poroto crudo;1;333;23.4;45.1;15.2;0.9
+57;Poroto de soya cocido;1;141;12.4;6.9;4.2;6.4
+57;Poroto de soya;1;147;13.0;6.9;4.2;6.8
+57;Porotos granados;1;115;7.8;13.0;9.0;0.4
+57;Porotos negros crudos;1;341;21.6;46.9;15.5;1.4
+59;Almendras;1;579;21.2;9.0;12.5;49.9
+59;Almendras;3;578;24.0;7.3;10.9;50.3
+59;Avellana;1;628;15.0;7.0;9.7;60.8
+59;Castaña de cajú tostada;1;574;15.3;29.7;3.0;46.4
+59;Macadamia;1;718;7.9;5.2;8.6;75.8
+60;Maní;1;567;25.8;7.6;8.5;49.2
+60;Maní japonés;3;437;17.7;44.2;12.4;21.1
+60;Maní tostado salado;1;587;24.4;12.9;8.4;49.7
+60;Nueces;3;551;17.5;3.1;22.4;52.1
+60;Nueces;1;606;24.3;8.2;5.0;56.6
+61;Pistacho;1;560;20.2;16.6;10.6;45.3
+61;Castaña cruda pelada;1;369;5.0;78.4;;3.9
+61;Piñón (araucaria);2;180;4.5;38.0;;1.1
+61;Piñón deshidratado;1;673;13.7;9.4;3.7;68.4
+61;Chía;1;486;16.5;7.7;34.4;30.7
+62;Semilla de amapola;1;525;18.0;8.6;19.5;41.6
+62;Semilla de sésamo tostada;1;565;17.0;11.7;14.0;48.0
+62;Semilla de maravilla tostada pelada;1;619;17.2;9.1;11.5;56.8
+62;Semilla de zapallo;1;559;30.2;4.7;6.0;49.1
+62;Semillas de linaza;3;418;21.9;29.6;16.1;22.2
+64;Crutones;1;407;11.9;68.4;5.1;6.6
+64;Pan blanco sin sal;1;267;8.2;47.3;2.3;3.6
+64;Pan de centeno;1;259;8.5;42.6;5.8;3.3
+64;Pan de miel;3;250;12.0;44.9;4.0;2.5
+64;Pan especial;3;212;10.2;38.4;8.4;1.9
+65;Pan hallulla;3;363;9.1;53.6;;12.5
+65;Pan integral;1;252;12.5;36.7;6.0;3.5
+65;Pan marraqueta;1;272;10.8;49.7;2.2;2.4
+65;Pan de molde;1;269;8.7;48.8;1.9;3.2
+66;Pan de molde;3;244;8.1;49.9;3.3;1.4
+66;Pan pita blanco;1;275;9.1;53.5;2.2;1.2
+66;Pan rallado seco;1;395;13.4;67.5;4.5;5.3
+66;Pan salvado de trigo;1;248;8.8;43.8;4.0;3.4
+66;Pan de trigo;1;260;8.7;44.0;5.5;3.9
+66;Tortilla para tacos;4;269;8.9;45.0;;5.9
+67;Arroz blanco crudo;1;370;6.8;78.9;2.8;0.6
+67;Arroz blanco cocido;1;130;2.7;27.8;0.4;0.3
+67;Arroz integral crudo;1;367;7.5;72.7;3.6;3.2
+67;Arroz integral cocido;1;112;2.3;21.7;1.8;0.8
+67;Cabritas;1;387;12.9;63.3;14.5;4.5
+68;Choclo cocido;1;96;3.4;18.6;2.4;1.5
+68;Choclo congelado;1;81;2.6;16.9;2.4;0.7
+68;Choclo;1;86;3.3;16.7;2.0;1.4
+68;Mote de trigo cocido;2;131;3.5;28.4;0;0.4
+68;Mote de trigo crudo;4;354;10.5;73.6;;2.0
+69;Quínoa cruda;1;368;14.1;57.2;7.0;6.1
+69;Quínoa cruda;3;351;12.2;65.6;5.9;4.4
+69;Quínoa cocida;1;120;4.4;18.5;2.8;1.9
+69;Salvado de avena;1;246;17.3;50.8;15.4;7.0
+69;Salvado de trigo;1;216;15.6;21.7;42.8;4.3
+70;Avena (hojuelas);1;389;16.9;55.7;10.6;6.9
+70;Cereal de maíz (corn flakes);3;358;8.1;79.0;3.7;1.1
+70;Cereal de maíz (corn flakes);1;357;7.5;81.0;3.3;0.4
+70;Granola;3;442;11.4;51.1;11.5;21.4
+71;Burgol;3;364;10.4;78.0;;1.1
+71;Cuscús cocido;1;112;3.8;21.8;1.4;0.2
+71;Cuscús seco;1;376;12.8;72.4;5.0;0.6
+71;Fideos crudos;1;352;13.9;64.2;9.2;2.9
+71;Fideos cocidos;1;149;6.0;26.2;3.9;1.7
+71;Fideos de arroz cocidos;1;108;1.8;23.0;1.0;0.2
+72;Galleta de champaña;4;409;5.6;81.7;;6.6
+72;Galleta cereal avena manzana;3;428;8.6;56.1;6.5;17.0
+72;Galleta cereal berries;3;430;8.5;57.9;5.1;16.4
+72;Galleta cereal cacao;3;427;8.3;54.2;6.9;17.3
+72;Galleta cereal clásica;3;430;7.6;61.8;7.7;16.9
+73;Galleta cereal fibra cacao;3;427;8.9;54.8;11.7;19.0
+73;Galleta chips de chocolate;1;481;5.4;64.3;2.5;22.6
+73;Galleta de chocolate;3;463;7.1;66.0;3.1;18.9
+73;Galleta de arroz;3;363;6.7;83.4;3.7;0.3
+73;Galleta de arroz;4;373;5.2;82.7;3.2;1.3
+74;Galleta de arroz con sésamo;3;371;7.5;74.2;5.7;4.9
+74;Galleta de arroz sin sal;3;363;7.7;80.1;4.6;1.3
+74;Galleta de arroz trigo avena;3;356;11.0;72.2;7.5;2.6
+74;Galleta de mantequilla;3;469;5.8;71.0;1.6;18.0
+74;Galleta mini cocaditas;3;483;5.4;65.5;4.0;22.2
+75;Galleta mini limón;3;467;7.3;67.4;2.2;18.7
+75;Galleta mini mantequilla;3;476;6.5;67.4;1.9;20.0
+75;Galleta mini vino;3;409;9.6;59.5;13.6;14.7
+75;Galleta de soda;4;428;9.0;73.4;;10.4
+75;Galleta de vainilla;3;453;8.0;69.7;2.2;15.8
+76;Galleta de vino;3;405;7.4;60.3;14.6;14.9
+76;Galletas cracker;1;386;5.7;72.3;5.7;5.7
+76;Galletas de agua;1;384;8.0;71.1;2.5;9.4
+76;Galletas de arroz;4;363;8.4;77.0;5.5;2.4
+77;Harina de centeno;1;349;10.9;63.6;11.8;1.5
+77;Harina de trigo;1;364;10.3;73.6;2.7;1.0
+77;Harina de yuca;3;333;0.3;82.7;8.0;0.1
+77;Harina de trigo tostada;2;380;13.4;77.4;0.9;1.9
+77;Chuchoca;1;361;6.9;69.6;7.3;3.9
+78;Chuño;1;351;8.0;78.9;1.1;0.8
+78;Maicena;1;381;0.3;90.4;0.9;0.1
+78;Sémola;1;360;12.7;68.9;3.9;1.1
+78;Sémola;4;342;12.0;69.0;;2.0
+78;Tapioca;1;358;0.2;87.8;0.9;0.0
+80;Camote;6;131;1.6;30.2;;0.4
+80;Papa cocida;1;89;2.3;17.8;1.8;0.2
+80;Papa cruda;6;80;3.1;16.5;;0.2
+80;Papa entera rojiza;1;79;2.1;16.8;1.3;0.1
+82;Aceite de canola;1;884;0;0;0;100.0
+82;Aceite de coco;1;892;0;0.9;0;99.1
+82;Aceite de maíz;2;897;0;0.3;0;99.7
+82;Aceite de maravilla;1;884;0;0;0;100.0
+83;Aceite de maravilla;3;898;0;0.2;0;99.8
+83;Aceite de oliva;1;884;0;0;0;100.0
+83;Aceite de oliva extra virgen;3;887;0.2;0;;97.9
+83;Aceite de palma;1;884;0;0;0;100.0
+84;Aceite de soya;1;884;0;0;0;100.0
+84;Aceite de palta;3;897;0.4;0;0;99.4
+85;Crema ácida;1;181;7.0;7.0;0;14.1
+85;Crema chantilly;1;345;2.1;2.8;0;37.0
+85;Crema de leche light;4;194;2.7;4.8;0;18.2
+85;Grasa animal;1;897;0;0;0;99.5
+85;Manteca vegetal;2;897;0;0.3;0;99.7
+86;Mantequilla;1;717;0.9;0.1;0;81.1
+86;Mantequilla;3;749;0.3;0;;83.1
+86;Margarina;1;717;0.2;0.7;0;80.7
+86;Margarina;3;700;0.6;0.2;;77.4
+86;Margarina reducida en grasa;1;424;0.2;0.9;0;47.5
+87;Margarina light;4;192;0;0;0;21.3
+87;Mayonesa;1;717;1.1;2.7;0;79.7
+87;Mayonesa casera;3;671;7.2;1.8;;70.6
+89;Acelga;3;27;4.4;2.0;5.0;0.2
+89;Acelga cocida;1;20;1.9;2.0;2.1;0.1
+89;Acelga;1;19;1.8;2.1;1.6;0.2
+89;Achicoria;1;23;1.7;0.7;4.0;0.3
+89;Ajo;1;149;6.4;31.0;2.1;0.5
+90;Alcachofa;1;53;2.9;6.3;5.7;0.3
+90;Brotes de alfalfa;1;23;4.0;0.2;1.9;0.7
+90;Apio;1;16;0.7;1.4;1.6;0.2
+90;Berenjena;1;35;0.8;6.2;2.5;0.2
+90;Berro;1;11;2.3;0.8;0.5;0.1
+91;Betarraga;1;43;1.6;6.8;2.8;0.2
+91;Brócoli;1;28;3.1;2.4;3.0;0.1
+91;Cebolla;1;40;1.1;7.6;1.7;0.1
+91;Cebollín;1;32;1.8;4.7;2.6;0.2
+91;Champiñón blanco;1;22;3.1;2.3;1.0;0.3
+92;Champiñón blanco cocido;1;28;2.2;3.1;2.2;0.5
+92;Champiñón ostra;1;33;3.3;3.8;2.3;0.4
+92;Champiñón portobello;1;22;2.1;2.6;1.3;0.4
+92;Champiñón shiitake;1;34;2.2;4.3;2.5;0.5
+92;Champiñón shiitake cocido;1;56;1.6;12.3;2.1;0.2
+93;Champiñones en conserva;1;25;1.9;2.7;2.4;0.3
+93;Cochayuyo;2;56;1.7;6.2;6.9;0.2
+93;Coliflor;1;23;1.8;1.8;2.3;0.5
+93;Endivia;1;17;1.3;0.3;3.1;0.2
+93;Espárrago;1;22;2.4;2.1;2.0;0.2
+94;Espinaca cocida;1;23;3.0;1.3;2.4;0.3
+94;Espinaca;1;23;2.9;1.4;2.2;0.4
+94;Hinojo;1;31;1.2;4.2;3.1;0.2
+94;Lechuga;1;13;1.4;1.1;1.1;0.2
+94;Lechuga escarola;3;14;0.7;1.3;;0.7
+95;Lechuga roja;1;16;1.3;1.4;0.9;0.2
+95;Luche;2;37;3.3;0;8.8;0.7
+95;Luche ahumado;3;157;23.9;15.1;41.6;0.1
+95;Nabo;1;28;0.9;4.6;1.8;0.1
+95;Penca;2;21;0.4;4.4;;0.2
+95;Pepino;1;12;0.6;1.5;0.7;0.2
+96;Pepinillos en conserva;1;12;0.5;1.4;1.0;0.3
+96;Pickles;1;67;0.9;16.3;1.3;0.2
+96;Pimentón rojo;1;31;1.0;3.9;2.1;0.3
+96;Pimentón verde;1;20;0.9;2.9;1.7;0.2
+96;Poroto verde enlatado;1;21;1.1;2.3;1.9;0.4
+97;Porotos verdes;1;35;1.9;4.7;3.2;0.3
+97;Puerro;1;61;1.5;12.4;1.8;0.3
+97;Rabanito;1;16;0.7;1.8;1.6;0.1
+97;Repollitos de Bruselas;1;36;2.6;4.5;2.6;0.5
+97;Repollitos de Bruselas cocidos;1;42;3.6;4.2;4.1;0.4
+98;Repollo;1;25;1.3;3.3;2.5;0.1
+98;Repollo morado;1;31;1.4;5.3;2.1;0.2
+98;Tomate;1;18;0.9;2.7;1.2;0.2
+98;Ulte;2;29;1.5;4.7;6.4;0.4
+98;Zanahoria cocida;1;35;0.8;5.2;3.0;0.2
+99;Zanahoria;1;41;0.9;6.8;2.8;0.2
+99;Zapallo italiano;1;17;1.2;2.1;1.0;0.3
+99;Zapallo italiano cocido;1;15;1.1;1.7;1.0;0.4
+99;Zapallo;1;20;0.7;3.8;1.1;0.1
+101;Aceitunas negras;4;232;1.1;2.1;;24.4
+101;Aceitunas verdes;4;263;1.2;3.1;;27.3
+101;Arándanos;1;57;0.7;12.1;2.4;0.3
+101;Arándanos rojos (cranberries);1;46;0.5;8.4;3.6;0.1
+101;Caqui;1;70;0.6;16.8;1.8;0.2
+102;Cerezas;1;50;1.0;10.6;1.6;0.3
+102;Chirimoya;1;75;1.6;14.7;3.0;0.7
+102;Ciruelas;1;46;0.7;10.0;1.4;0.3
+102;Ciruelas deshidratadas;1;240;2.2;56.8;7.1;0.4
+102;Clementinas;1;47;0.9;10.3;1.7;0.2
+103;Damasco;1;48;1.4;9.1;2.0;0.4
+103;Damascos secos;3;244;4.6;56.1;9.1;0.1
+103;Durazno;1;39;0.9;8.0;1.5;0.3
+103;Duraznos en conserva;4;45;0.6;10.0;;0.3
+103;Frambuesa;1;52;1.2;5.4;6.5;0.7
+104;Frutilla;1;32;0.7;5.7;2.0;0.3
+104;Granada;1;83;1.7;14.7;4.0;1.2
+104;Grosella;1;56;1.4;9.5;4.3;0.2
+104;Guayaba;1;68;2.6;8.9;5.4;1.0
+104;Guindas;1;63;1.1;13.9;2.1;0.2
+105;Guindas ácidas rojas;1;50;1.0;10.6;1.6;0.3
+105;Higos frescos;1;74;0.8;16.3;2.9;0.3
+105;Higos secos;1;249;3.3;54.1;9.8;0.9
+105;Huesillo;1;239;3.6;53.1;8.2;0.8
+105;Kiwi;1;61;1.1;11.7;3.0;0.5
+106;Limón;1;29;1.1;6.5;2.8;0.3
+106;Mandarina;1;53;0.8;11.5;1.8;0.3
+106;Mango;1;60;0.8;13.4;1.6;0.4
+106;Manzana;1;52;0.3;11.4;2.4;0.2
+107;Manzana fuji;1;63;0.2;13.1;2.1;0.2
+107;Manzana golden;1;57;0.3;11.2;2.4;0.2
+107;Manzana roja;1;59;0.3;11.8;2.3;0.2
+107;Manzana sin cáscara;1;48;0.3;11.5;1.3;0.1
+107;Manzana verde;1;58;0.4;10.8;2.8;0.2
+108;Melón;1;34;0.8;7.3;0.9;0.2
+108;Membrillo;1;57;0.4;13.4;1.9;0.1
+108;Mora;1;43;1.4;4.3;5.3;0.5
+108;Naranja;1;47;0.9;9.3;2.4;0.1
+108;Níspero;1;47;0.4;8.9;3.2;0.2
+109;Palta;1;160;2.0;1.8;6.7;14.7
+109;Palta hass;4;160;1.7;;;15.4
+109;Papaya;1;43;0.5;9.1;1.7;0.3
+109;Pasas;1;299;3.1;75.5;3.7;0.5
+109;Pepino dulce;2;25;0.4;6.3;0.5;0.1
+111;Azúcar;1;387;0;100.0;0;0
+111;Azúcar flor;1;389;0;99.8;0;0
+111;Azúcar light con estevia;3;400;0;99.9;;0
+112;Miel de abeja;3;334;0.6;82.7;0;0.1
+112;Miel de abeja;2;318;0.3;78.8;0;0
+112;Miel de palma;2;254;0;63.6;0;0
+114;Alfajor;3;407;2.3;69.0;1.8;13.2
+114;Barra de cereal;3;354;11.6;59.9;11.0;7.5
+114;Barra sabor chocolate rellena frutilla;4;487;3.0;69.2;;22.0
+114;Berlín;2;307;6.2;47.4;0;10.3
+115;Bizcocho simple;2;381;4.2;51.7;0.1;17.4
+115;Cacao en polvo sin azúcar;1;228;19.6;20.9;37.0;13.7
+115;Chancaca;3;367;0.8;91.0;;0
+115;Chocolate de leche con almendras;4;559;11.3;46.9;;36.2
+116;Chocolate amargo 60-69% cacao;1;579;6.1;44.4;8.0;38.3
+116;Chocolate amargo 70-85% cacao;1;598;7.8;35.0;10.9;42.6
+116;Chocolate de leche;4;548;8.3;60.0;;30.5
+116;Cacao en polvo con azúcar;1;393;8.0;80.5;2.3;4.0
+117;Fruta confitada;1;322;0.3;81.3;1.6;0.1
+117;Jalea en polvo;1;381;7.8;90.5;0;0
+117;Jalea preparada;1;62;1.2;14.2;0;0
+117;Jalea preparada;3;28;0;7.1;;0
+117;Jalea en polvo sin azúcar;4;318;62.0;9.0;;0
+118;Manjar;3;290;6.2;47.4;;8.4
+118;Mermelada de damasco;3;232;0.4;57.6;2.0;0
+118;Mermelada de membrillo;3;199;0.2;49.6;1.8;0
+118;Mermelada sin azúcar añadida;4;56;0.7;17.0;17.0;0.2
+118;Dulce de membrillo;4;237;0.2;58.7;0.9;0.1
+119;Mousse de vainilla;2;149;6.2;18.2;0;5.7
+119;Muffin de arándano;1;333;4.9;54.8;1.9;10.1
+119;Oblea bañada sabor chocolate;4;503;4.0;68.0;;23.9
+119;Cono de barquillo;1;402;7.9;82.5;1.7;3.8
+120;Pie de limón;1;268;1.5;46.0;1.2;8.7
+120;Strudel de manzana;1;274;3.3;39.0;2.2;11.2
+120;Marshmallow;3;338;4.3;80.2;;0
+120;Sustancia simple (marshmallow);2;349;2.1;84.1;0;0.5
+120;Sustancia con chocolate;2;464;4.4;69.9;0;18.4
+122;Arroz con leche;4;85;3.5;14.5;;1.4
+122;Flan de leche sabor vainilla;4;115;2.6;24.0;;0.9
+122;Flan de vainilla preparado;3;81;3.4;8.4;;3.8
+122;Flan en polvo;2;390;0;97.4;0;0
+122;Leche asada con salsa de caramelo;4;144;3.6;24.4;;3.6
+122;Sémola con leche y caramelo;4;142;2.7;28.0;;2.2
+124;Bebida de soya sabor manzana;4;66;1.2;14.0;0.8;0.6
+124;Jugo de limón;1;22;0.4;6.6;0.3;0.2
+124;Jugo de mandarina;1;43;0.5;9.9;0.2;0.2
+124;Jugo de maqui;3;45;0;11.2;;0
+124;Jugo de naranja;1;45;0.7;10.2;0.2;0.2
+125;Jugo de pomelo;1;39;0.5;9.1;0.1;0.1
+125;Néctar de damasco;3;42;0.1;10.3;;0
+125;Néctar de damasco light;4;10;0.3;1.9;;0.1
+125;Néctar de durazno;3;42;0.1;10.4;;0
+125;Néctar de durazno light;3;15;0.3;3.3;;0
+126;Néctar de manzana;3;41;0;10.2;;0
+126;Néctar de naranja;3;41;0.4;9.8;;0
+126;Néctar de naranja light;3;20;0.3;4.8;;0
+126;Néctar de uva light;3;9;0.3;1.9;;0
+128;Refresco en polvo bajo en calorías;4;366;0;81.0;;0
+128;Refresco en polvo light durazno;3;155;3.0;35.7;52.0;0
+128;Refresco en polvo light naranja;3;226;1.7;54.8;35.3;0
+128;Refresco en polvo light piña;3;125;1.5;29.8;57.9;0
+130;Agua tónica;1;34;0;8.8;0;0
+130;Bebida cola light;3;0;0.1;0;;0
+130;Bebida cola tradicional;1;42;0;10.4;0;0.3
+130;Bebida energética;1;43;0.5;10.2;0;0
+130;Bebida gaseosa sabor limón;1;41;0.1;10.4;0;0
+131;Bebida gaseosa sabor naranja;1;48;0;12.3;0;0
+131;Bebida gaseosa sabor piña;1;40;0.1;10.1;0;0
+131;Bebida gaseosa sin azúcar;3;1;0.1;0.2;;0
+131;Bebida isotónica;1;32;0;7.8;0;0.1
+131;Bebida isotónica lima limón;4;24;0;6.0;;0
+133;Cerveza;1;51;0.5;7.4;0;0
+133;Champaña;1;77;0.2;0;;0
+133;Licor de café;1;325;0.1;52.5;0;0.3
+133;Licor de menta;1;351;0;71.4;0;0.3
+133;Martini;1;223;0;0;;0
+134;Pisco;6;210;0;0;0;0
+134;Pisco sour;3;185;0;14.3;;0.1
+134;Ron;1;231;0;33.4;0;0
+134;Vodka;1;230;0;33.4;0;0
+134;Whisky;1;240;0;36.1;0;0
+135;Vino blanco;1;81;0.1;3.3;0;0
+135;Vino tinto;1;82;0.1;3.6;0;0
+135;Vino tinto;3;84;0.1;1.6;;0
+137;Papas fritas de bolsa;3;500;5.7;59.7;3.6;26.5
+137;Papas fritas de bolsa crema y cebolla;3;485;6.1;57.8;4.5;25.5
+137;Suflé sabor queso;3;510;6.2;64.5;1.2;25.2
+139;Pesto;1;418;9.8;8.3;1.8;37.6
+139;Salsa barbecue;1;172;0.8;39.9;0.9;0.6
+139;Salsa blanca casera;1;105;3.8;7.3;0.1;6.7
+139;Salsa de tomates;1;24;1.2;3.8;1.5;0.3
+139;Salsa de tomates;4;47;1.7;9.7;;0.2
+140;Salsa de tomates con cebolla;1;42;1.6;8.2;1.8;0.2
+140;Salsa tártara;1;211;1.0;12.8;0.5;16.7
+140;Salsa teriyaki;1;89;5.9;15.8;0.1;0
+140;Salsa verde;1;38;1.1;4.5;1.9;0.9
+151;Endulzante agave líquido;3;153;0.1;37.9;;0
+151;Endulzante stevia líquido;3;49;0.1;12.1;;0
+151;Endulzante sucralosa líquido;3;15;0;3.7;;0
+153;Carne asada arvejada;3;109;19.9;1.2;;2.7
+153;Cebolla en escabeche;3;30;1.5;4.5;;0.7
+153;Cerdo a la mostaza;3;151;23.8;0.6;;5.9
+153;Crema de cebolla;3;22;0.3;3.5;;0.8
+153;Lentejas con arroz;3;90;3.3;10.3;;4.0
+154;Manzana asada;3;96;1.1;20.2;;1.2
+154;Puré de manzana;3;50;0.2;12.0;1.1;0.1
+154;Puré de manzana y plátano;3;58;0.4;13.8;1.4;0.1
+154;Puré de pera con canela;3;64;0;15.8;3.3;0.1
+155;Mariscal;3;87;12.2;3.2;1.0;2.8
+155;Pollo a la mostaza;3;121;21.8;2.5;;2.7
+155;Sopa de sémola;3;16;0.6;2.7;;0.3
+156;Tomate con papas;3;55;2.3;10.3;;0.5
+156;Torta de durazno con crema;3;226;5.3;35.0;;7.2
+156;Verduras guisadas;3;54;2.0;5.8;;2.5
