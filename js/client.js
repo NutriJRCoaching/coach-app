@@ -321,7 +321,10 @@ act("frecPick", async (el) => {
   const it = FS.freq[+el.dataset.k]; if (!it) return;
   if (it.per100 === false) return addItems([{ ...it, t: undefined }].map(({ t, ...x }) => x));
   const base = await getFoodBase(), mine = await db.list(P() + "/foods");
-  const f = [...mine, ...base].find((x) => x.id === it.fid) || { id: "fr-" + it.name, name: it.name, kcal: it.kcal, cho: it.cho, fat: it.fat, prot: it.prot, cat: it.cat || "", portion: it.por || null, src: "recent" };
+  // Se busca por nombre (los números internos de la base cambiaron con la base INTA); si no está, se usan los datos del registro
+  const nm = (x) => String(x || "").toLowerCase().trim(), all = [...mine, ...base];
+  const f = all.find((x) => x.id === it.fid && nm(x.name) === nm(it.name)) || all.find((x) => nm(x.name) === nm(it.name))
+    || { id: "fr-" + it.name, name: it.name, kcal: it.kcal, cho: it.cho, fat: it.fat, prot: it.prot, cat: it.cat || "", portion: it.por || null, src: "recent" };
   pickFood(f, it.g);
 });
 // Elige un alimento: con medida casera parte en 1 unidad; en gramos parte vacío (salvo que venga de "Frecuentes")

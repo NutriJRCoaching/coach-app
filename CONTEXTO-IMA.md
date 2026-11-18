@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.12.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 17-nov-2026, versión **1.12.2**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -55,6 +55,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Pantalla completa (`sheet(..., { full: true })`) con el **buscador fijo arriba**; al escribir pasa solo a resultados y al borrar vuelve a la pestaña anterior.
 - Pestañas: Frecuentes (lo más registrado en 30 días; al tocarlo queda con los gramos de la última vez), Favoritos, Recetas, Por voz, Añadir rápido, Suplementos, Crear.
 - `pickFood`: con medida casera parte en 1 unidad; al cambiar a **Gramos el campo queda vacío ("–")**, no se convierte el número.
+- Ojo: los ids de la base (`r0`, `r1`…) cambiaron con la base INTA; los registros viejos guardan `fid` antiguos. Siempre buscar alimentos por **nombre** (Frecuentes ya lo hace).
 - Inicio: calorías, agua y pasos muestran "Llevas el X %".
 - Idea pendiente: mostrar alimentos del plan de alimentación del cliente en el agregador (hoy el plan es PDF + porciones, sin lista de alimentos).
 
