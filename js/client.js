@@ -7,8 +7,9 @@ import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours
 import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
-import { macroGuide } from "./data.js";
+import { macroGuide, adjTxt } from "./data.js";
 import { has, loadMatrix } from "./features.js";
+import { maybeOnboard } from "./onboarding.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
 import { menusHtml, shoppingView } from "./menus.js";
@@ -80,7 +81,7 @@ async function home() {
   const inProgress = sessions.find((s) => s.status === "curso");
   const cdays = c.cardio?.days || [];
   const trainTxt = inProgress ? `<small class="muted">Sesión en curso</small><b>${esc(inProgress.routineName)}</b>` : slot && !slot.rest ? `<small class="muted">${slot.status === "hecho" ? "Completado" : date === today ? "Hoy te toca" : "Este día toca"}</small><b>${esc(slot.name)}</b>` : `<small class="muted">Hoy</small><b>Descanso</b>`;
-  if (date === today) setTimeout(askYesterdaySteps, 900);
+  if (date === today) { setTimeout(maybeOnboard, 400); setTimeout(askYesterdaySteps, 1200); }
   return `<header class="topbar ima"><img src="icons/logo.png?v=ima2" class="hdr-logo" alt="IMA"><div class="brand-t">INTELIGENCIA MUSCULAR APLICADA</div>${bellBtn(pend)}</header>${dayStrip()}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
@@ -708,14 +709,15 @@ act("measureSave", async () => {
 async function more() {
   return `${head("Más")}<div class="list">
   ${has("macro_guide") ? `<a href="#plan"><span>Mi guía de macros</span>${I.chev}</a>` : has("plan_menus") || has("plan_pdf") || has("plan_pauta") ? `<a href="#plan"><span>Mi plan de alimentación</span>${I.chev}</a>` : ""}${has("checkin") ? `<a href="#checkin"><span>Check-in semanal</span>${I.chev}</a>` : ""}${has("guides") ? `<a href="#guias"><span>Guías</span>${I.chev}</a>` : ""}${has("equipment") ? `<a href="#equipo"><span>Mi equipamiento</span>${I.chev}</a>` : ""}
-  <a href="#info"><span>Información personal</span>${I.chev}</a><a href="#ajustes"><span>Ajustes</span>${I.chev}</a>
+  <a href="#info"><span>Información personal</span>${I.chev}</a><a href="#ajustes"><span>Ajustes</span>${I.chev}</a><a data-a="obOpen"><span>Bienvenida a IMA<small>Cómo funciona la app</small></span>${I.chev}</a>
   ${S.role === "coach" ? `<a data-a="asCoach"><span><b>Volver al panel de coach</b></span>${I.chev}</a>` : ""}<a data-a="logout"><span class="red">Cerrar sesión</span></a></div>
   <p class="muted small center">${navigator.onLine ? "Conectado · todo sincronizado" : "Sin conexión · tus datos se guardan y se suben al volver la señal"}${DEMO ? " · MODO DEMO" : ""}</p>`;
 }
 async function planView() {
   if (has("macro_guide")) return macroGuideView();
   const p = has("plan_pdf") ? S.client.plan || {} : {}, opts = has("plan_menus") ? menusHtml(S.client) : "";
-  return `${head("Mi plan de alimentación", "mas")}${opts}
+  const st = S.client.stage, aj = adjTxt(st?.adj);
+  return `${head("Mi plan de alimentación", "mas")}${aj ? `<div class="card fbmini"><div class="card-t">Etapa: ${esc(st.phase)} · semanas ${st.from}–${st.to}</div><div class="small">Tu plan ya viene ajustado para esta etapa: <b>${esc(aj)}</b> porciones al día. Los gramos de abajo ya incluyen el cambio.</div>${st.note ? `<div class="muted small mt">${esc(st.note)}</div>` : ""}</div>` : ""}${opts}
   ${p.pdfUrl || p.notes || !opts ? `<div class="card">${p.pdfUrl ? `<a class="btn ${opts ? "" : "primary"} big block" target="_blank" href="${esc(p.pdfUrl)}">Abrir mi plan (PDF)</a>` : opts ? "" : `<p class="muted">Tu coach aún no sube tu plan.</p>`}
   ${p.notes ? `<div class="pre">${esc(p.notes)}</div>` : ""}</div>` : ""}
   ${has("plan_pauta") && S.client.pauta ? `<details class="card"><summary class="card-t">Porciones por día</summary>${Object.entries(S.client.pauta).filter(([, v]) => +v > 0).map(([g, v]) => `<div class="li row between"><span>${esc(g)}</span><b>${v}</b></div>`).join("")}</details>` : ""}`;

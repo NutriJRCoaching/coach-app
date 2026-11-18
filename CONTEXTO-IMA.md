@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.16.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.17.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -67,6 +67,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Clientes de ejemplo**: uno por servicio, con 4 semanas de datos (`seedClient` en demo.js).
 - Importación del 18-nov-2026: 7 clientes desde "PANEL DE CONTROL - Asesorías" y sus planillas (Vicente, Felipe, Marian, René, Cristóbal, Gabriel, Déborah). La historia de entrenamiento se acomodó para que el último registro de la planilla quede en la semana pasada. Solo Vicente tenía su plan por opciones en el panel; los demás quedan con "plan en PDF: pásalo a la app".
 
+## Bienvenida y etapas (v1.17)
+- **Bienvenida (onboarding)** en js/onboarding.js: se abre sola la primera vez que el cliente entra (no en la vista previa) y queda en Más → "Bienvenida a IMA". Pantallas: video + mensaje del coach, su asesoría (según `has()`), instalar y activar avisos, día a día, entrenamientos, check-in, listo. El coach configura video, mensaje y link al manual en Biblioteca (`library/onboarding`). Al terminar: `clients/{id}/settings/onboarding.done`. El panel muestra en gris "Aún no completa la bienvenida".
+- **Ajuste del plan por etapa**: `stage.adj = { grupo: ±porciones }` (Etapas → botón "Ajuste del plan"). `applyStage` cambia la pauta, achica/agranda en la misma proporción los gramos de ese grupo en las opciones del plan y, si la etapa no fija kcal/macros, los recalcula con los macros de intercambio. El cliente ve un aviso con el ajuste arriba de su plan.
+- Decisiones de Joaquín (18-nov): **no trabaja con bloques fijos ni descargas** (los bloques duran lo más posible y se ajustan de forma natural); los **videos de las series siguen por WhatsApp** (descartado subirlos a Drive); quien deja la asesoría pierde el acceso.
+- Primeros clientes en usar la app: **Marian, Vicente, Felipe y René** (semana del 23-nov-2026).
+
 ## Datos (Firestore)
 - `users/{uid}`
 - `library/exercises`, `library/foods`
@@ -132,8 +138,6 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **App Android (Capacitor) para leer los pasos desde Health Connect** (hoy se anotan a mano).
 - **Tips de ejecución por ejercicio** desde su hoja "Programa y tips".
 - **Plan de alimentación**: verificar en el celular las opciones, reemplazos y lista de compras (v1.13). Idea: mostrar la escala de hambre como gráfico semanal en el panel.
-- **Planificación por bloques (mesociclos de 6–8 semanas)** de entrenamiento y alimentación, conversada el 18-nov (ver propuesta en el chat): pendiente que Joaquín la apruebe.
-- Videos de los clientes al coach: Firebase Storage ya no es gratis; opción conversada: subirlos a su Google Drive con un Apps Script.
 - Pasar los planes en PDF de Felipe, Marian, René, Cristóbal y Déborah al plan por opciones.
 
 ## Forma de trabajar con Joaquín

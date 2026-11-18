@@ -6,7 +6,8 @@ import { S, refresh, go } from "./state.js";
 import { I } from "./icons.js";
 import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, $, $$ } from "./ui.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
-import { DEFAULT_RANGES } from "./data.js";
+import { DEFAULT_RANGES, adjTxt } from "./data.js";
+import "./onboarding.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
 import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN } from "./data.js";
 import { weeksTable } from "./client.js";
@@ -429,7 +430,13 @@ async function library() {
   ${FEATURES.map(([g, k, l, d]) => { const h = g !== grp ? `<tr class="svg"><td colspan="4">${esc(g)}</td></tr>` : ""; grp = g; const diff = new Set(SVC_COLS.map(([sv]) => val(k, sv))).size > 1;
     return `${h}<tr class="${diff ? "diff" : ""}"><td><b>${esc(l)}</b><br><small class="muted">${esc(d)}</small></td>${SVC_COLS.map(([sv]) => `<td class="center"><input type="checkbox" class="svck" ${val(k, sv) ? "checked" : ""} data-a-change="svcSet" data-k="${k}" data-s="${sv}"></td>`).join("")}</tr>`; }).join("")}</table>
   <p class="muted small">Las filas marcadas en color son las que cambian entre servicios. <button class="btn tiny ghost" data-a="svcReset">Volver a los valores de fábrica</button></p></div>`;
-  return `<h1>Biblioteca</h1>${svcTable}
+  const ob = (await db.get("library/onboarding")) || {};
+  const obCard = `<div class="card"><div class="card-t">Bienvenida (onboarding de clientes nuevos)</div><p class="muted small">Se abre sola la primera vez que el cliente entra: tu video, tu mensaje y 5–6 pantallas cortas que explican la app según su tipo de asesoría (su servicio, instalar y activar avisos, registrar, entrenar, check-in). Queda en Más → “Bienvenida a IMA” para volver a verla.</p>
+  <label>Video de bienvenida (YouTube no listado)<input id="obV" value="${esc(ob.videoUrl || "")}" placeholder="https://youtu.be/…"></label>
+  <label>Mensaje de bienvenida<textarea id="obT" rows="3" placeholder="Esta es tu app de asesoría…">${esc(ob.text || "")}</textarea></label>
+  <label>Link al manual de uso (opcional)<input id="obM" value="${esc(ob.manualUrl || "")}"></label>
+  <div class="row gap"><button class="btn primary" data-a="obSave">Guardar</button><button class="btn" data-a="obOpen">Ver cómo se ve</button></div></div>`;
+  return `<h1>Biblioteca</h1>${obCard}${svcTable}
   <div class="card"><div class="card-t">Base de ejercicios (${ex.length})</div><p class="muted small">Al escribir un ejercicio en una rutina, se completan solos su video, reemplazos y salto de carga.</p>
   <table class="tbl"><tr><th>Ejercicio</th><th>Grupo / patrón</th><th>Video</th><th>Salto (kg)</th><th>Reemplazos (Nombre | link; …)</th><th>Tips (los ven tus clientes de nutrición)</th><th></th></tr>
   ${ex.map((e, k) => `<tr><td><input value="${esc(e.name)}" data-a-change="libEx" data-k="${k}" data-f="name"></td><td><input value="${esc(e.group || "")}" data-a-change="libEx" data-k="${k}" data-f="group"></td><td><input value="${esc(e.video || "")}" data-a-change="libEx" data-k="${k}" data-f="video"></td><td><input type="number" step="0.5" value="${e.inc || ""}" data-a-change="libEx" data-k="${k}" data-f="inc" style="width:70px"></td><td><input value="${esc((e.alts || []).map((a) => a.name + (a.video ? " | " + a.video : "")).join("; "))}" data-a-change="libEx" data-k="${k}" data-f="alts"></td><td><textarea rows="1" data-a-change="libEx" data-k="${k}" data-f="tips">${esc(e.tips || "")}</textarea></td><td><button class="icon-btn" data-a="libExDel" data-k="${k}">✕</button></td></tr>`).join("")}</table>
@@ -441,6 +448,7 @@ async function library() {
 }
 act("svcSet", async (el) => { const m = await loadMatrix(true); m[el.dataset.k] = { ...(m[el.dataset.k] || {}), [el.dataset.s]: el.checked }; await db.set("library/services", { matrix: m, at: Date.now() }, false); await loadMatrix(true); toast("Guardado"); refresh(); });
 act("svcReset", async () => { if (!(await confirmBox("¿Volver a los valores de fábrica en todos los servicios?"))) return; await db.set("library/services", { matrix: {}, at: Date.now() }, false); await loadMatrix(true); refresh(); });
+act("obSave", async () => { await db.set("library/onboarding", { videoUrl: $("#obV").value.trim(), text: $("#obT").value.trim(), manualUrl: $("#obM").value.trim(), at: Date.now() }, false); toast("Bienvenida guardada ✓"); });
 const libSave = async (doc, items) => { await db.set("library/" + doc, { items }, false); };
 act("libEx", async (el) => {
   const items = (await db.get("library/exercises"))?.items || [], e = items[+el.dataset.k], f = el.dataset.f;
@@ -486,14 +494,23 @@ async function stagesView(c) {
   const now = weekInfo(c, ymd()).n;
   const inp = (k, i, v, w = 80, type = "number") => `<input type="${type}" data-a-change="stF" data-i="${i}" data-k="${k}" value="${esc(v ?? "")}" style="width:${w}px">`;
   return `<div class="card"><div class="card-t">Calendario nutricional · semana actual ${now}</div>${stagesBar(c, now)}</div>
-  <div class="card"><p class="muted small">Define cada etapa por número de semana. Mientras dure una etapa, sus objetivos reemplazan a los de "Datos y objetivos" (deja en blanco lo que no cambie). El cliente lo ve en su Timeline y sus metas cambian solas al pasar de etapa.</p>
-  <table class="tbl"><tr><th>Etapa</th><th>Desde sem.</th><th>Hasta sem.</th><th>Kcal</th><th>CHO</th><th>Lípidos</th><th>Proteína</th><th>Pasos</th><th>Agua (ml)</th><th>Nota para el cliente</th><th></th></tr>
+  <div class="card"><p class="muted small">Define cada etapa por número de semana. Los bloques duran lo que necesiten; no hay descargas automáticas. Mientras dure una etapa, sus objetivos reemplazan a los de "Datos y objetivos" (deja en blanco lo que no cambie). El cliente lo ve en su Timeline y sus metas cambian solas al pasar de etapa.</p>
+  <table class="tbl"><tr><th>Etapa</th><th>Desde sem.</th><th>Hasta sem.</th><th>Kcal</th><th>CHO</th><th>Lípidos</th><th>Proteína</th><th>Pasos</th><th>Agua (ml)</th><th>Ajuste del plan</th><th>Nota para el cliente</th><th></th></tr>
   ${st.map((x, i) => `<tr><td><div class="row"><span class="dotc" style="background:${phaseColor(x.phase)}"></span><select data-a-change="stF" data-i="${i}" data-k="phase">${Object.keys(PHASES).map((p) => `<option ${p === x.phase ? "selected" : ""}>${p}</option>`).join("")}</select></div></td>
     <td>${inp("from", i, x.from, 64)}</td><td>${inp("to", i, x.to, 64)}</td><td>${inp("kcal", i, x.kcal)}</td><td>${inp("cho", i, x.cho, 64)}</td><td>${inp("fat", i, x.fat, 64)}</td><td>${inp("prot", i, x.prot, 64)}</td><td>${inp("steps", i, x.steps, 80)}</td><td>${inp("water", i, x.water, 80)}</td>
+    <td><button class="btn tiny" data-a="stAdj" data-i="${i}">${adjTxt(x.adj) ? esc(adjTxt(x.adj)) : "Sin cambios"}</button></td>
     <td>${inp("note", i, x.note, 220, "text")}</td><td><button class="icon-btn" data-a="stDel" data-i="${i}">✕</button></td></tr>`).join("")}</table>
   <button class="btn" data-a="stAdd">＋ Agregar etapa</button></div>`;
 }
 const stSave = async (fn) => { const c = await getClient(CW.cid); const st = [...(c.stages || [])].sort((a, b) => a.from - b.from); fn(st); await db.set("clients/" + CW.cid, { stages: st }); refresh(); };
 act("stF", (el) => stSave((st) => { const k = el.dataset.k; st[+el.dataset.i][k] = ["phase", "note"].includes(k) ? el.value : num(el.value); }));
+act("stAdj", async (el) => {
+  const c = await getClient(CW.cid), st = [...(c.stages || [])].sort((a, b) => a.from - b.from), x = st[+el.dataset.i]; if (!x) return;
+  const groups = Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => g);
+  sheet(`Ajuste del plan · ${x.phase} (sem. ${x.from}–${x.to})`, `<p class="muted small">Porciones que sumas o restas a la pauta en esta etapa (ej. <b>-1</b> Cereales, <b>-0.5</b> Aceites y grasas). En el plan del cliente, los alimentos de ese grupo bajan su gramaje en la misma proporción. Si dejaste en blanco las calorías y macros de la etapa, se recalculan solas.</p>
+  <div class="grid3">${groups.map((g) => `<label>${esc(g)}<small class="muted"> · pauta ${c.pauta?.[g] ?? 0}</small><input type="number" step="0.25" data-adj="${esc(g)}" value="${x.adj?.[g] ?? ""}" placeholder="0"></label>`).join("")}</div>
+  <button class="btn primary big" data-a="stAdjOk" data-i="${el.dataset.i}">Guardar ajuste</button>`, { wide: true });
+});
+act("stAdjOk", (el) => { const adj = {}; $$("[data-adj]").forEach((i) => { if (num(i.value)) adj[i.dataset.adj] = num(i.value); }); closeSheet(); stSave((st) => { st[+el.dataset.i].adj = adj; }); });
 act("stAdd", () => stSave((st) => { const last = st[st.length - 1]; const from = last ? +last.to + 1 : 1; st.push({ phase: "Mantención", from, to: from + 3 }); }));
 act("stDel", async (el) => { if (await confirmBox("¿Eliminar esta etapa?")) stSave((st) => st.splice(+el.dataset.i, 1)); });

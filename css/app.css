@@ -448,3 +448,6 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .mrx { padding: 6px 0; border-bottom: 1px solid var(--line); align-items: center; } .row.wrap { flex-wrap: wrap; }
 .svct td, .svct th { vertical-align: middle; } .svct .svg td { background: var(--surf2); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .svct tr.diff td:first-child { box-shadow: inset 3px 0 0 var(--acc); } .svck { width: 18px; height: 18px; accent-color: var(--acc); }
+.ob { min-height: 46vh; } .ob p { line-height: 1.5; } .ob-hero { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 6px 0 14px; } .ob-hero img { width: 84px; height: 84px; border-radius: 20px; } .ob-hero b { letter-spacing: .12em; font-size: 12px; }
+.ob-list { padding-left: 18px; line-height: 1.55; } .ob-list li { margin: 6px 0; }
+.ob-dots { display: flex; justify-content: center; gap: 6px; margin: 14px 0; } .ob-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); } .ob-dots i.on { background: var(--acc); width: 18px; border-radius: 9px; }

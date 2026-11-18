@@ -13,12 +13,13 @@ export const emailKey = (e) => String(e || "").trim().toLowerCase();
 // Carga lo necesario para revisar a un cliente
 export async function loadCtx(c) {
   const today = ymd();
-  const [routines, sessions, days, checkins, feedbacks, access] = await Promise.all([
+  const [routines, sessions, days, checkins, feedbacks, access, onb] = await Promise.all([
     getRoutines(c.id), getSessions(c.id), getDays(addDays(today, -6), today, c.id),
     db.list(`clients/${c.id}/checkins`), db.list(`clients/${c.id}/feedbacks`),
-    c.email ? db.get("access/" + emailKey(c.email)).catch(() => null) : null
+    c.email ? db.get("access/" + emailKey(c.email)).catch(() => null) : null,
+    db.get(`clients/${c.id}/settings/onboarding`).catch(() => null)
   ]);
-  return { routines, sessions, days, checkins, feedbacks, access };
+  return { routines, sessions, days, checkins, feedbacks, access, onb };
 }
 
 export function alertsFor(c, x) {
@@ -29,6 +30,7 @@ export function alertsFor(c, x) {
   if (!c.service) add("r", "Falta definir el tipo de asesoría");
   if (!c.email && !c.example) add("y", "Falta su correo (lo necesita para crear su cuenta)");
   else if (!active) add("i", "Aún no tiene acceso a la app");
+  if (active && !c.example && !x.onb?.done) add("i", "Aún no completa la bienvenida a la app");
   if (!c.startDate) add("y", "Falta la fecha de inicio (define sus semanas)");
   const miss = [["sex", "sexo"], ["birth", "fecha de nacimiento"], ["height", "estatura"]].filter(([k]) => !c[k]).map(([, l]) => l);
   if (miss.length) add("y", "Faltan datos: " + miss.join(", "));

@@ -3,6 +3,7 @@ import { db } from "./db.js";
 import { S } from "./state.js";
 import { ymd, addDays, weekInfo, e1rm, uid } from "./util.js";
 import { REAL_FOODS, realToFood } from "./realfoods.js";
+import { GROUPS } from "./foods.js";
 
 const C = (cid = S.cid) => "clients/" + cid;
 export const dayPath = (date, cid) => `${C(cid)}/days/${date}`;
@@ -213,12 +214,28 @@ export function stageAt(c, date) {
   return (c.stages || []).find((s) => n >= +s.from && n <= +s.to) || null;
 }
 // Objetivos vigentes en una fecha: los de la etapa (si hay) sobre los generales del cliente
+// Cada etapa puede ajustar porciones por grupo (s.adj = { "Cereales": -1, "Aceites y grasas": -0.5 }):
+// la pauta cambia y los alimentos de ese grupo en las opciones del plan se achican (o agrandan) en la misma proporción.
+// Si la etapa no fija calorías/macros, se recalculan con los macros de las porciones de intercambio.
 export function applyStage(c, date = ymd()) {
   const s = stageAt(c, date); if (!s) return c;
   const o = { ...c, phase: s.phase || c.phase, stage: s };
+  const adj = Object.entries(s.adj || {}).filter(([, d]) => +d);
+  if (adj.length && c.pauta) {
+    const pauta = { ...c.pauta }, f = {}, dm = { kcal: 0, cho: 0, fat: 0, prot: 0 };
+    for (const [g, d] of adj) {
+      const old = +pauta[g] || 0, nu = Math.max(0, old + +d); pauta[g] = nu;
+      if (old > 0) f[g] = nu / old;
+      const G = GROUPS[g]; if (G) { const real = nu - old; dm.kcal += real * G[0]; dm.cho += real * G[1]; dm.fat += real * G[2]; dm.prot += real * G[3]; }
+    }
+    o.pauta = pauta;
+    if (c.menus) o.menus = c.menus.map((m) => ({ ...m, meals: m.meals.map((ml) => ({ ...ml, items: ml.items.map((it) => (f[it.cat] != null && f[it.cat] !== 1 ? { ...it, por: it.por != null ? Math.round(it.por * f[it.cat] * 100) / 100 : it.por, g: it.g != null ? Math.round(it.g * f[it.cat]) : it.g, adj: true } : it)).filter((it) => !(it.adj && !it.g)) })) }));
+    for (const k of ["kcal", "cho", "fat", "prot"]) if ((s[k] === "" || s[k] == null) && c[k]) o[k] = Math.round(c[k] + dm[k]);
+  }
   for (const k of ["kcal", "cho", "fat", "prot", "steps", "water"]) if (s[k] !== "" && s[k] != null) o[k] = +s[k];
   return o;
 }
+export const adjTxt = (adj) => Object.entries(adj || {}).filter(([, d]) => +d).map(([g, d]) => `${g} ${+d > 0 ? "+" : "−"}${String(Math.abs(+d)).replace(".", ",")}`).join(" · ");
 // Barra de calendario de etapas
 export function stagesBar(c, curN) {
   const st = [...(c.stages || [])].sort((a, b) => a.from - b.from);
