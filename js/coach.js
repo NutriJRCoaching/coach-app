@@ -9,7 +9,7 @@ import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours
 import { DEFAULT_RANGES, adjTxt } from "./data.js";
 import "./onboarding.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
-import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN } from "./data.js";
+import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN, CHECKIN_OLD } from "./data.js";
 import { weeksTable } from "./client.js";
 import { GROUPS } from "./foods.js";
 import { menusEditor } from "./menus.js";
@@ -285,8 +285,14 @@ async function checkinsView(c) {
   if (!list.length) return head + `<p class="muted">Sin check-ins.</p>`;
   const v = (x) => Array.isArray(x) ? x.join(", ") : x;
   const ans = (id) => fbs.find((f) => f.id === id && (f.at || f.answered));
+  const box = (ci) => { const it = [["Seguimiento de su foco", ci.accionFoco ? `${ci.accionFoco} → ${ci.accion || "sin responder"}${ci.accionDet ? ` · ${ci.accionDet}` : ""}` : ""], ["Progreso (qué se le hace más fácil)", ci.facil], ["Barreras", ci.barrera], ["De qué está orgulloso", ci.orgullo], ["La próxima semana", ci.proxSemana], ["Foco que propone", ci.foco]].filter(([, v]) => v);
+    return it.length ? `<div class="ci-key">${it.map(([l, v]) => `<div class="qa"><span class="muted">${l}</span><b>${esc(v)}</b></div>`).join("")}<p class="muted small">Antes de responder: busca el progreso, las barreras y lo que viene, y acuerda <b>una sola acción</b> para la semana. En la próxima le preguntamos cómo le fue.</p></div>` : ""; };
+  const shown = new Set(CHECKIN.flatMap((x) => x.q.map(([k]) => k)).concat(["facil", "barrera", "orgullo", "proxSemana", "foco", "accion", "accionDet", "accionFoco"]));
+  const legacy = (ci) => Object.entries(CHECKIN_OLD).filter(([k]) => !shown.has(k) && ci[k] != null && ci[k] !== "").map(([k, l]) => `<div class="qa"><span class="muted">${esc(l)}</span><b>${esc(v(ci[k]))}${ci[k + "Det"] ? ` · ${esc(ci[k + "Det"])}` : ""}</b></div>`).join("");
   return head + list.map((ci, k) => `<details class="card ci-view" ${k === 0 ? "open" : ""}><summary class="row between"><h3>Semana ${+ci.id.slice(1)} <small class="muted">${ci.date ? fmtDate(ci.date) : ""}</small> ${ans(ci.id) ? '<span class="badge g">Respondido ✓</span>' : '<span class="badge r">Sin responder</span>'}</h3><span class="row gap small"><span class="muted">Días con registro de comida: ${ci.diasRegistrados ?? "—"}/7</span>${ans(ci.id) ? "" : `<button class="btn tiny primary" data-a="ciAnswer" data-n="${+ci.id.slice(1)}">Responder</button><button class="btn tiny" data-a="ciMark" data-w="${ci.id}">Marcar respondido</button>`}</span></summary>
-  <div class="grid3">${CHECKIN.map((sec) => { const qs = sec.q.filter(([key]) => ci[key] != null && ci[key] !== "" && !(Array.isArray(ci[key]) && !ci[key].length)); if (!qs.length) return ""; return `<div><h4>${esc(sec.t)}</h4>${qs.map(([key, label]) => `<div class="qa"><span class="muted">${esc(label)}</span><b>${esc(v(ci[key]))}${ci[key + "Det"] ? ` · ${esc(ci[key + "Det"])}` : ""}</b></div>`).join("")}</div>`; }).join("")}
+  ${box(ci)}${ci.entrenos ? `<p class="small">Entrenamientos: <b>${ci.entrenos}</b></p>` : ""}
+  <div class="grid3">${CHECKIN.filter((sec) => !sec.open).map((sec) => { const qs = sec.q.filter(([key]) => ci[key] != null && ci[key] !== "" && !(Array.isArray(ci[key]) && !ci[key].length)); if (!qs.length) return ""; return `<div><h4>${esc(sec.t)}</h4>${qs.map(([key, label]) => `<div class="qa"><span class="muted">${esc(label)}</span><b>${esc(v(ci[key]))}${ci[key + "Det"] ? ` · ${esc(ci[key + "Det"])}` : ""}</b></div>`).join("")}</div>`; }).join("")}
+  ${legacy(ci) ? `<div><h4>Otras respuestas (versión anterior)</h4>${legacy(ci)}</div>` : ""}
   ${ci.ciclo ? `<div><h4>Ciclo</h4><div class="qa"><span class="muted">En ciclo menstrual</span><b>${esc(ci.ciclo)}</b></div></div>` : ""}</div></details>`).join("");
 }
 
@@ -295,11 +301,13 @@ act("ciMark", async (el) => { await db.set(`clients/${CW.cid}/feedbacks/${el.dat
 // ---------- Retroalimentación semanal
 async function feedbackView(c, w) {
   const fb = c.feedback?.week === w.key ? c.feedback : (await db.get(`clients/${c.id}/feedbacks/${w.key}`)) || {};
+  const ciW = await db.get(`clients/${c.id}/checkins/${w.key}`), goals = c.feedback?.week === w.key ? c.weeklyGoals || [] : ciW?.foco ? [ciW.foco] : c.weeklyGoals || [];
   return `<div class="card"><div class="card-t">Retroalimentación · Semana ${w.n}</div><p class="muted small">Aparece como mensaje grande en la pantalla de inicio del cliente durante esa semana.</p>
   <label>Link del video (YouTube no listado, Drive, Loom…)<input id="fbV" value="${esc(fb.videoUrl || "")}"></label>
   <label>Puntos clave (uno por línea)<textarea id="fbP" rows="5">${esc((fb.points || []).join("\n"))}</textarea></label>
   <label>Mensaje (opcional)<textarea id="fbT" rows="3">${esc(fb.text || "")}</textarea></label>
-  <label>Metas de la semana (una por línea)<textarea id="fbG" rows="3">${esc((c.weeklyGoals || []).join("\n"))}</textarea></label>
+  ${ciW?.foco ? `<p class="small">Foco que propuso en su check-in: <b>${esc(ciW.foco)}</b></p>` : ""}
+  <label>Foco de la semana (la primera línea es la acción que le preguntamos en el próximo check-in)<textarea id="fbG" rows="3">${esc(goals.join("\n"))}</textarea></label>
   <button class="btn primary" data-a="fbSave" data-w="${w.key}">Publicar al cliente</button></div>`;
 }
 act("fbSave", async (el) => {

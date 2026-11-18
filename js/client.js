@@ -743,10 +743,15 @@ async function checkinView() {
   const days = await getDays(w.first, w.last);
   const regDays = Object.values(days).filter((d) => Object.values(d.meals || {}).some((m) => m.length)).length;
   const dep = avg(Object.values(days).map((d) => d.depos).filter((x) => x != null));
-  const q = ([k, label, type, extra]) => {
+  // Seguimiento: el foco que se propuso la semana pasada (o la meta que le dejó el coach)
+  const pw = weekInfo(S.client, addDays(w.first, -7)), prevCi = pw.n >= 1 ? await db.get(`${P()}/checkins/${pw.key}`) : null;
+  const prevFoco = (S.client.weeklyGoals || [])[0] || prevCi?.foco || "";
+  if (prevFoco && !CI.accionFoco) CI.accionFoco = prevFoco;
+  const [rts, sss] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]), tp = weekPlan(S.client, rts, sss, w.first);
+  const q = ([k, label, type, extra, ph]) => {
     let inp;
     if (type === "text") inp = `<textarea rows="2" data-a-input="ciTxt" data-k="${k}">${esc(CI[k] || "")}</textarea>`;
-    else if (type === "line") inp = `<input data-a-input="ciTxt" data-k="${k}" value="${esc(CI[k] || "")}" placeholder="Ejercicio, peso × reps">`;
+    else if (type === "line") inp = `<input data-a-input="ciTxt" data-k="${k}" value="${esc(CI[k] || "")}" placeholder="${esc(ph || "Ejercicio, peso × reps")}">`;
     else if (type === "num") inp = `<input type="number" step="0.1" inputmode="decimal" data-a-input="ciTxt" data-k="${k}" value="${esc(CI[k] ?? "")}">`;
     else if (type.multi) inp = `<div class="ci-grid">${type.multi.map((o) => `<label><input type="checkbox" data-a-change="ciMulti" data-k="${k}" value="${esc(o)}" ${(CI[k] || []).includes(o) ? "checked" : ""}>${esc(o)}</label>`).join("")}</div>`;
     else if (type.length > 6) inp = `<select data-a-change="ciSel" data-k="${k}"><option value="">—</option>${type.map((o) => `<option ${CI[k] === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
@@ -756,7 +761,11 @@ async function checkinView() {
   };
   return `${head(`Check-in · Semana ${w.n}`, "mas")}
   <p class="muted small center">${fmtDate(w.first)} – ${fmtDate(w.last)}${saved.at ? " · enviado ✓ (puedes actualizarlo)" : ""}</p>
-  ${CHECKIN.map((sec) => `<div class="ci-sec"><h3>${esc(sec.t)}</h3>
+  ${prevFoco ? `<div class="ci-sec ci-open"><h3>Tu foco de la semana pasada</h3><div class="note"><b>${esc(prevFoco)}</b></div>
+    ${q(["accion", "¿Cómo te fue?", ["Lo logré", "A medias", "No lo logré"]])}${q(["accionDet", "¿Qué te ayudó o qué te lo impidió?", "text"])}</div>` : ""}
+  ${CHECKIN.map((sec) => `<div class="ci-sec ${sec.open ? "ci-open" : ""}"><h3>${esc(sec.t)}</h3>
+    ${sec.open ? `<p class="muted small">Tómate un par de minutos en estas: son las que más me sirven para ajustar tu plan.</p>` : ""}
+    ${sec.t === "Entrenamiento" && tp.planned.length ? `<div class="ci-q"><div>Entrenamientos de la semana</div><b>${tp.doneCount} de ${tp.planned.length}</b> <span class="muted small">(automático)</span></div>` : ""}
     ${sec.t === "Nutrición" ? `<div class="ci-q"><div>¿Cuántos días registraste tu alimentación en la app?</div><b>${regDays} de 7</b> <span class="muted small">(automático)</span></div>` : ""}
     ${sec.t === "Digestión" && dep != null ? `<div class="note">Según tus registros diarios: ${r1(dep)} deposiciones por día en promedio.</div>` : ""}
     ${sec.q.map(q).join("")}
@@ -770,6 +779,8 @@ act("ciMulti", (el) => { const s = new Set(CI[el.dataset.k] || []); el.checked ?
 act("ciSave", async () => {
   const w = weekInfo(S.client, ymd()), days = await getDays(w.first, w.last);
   CI.diasRegistrados = Object.values(days).filter((d) => Object.values(d.meals || {}).some((m) => m.length)).length;
+  const [rts, sss] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]), tp = weekPlan(S.client, rts, sss, w.first);
+  CI.entrenos = `${tp.doneCount}/${tp.planned.length}`;
   await db.set(`${P()}/checkins/${w.key}`, { ...CI, at: Date.now(), date: ymd() }, false);
   toast("Check-in enviado ✓"); go("inicio");
 });

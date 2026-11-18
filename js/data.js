@@ -254,32 +254,36 @@ export function stagesBar(c, curN) {
 const L5 = ["Muy bajo", "Bajo", "Normal", "Alto", "Muy alto"];
 const Q5 = ["Muy malo", "Malo", "Regular", "Bueno", "Muy bueno"];
 const FREQ = ["0 veces", "1 vez a la semana", "2 veces a la semana", "3 veces a la semana", "4 veces a la semana", "5 veces a la semana", "6 veces a la semana", "Todos los días"];
+// Check-in v1.18: primero las preguntas abiertas que dan algo con qué trabajar (progreso, barreras, lo que viene,
+// un foco concreto); después las escalas rápidas. Lo que la app ya sabe (entrenos hechos, días registrados) no se pregunta.
 export const CHECKIN = [
+  { t: "Lo más importante de tu semana", open: true, q: [
+    ["facil", "¿Qué se te hace más fácil ahora que hace un mes? (en el gimnasio, al comer, en tu día a día)", "text"],
+    ["barrera", "¿Qué hizo más fácil o más difícil seguir tu plan esta semana?", "text"],
+    ["orgullo", "¿De qué te sientes orgulloso esta semana?", "text"],
+    ["proxSemana", "¿Qué pasa la próxima semana que debamos planificar? (viajes, pruebas, turnos, panoramas, poco sueño…)", "text"],
+    ["foco", "¿En qué una cosa quieres enfocarte de aquí al próximo check-in? Que sea concreta y realista", "line", null, "Ej: llevar almuerzo a la pega 4 días"]
+  ] },
   { t: "Entrenamiento", q: [
-    ["todos", "¿Hiciste todos los entrenamientos que te correspondían?", ["Sí", "Casi todos", "No"]],
     ["otroDeporte", "¿Hiciste otro deporte o actividad física aparte de lo planificado?", ["No", "Sí"], "¿Cuál y cuánto?"],
-    ["progCarga", "¿Hubo progreso de carga/repeticiones esta semana?", ["Más carga/reps", "Igual", "Menos carga/reps"]],
-    ["progTec", "¿Hubo progreso de técnica esta semana?", ["Sí, mejoró", "Se mantuvo", "Empeoró"]],
     ["entGeneral", "¿Cómo estuvieron los entrenamientos en general?", Q5],
     ["motivEnt", "Disposición a entrenar / motivación", L5],
     ["fuerza", "Fuerza y rendimiento", L5],
     ["doms", "DOMS / dolor muscular post entrenamiento", ["Nada", "Leve", "Moderado", "Alto", "Muy alto"]],
     ["articular", "¿Hubo dolor articular durante los entrenamientos?", ["Nada", "Leve", "Moderado", "Alto"], "¿Dónde y en qué ejercicio?"],
-    ["comEnt", "Comentarios", "text"],
-    ["top1", "Mejor levantamiento/serie · Top 1", "line"], ["top2", "Top 2", "line"], ["top3", "Top 3", "line"], ["peor", "El peor", "line"]
+    ["confianza", "¿Qué ejercicio sientes que ya dominas y harías bien sin mí? ¿Y en cuál todavía no te sientes seguro?", "text"],
+    ["top1", "Tu mejor serie de la semana", "line"], ["peor", "La que más te costó", "line"]
   ] },
   { t: "Nutrición", q: [
     ["cintura", "Circunferencia de cintura en ayunas, altura del ombligo (cm)", "num"],
     ["adhPlan", "¿Qué tanto pudiste seguir el plan de alimentación?", ["Menos del 50%", "50–70%", "70–90%", "Más del 90%"]],
-    ["motivNut", "Motivación para tomar buenas decisiones alimentarias", L5],
-    ["contribuyen", "¿Sientes que las decisiones que tomaste contribuyen a lograr tus objetivos?", ["Sí", "Más o menos", "No"]],
+    ["momentoDificil", "¿Qué comida o momento del día te costó más? ¿Por qué?", "text"],
     ["hambre", "Hambre durante la semana", ["Poca", "Normal", "Mucha"]],
     ["saciedad", "Saciedad después de comer", ["Poca", "Normal", "Mucha"]],
     ["antojos", "Antojos durante la semana", ["No tuve", "Pocos", "Varios", "Muchos"]],
-    ["fueraPlan", "Si tuviste comidas fuera de plan, cuéntame cuántas fueron y en qué contexto, junto con cualquier otra novedad de la alimentación", "text"],
-    ["comNut", "Comentarios", "text"]
+    ["fueraPlan", "Si tuviste comidas fuera de plan, ¿cuántas fueron y en qué contexto?", "text"]
   ] },
-  { t: "Encuesta de tendencia de consumo", freq: true, q: ["Frutas", "Verduras", "Lácteos", "Carne/Pollo/Cerdo", "Pescado/Mariscos", "Legumbres", "Huevo", "Frutos secos", "Semillas", "Ultraprocesados", "Mayo/Mantequilla/Margarina", "Azúcar de mesa", "Embutidos", "Alcohol"].map((f) => ["f_" + f, f, FREQ]).concat([["comFreq", "Comentarios", "text"]]) },
+  { t: "Encuesta de tendencia de consumo", freq: true, q: ["Frutas", "Verduras", "Lácteos", "Carne/Pollo/Cerdo", "Pescado/Mariscos", "Legumbres", "Huevo", "Frutos secos", "Semillas", "Ultraprocesados", "Mayo/Mantequilla/Margarina", "Azúcar de mesa", "Embutidos", "Alcohol"].map((f) => ["f_" + f, f, FREQ]) },
   { t: "Digestión", q: [
     ["depos", "Deposiciones por día (promedio de la semana)", ["0", "1", "2", "3 o más"]],
     ["bristol", "¿Cómo fueron tus deposiciones?", ["Duras", "Normales", "Blandas", "Líquidas"]],
@@ -291,30 +295,24 @@ export const CHECKIN = [
     ["enerFuera", "Niveles de energía fuera de las sesiones", L5],
     ["recup", "¿Te sientes lo suficientemente recuperado de una sesión a otra?", ["Sí", "Más o menos", "No"]],
     ["salud", "¿Cómo te sentiste de salud en general?", Q5],
-    ["resfrio", "¿Hubo algún signo de resfrío o enfermedad esta semana?", ["Todo bien", "Síntomas leves", "Me enfermé"]],
-    ["comRec", "Comentarios", "text"]
+    ["resfrio", "¿Hubo algún signo de resfrío o enfermedad esta semana?", ["Todo bien", "Síntomas leves", "Me enfermé"]]
   ] },
   { t: "Estrés y ánimo", q: [
     ["estEmo", "Estrés emocional", L5], ["estFis", "Estrés físico", L5], ["estLab", "Estrés laboral/profesional", L5], ["estGen", "Estrés en general", L5],
-    ["animo", "Ánimo en general", Q5], ["comEst", "Comentarios", "text"]
+    ["animo", "Ánimo en general", Q5], ["comEst", "¿Algo que quieras contarme de cómo estuviste?", "text"]
   ] },
   { t: "Sintomatología", q: [
     ["sintomas", "¿Has tenido alguno de estos síntomas durante la última semana?", { multi: ["Dolores de cabeza", "Debilidad/fatiga sin motivo aparente", "Mareos o visión borrosa", "Adormecimiento de extremidades", "Calambres", "Disnea (falta de aire)", "Náuseas o vómitos", "Diarrea", "Estreñimiento", "Distensión abdominal (hinchazón)", "Flatulencias (gases excesivos)", "Pérdida de apetito", "Cambios de ánimo", "Insomnio", "Dificultad para concentrarse", "Irritabilidad excesiva", "Alergias", "Acné", "Picazón"] }],
     ["comSin", "Comentarios", "text"]
   ] },
-  { t: "Autoanálisis", q: [
-    ["orgullo", "Cosas que quieras destacar de esta semana. ¿De qué te sientes orgulloso?", "text"],
-    ["dificil", "¿Hay algo que se te haya dificultado más durante esta semana?", "text"],
-    ["mejorar", "¿Hay algo que desees mejorar para la semana que viene?", "text"]
-  ] },
   { t: "Experiencia con la asesoría", q: [
     ["expProg", "¿Cómo te sientes con el progreso que hemos tenido?", Q5],
-    ["expResp", "¿Cómo evaluarías mi tiempo de respuesta esta semana?", Q5],
-    ["expRetro", "¿Cómo evaluarías la retroalimentación esta semana?", Q5],
-    ["expServ", "¿Qué te ha parecido el servicio en general esta semana?", Q5],
-    ["sugerencia", "¿Tienes alguna sugerencia para mejorar tu experiencia con la asesoría?", "text"]
+    ["expRetro", "¿Qué tan útil te sirvió mi retroalimentación de la semana pasada?", Q5],
+    ["sugerencia", "¿Qué podría hacer yo para que te resulte más fácil seguir el plan?", "text"]
   ] },
   { t: "Consultas / dudas", q: [
-    ["consultas", "¿Necesitas algo en específico de mi esta semana? ¿Dudas sobre tu plan de entrenamiento o de alimentación?", "text"]
+    ["consultas", "¿Necesitas algo de mí esta semana? ¿Dudas sobre tu plan de entrenamiento o de alimentación?", "text"]
   ] }
 ];
+// Preguntas de versiones anteriores: se siguen mostrando en el panel si un check-in antiguo las tiene
+export const CHECKIN_OLD = { todos: "¿Hiciste todos los entrenamientos?", progCarga: "¿Hubo progreso de carga/repeticiones?", progTec: "¿Hubo progreso de técnica?", comEnt: "Comentarios de entrenamiento", top2: "Top 2", top3: "Top 3", motivNut: "Motivación para tomar buenas decisiones alimentarias", contribuyen: "¿Las decisiones que tomaste contribuyen a tus objetivos?", comNut: "Comentarios de nutrición", comFreq: "Comentarios de consumo", comRec: "Comentarios de recuperación", dificil: "¿Algo que se te haya dificultado más?", mejorar: "¿Algo que desees mejorar para la semana que viene?", expResp: "Tiempo de respuesta", expServ: "Servicio en general" };

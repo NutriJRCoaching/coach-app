@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.17.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.18.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -72,6 +72,13 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Ajuste del plan por etapa**: `stage.adj = { grupo: ±porciones }` (Etapas → botón "Ajuste del plan"). `applyStage` cambia la pauta, achica/agranda en la misma proporción los gramos de ese grupo en las opciones del plan y, si la etapa no fija kcal/macros, los recalcula con los macros de intercambio. El cliente ve un aviso con el ajuste arriba de su plan.
 - Decisiones de Joaquín (18-nov): **no trabaja con bloques fijos ni descargas** (los bloques duran lo más posible y se ajustan de forma natural); los **videos de las series siguen por WhatsApp** (descartado subirlos a Drive); quien deja la asesoría pierde el acceso.
 - Primeros clientes en usar la app: **Marian, Vicente, Felipe y René** (semana del 23-nov-2026).
+
+## Check-in v1.18 (inspirado en un carrusel de @logandube.3dfit que mandó Joaquín)
+- Idea: preguntas que no se contestan con "bien"; escuchar progreso, barreras y lo que viene; acordar **una acción** y hacerle seguimiento.
+- Abre con "Lo más importante de tu semana": `facil` (qué se hace más fácil que hace un mes), `barrera` (qué hizo más fácil/difícil seguir el plan), `orgullo`, `proxSemana` (qué pasa la próxima semana que debamos planificar), `foco` (una cosa concreta hasta el próximo check-in).
+- Si hay foco anterior (primera línea de `weeklyGoals`, o el `foco` del check-in pasado): "Tu foco de la semana pasada" con `accion` (Lo logré / A medias / No lo logré) + `accionDet`; se guarda `accionFoco`.
+- Ya no se pregunta lo que la app sabe: entrenos hechos (se guarda `entrenos` "4/4" automático) y días con registro. Se quitaron progCarga, progTec, top2/top3, motivación nutricional, "contribuyen", comentarios genéricos, tiempo de respuesta y servicio general. Nuevas: `confianza` (qué ejercicio domina sin el coach y cuál no), `momentoDificil`.
+- Panel: recuadro destacado con seguimiento, progreso, barreras, orgullo, próxima semana y foco; las respuestas de preguntas antiguas salen en "Otras respuestas (versión anterior)" (`CHECKIN_OLD`). En Retroalimentación, "Foco de la semana" viene prellenado con el foco que propuso el cliente.
 
 ## Datos (Firestore)
 - `users/{uid}`
