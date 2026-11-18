@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.15.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.15.2**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -80,11 +80,8 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Niveles: Muerto de hambre, Mucha hambre, Con hambre, Un poco de hambre, Ni hambre ni lleno, Satisfecho, Tranquilo en su punto, Lleno, Muy lleno, A punto de reventar.
 - El coach lo ve en Alimentación ("Hambre 3 → 7" junto a cada comida).
 
-## Estrés del día (v1.15)
-- Lo que Joaquín pidió originalmente con la "barra deslizable con caras" era para el **estrés**.
-- Tarjeta ancha y **compacta** en el **inicio**, debajo de Cardio y Digestión (antes estaba en la pantalla de peso): título "Estrés de hoy" con el nivel a la derecha, y abajo la carita chica (30 px) a la izquierda de la barra. 1 = muy tranquilo … 10 = al límite. Se guarda sola al soltar la barra (`day.stress`), **sin aviso** de "guardado": solo queda marcada.
-- Diseño elegido: **estilo A** (cara de línea sobre negro, `stressFaceSvg` en menus.js); el color va de menta a coral y la cara cambia (ojos cerrados y sonrisa → cejas de preocupación y boca hacia abajo).
-- El coach la ve en el Timeline semanal (fila "Estrés (1–10)").
+## Estrés del día (QUITADO en v1.15.2)
+- Se probó una barra deslizable de estrés con carita (en peso y luego en el inicio). A Joaquín no le convenció y se quitó completa, igual que la escala de hambre en las comidas. Los valores ya guardados (`day.stress`, `day.hunger`) quedan en Firestore, pero no se muestran. No volver a proponerla salvo que él lo pida.
 
 ## Descanso entre series (v1.15)
 - Al terminar el descanso sigue contando hacia arriba: "+0:12" = segundos después del descanso (botón y barra en amarillo, sin texto). La barra flotante ya no tiene los botones −15/+15, solo el tiempo y ✕. Se apaga con ✕, al iniciar otro descanso o solo a los 10 min.

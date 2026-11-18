@@ -9,7 +9,7 @@ import { trainView, sessionView, surveyView, summaryView, restBar } from "./trai
 import { I } from "./icons.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
-import { menusHtml, shoppingView, stressCard } from "./menus.js";
+import { menusHtml, shoppingView } from "./menus.js";
 
 const P = () => "clients/" + S.cid;
 
@@ -89,7 +89,6 @@ async function home() {
       <div class="legend-mini"><span>● hecho</span><span>○ sugerido</span></div><div class="foot"><button class="btn tiny" data-a="cardioAdd">Registrar</button></div></div>
     <div class="card tile"><div class="card-t">${I.gut}Digestión</div><div class="row between"><span class="small muted">Deposiciones</span><div class="stepper-s"><button data-a="depo" data-n="-1">−</button><b>${day.depos ?? 0}</b><button data-a="depo" data-n="1">+</button></div></div>
       <div class="foot"><button class="btn tiny" data-a="gutNote">${day.gut ? "Molestias ●" : "¿Molestias?"}</button></div></div>
-    ${stressCard(day.stress ?? null)}
     <a class="card tile wide train-tile" href="#${inProgress ? "sesion/" + inProgress.id : "entreno"}"><div class="card-t" style="margin:0">${I.dumbbell}</div><div class="tt">${trainTxt}<span class="muted small">${plan.doneCount} de ${plan.planned.length} entrenamientos esta semana</span></div>${slot && !slot.rest && slot.status !== "hecho" || inProgress ? `<span class="btn primary small">${inProgress ? "Continuar" : "Empezar"}</span>` : I.chev}</a>
   </div>`;
 }
