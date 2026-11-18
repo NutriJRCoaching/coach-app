@@ -3,14 +3,22 @@ import { ymd, addDays, weekInfo, uid } from "./util.js";
 import { REAL_FOODS, realToFood } from "./realfoods.js";
 
 export async function seedDemo(L) {
-  const today = ymd();
-  const start = addDays(today, -26);
-  const cid = "cli-demo";
   const set = (p, d) => L.set(p, d, false);
   set("users/coach-demo", { role: "coach", email: "coach@demo.cl", name: "Joaquín" });
-  set("users/" + cid, { role: "client", email: "cliente@demo.cl", name: "Felipe Demo" });
+  set("users/cli-demo", { role: "client", email: "cliente@demo.cl", name: "Felipe Demo" });
+  const routines = await seedClient(set, "cli-demo", { name: "Felipe Demo", email: "cliente@demo.cl" });
+  set("library/exercises", { items: Object.values(routines).flatMap((r) => r.exercises).map((e) => ({ id: e.id, name: e.name, group: "", video: "", inc: e.inc, alts: e.alts })) });
+  set("library/guides", { items: [{ title: "Guía para no pasar hambre", url: "#", desc: "Estrategias de saciedad" }, { title: "Porciones de intercambio", url: "#", desc: "Cómo usar tu pauta" }] });
+  set("meta/seeded", { at: Date.now() });
+}
+
+// Cliente con ~4 semanas de datos (registros, entrenamientos, check-in, retroalimentación).
+// Se usa en el modo demo y en el botón "Crear cliente de ejemplo" del panel.
+export async function seedClient(set, cid, extra = {}) {
+  const today = ymd();
+  const start = addDays(today, -26);
   const client = {
-    name: "Felipe Demo", email: "cliente@demo.cl", sex: "M", birth: "1998-04-12", height: 176, startDate: start, goal: "Ganar masa muscular",
+    name: "Felipe Demo", email: "cliente@demo.cl", service: "completa", modalidad: "Completa", checkinDay: new Date(start + "T12:00").getDay(), sex: "M", birth: "1998-04-12", height: 176, startDate: start, goal: "Ganar masa muscular",
     phase: "Recomposición corporal", kcal: 2600, cho: 300, fat: 75, prot: 170, steps: 9000, water: 2800, sleep: 8, rest: 180,
     cardio: { perWeek: 2, type: "Bici", minutes: 25, intensity: "Moderada", days: [3, 6] },
     schedule: { 1: "antA", 2: "posA", 4: "antB", 5: "posB" },
@@ -38,7 +46,14 @@ export async function seedDemo(L) {
       { name: "Cena", time: "20:30", items: [pi("Arroz cocido", "Cereales", 2, 100), pi("Pollo pechuga deshuesada (crudo)", "Carnes magras", 3, 50, "1 filete", 150), pi("Naranja", "Frutas", 1, 120)] }] }
   ];
   const w = weekInfo(client, today);
-  client.feedback = { week: w.key, videoUrl: "", points: ["Buen progreso en press inclinado: +2,5 kg manteniendo técnica", "Faltó registrar la once 3 días", "Esta semana subimos a 9.000 pasos"], text: "" };
+  const pw = weekInfo(client, addDays(today, -7));
+  client.feedback = { week: pw.key, videoUrl: "", points: ["Buen progreso en press inclinado: +2,5 kg manteniendo técnica", "Faltó registrar la once 3 días", "Esta semana subimos a 9.000 pasos"], text: "¡Muy buena semana! Cumpliste los 4 entrenamientos. Ahora el foco es registrar la once.", at: Date.now() - 864e5 };
+  Object.assign(client, extra);
+  const sv = client.service || "completa";
+  if (sv === "entrenamiento") { // sin plan de alimentación: guía de macros en rangos
+    for (const k of ["menus", "pauta", "kcal", "cho", "fat", "prot", "stages"]) delete client[k];
+    Object.assign(client, { ranges: { prot: [1.8, 2.2], fat: [0.8, 1], cho: [3.5, 4.5] }, weightStart: 74.6, phase: "Mantención", plan: { notes: "Prioriza llegar a la proteína todos los días. Los carbohidratos, alrededor del entrenamiento." } });
+  }
   set("clients/" + cid, client);
 
   const ex = (id, name, sets, alts = [], inc = 2.5) => ({ id, name, sets: sets.map(([reps, rir]) => ({ reps, rir })), alts, inc, video: "" });
@@ -50,7 +65,11 @@ export async function seedDemo(L) {
   };
   routines.antA.exercises[2].changed = true;
   routines.antA.changes = { week: w.key, list: ["Press inclinado mancuernas: series 8@1, 8@1 → 8@1, 6@0"] };
-  for (const [id, r] of Object.entries(routines)) set(`clients/${cid}/routines/${id}`, r);
+  if (sv === "nutricion") { // el cliente arma sus rutinas: sin rangos de reps, sin videos, sin cambios del coach
+    const dayOf = Object.fromEntries(Object.entries(client.schedule).map(([d, r]) => [r, +d]));
+    for (const [id, r] of Object.entries(routines)) set(`clients/${cid}/routines/${id}`, { name: r.name, order: r.order, own: true, days: [dayOf[id]], exercises: r.exercises.map((e) => ({ id: e.id, name: e.name, sets: e.sets.map(() => ({ reps: "", rir: "" })), notes: "Controla la bajada, sin rebotes. Mantén la técnica en todas las series.", alts: (e.alts || []).map((a) => ({ name: a.name })), inc: e.inc })) });
+    set("clients/" + cid, { ...client, schedule: {} });
+  } else for (const [id, r] of Object.entries(routines)) set(`clients/${cid}/routines/${id}`, r);
 
   // Días anteriores con registros
   const foods = REAL_FOODS.map(realToFood);
@@ -90,13 +109,13 @@ export async function seedDemo(L) {
     set(`clients/${cid}/sessions/${sid}`, {
       routineId: rid, routineName: r.name, date: d, weekKey: wk, startedAt, endedAt: startedAt + 62 * 60000, status: "fin",
       survey: { dureza: 7 + (i % 3), fuerza: 3 + (i % 2), energia: 3 + (i % 3 ? 1 : 0), doms: 2, general: 4, articular: i === 4 ? "si" : "no", articularDet: i === 4 ? "Hombro derecho en press banca" : "", orden: "si" },
-      exercises: r.exercises.map((e, k) => ({ exId: e.id, name: e.name, target: e.sets, alts: e.alts, inc: e.inc, video: "", tech: k === 0 && i < 7 ? "mejor" : "igual",
+      exercises: r.exercises.map((e, k) => ({ exId: e.id, name: e.name, target: sv === "nutricion" ? e.sets.map(() => ({ reps: "", rir: "" })) : e.sets, alts: e.alts, inc: e.inc, video: "", tech: sv === "nutricion" ? "" : k === 0 && i < 7 ? "mejor" : "igual",
         sets: e.sets.map((s, j) => ({ w: Math.round((40 + k * 8 - j * 2 + progress * (e.inc || 2.5)) / (e.inc || 2.5)) * (e.inc || 2.5), r: parseInt(s.reps) + (j ? -1 : 0), rir: s.rir, note: j === 0 && k === 0 && i < 10 ? "Primera serie muy liviana" : "", done: true })) }))
     });
   }
   set(`clients/${cid}/checkins/${weekInfo(client, addDays(today, -7)).key}`, { todos: "Sí", otroDeporte: "No", progCarga: "Más carga/reps", progTec: "Sí, mejoró", entGeneral: "Bueno", motivEnt: "Alto", fuerza: "Alto", doms: "Leve", articular: "Nada", top1: "Press banca 60 × 8", cintura: 84, adhPlan: "70–90%", motivNut: "Alto", contribuyen: "Sí", hambre: "Normal", saciedad: "Normal", antojos: "Pocos", fueraPlan: "Un completo el sábado con amigos", "f_Frutas": "5 veces a la semana", "f_Verduras": "Todos los días", "f_Alcohol": "1 vez a la semana", depos: "1", bristol: "Normales", digest: "Bueno", enerSes: "Alto", enerFuera: "Normal", recup: "Sí", salud: "Bueno", resfrio: "Todo bien", estGen: "Normal", estLab: "Alto", animo: "Bueno", sintomas: ["Distensión abdominal (hinchazón)"], orgullo: "Cumplí todos los entrenamientos", dificil: "La once en la pega", mejorar: "Registrar la once", expProg: "Muy bueno", consultas: "¿Puedo cambiar el arroz por papas?", diasRegistrados: 5, date: addDays(today, -7), at: Date.now() });
   set(`clients/${cid}/measures/${addDays(today, -24)}`, { cuello: 38, hombros: 118, pecho: 99, brazo: 33.5, cintura: 82, abdomen: 85, cadera: 97, muslo: 57, pantorrilla: 37 });
-  set("library/exercises", { items: Object.values(routines).flatMap((r) => r.exercises).map((e) => ({ id: e.id, name: e.name, group: "", video: "", inc: e.inc, alts: e.alts })) });
-  set("library/guides", { items: [{ title: "Guía para no pasar hambre", url: "#", desc: "Estrategias de saciedad" }, { title: "Porciones de intercambio", url: "#", desc: "Cómo usar tu pauta" }] });
-  set("meta/seeded", { at: Date.now() });
+  // La semana anterior ya tiene su retroalimentación publicada (check-in respondido)
+  set(`clients/${cid}/feedbacks/${pw.key}`, { ...client.feedback, answered: true });
+  return routines;
 }

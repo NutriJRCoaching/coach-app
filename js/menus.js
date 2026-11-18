@@ -1,5 +1,6 @@
 // Plan de alimentación por opciones (pautas alternativas), reemplazos por grupo, lista de compras
 // y escala de hambre con carita que cambia al deslizar.
+import { has } from "./features.js";
 import { db } from "./db.js";
 import { S, refresh } from "./state.js";
 import { act, toast, sheet, closeSheet, confirmBox, $, $$ } from "./ui.js";
@@ -52,7 +53,7 @@ export function menusHtml(c) {
   ${(mn.meals || []).map((m, i) => `<div class="card pmeal"><div class="pmh"><b>${esc(m.name)}</b>${m.time ? `<span class="ptime">${esc(m.time)} hrs</span>` : ""}</div>
     ${(m.items || []).map((it, j) => `<div class="fi" data-a="pvSwap" data-i="${i}" data-j="${j}"><span>${esc(it.name)}<small>${esc(itemLine(it))}</small>${it.cat ? `<small class="pgrp">${esc(it.cat)}</small>` : ""}</span><span class="swap">⇄</span></div>`).join("") || `<div class="muted small">Sin alimentos</div>`}
     ${m.note ? `<div class="note">${esc(m.note)}</div>` : ""}</div>`).join("")}
-  <a class="btn big block" href="#compras">🛒 Lista de compras</a>`;
+  ${has("plan_shop") ? `<a class="btn big block" href="#compras">🛒 Lista de compras</a>` : ""}`;
 }
 act("pvOpt", (el) => { PV.k = +el.dataset.k; refresh(); });
 

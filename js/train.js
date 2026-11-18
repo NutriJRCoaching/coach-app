@@ -6,6 +6,7 @@ import { act, toast, sheet, closeSheet, chips, beep, notify, confirmBox, $, $$ }
 import { LS, esc, ymd, fmtDate, weekInfo, r1, num, embedUrl, uid, pad, parseYmd, D3, compressImage } from "./util.js";
 import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest, splitSides, setProgress } from "./data.js";
 import { I } from "./icons.js";
+import { has } from "./features.js";
 
 const P = () => "clients/" + S.cid;
 const head = (t, back, right = "") => `<header class="ch">${back ? `<a href="#${back}" class="icon-btn">${I.back}</a>` : "<span></span>"}<h2>${esc(t)}</h2><span class="right">${right}</span></header>`;
@@ -34,8 +35,45 @@ export async function trainView() {
     ? `<div class="slot rest ${s.date === today ? "today" : ""}">${day(s.date)}<span class="rest-t">${s.date === today ? "Hoy · " : ""}Descanso</span></div>`
     : `<div class="slot ${s.status}">${day(s.date)}<span class="grow"><b>${esc(s.name)}</b><span class="badge ${s.status}">${STATUS[s.status]}</span></span>
       ${s.status === "hecho" ? `<a class="btn tiny" href="#resumen/${s.session.id}">Ver</a>` : `<span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${s.rid}">Ver</button><button class="btn tiny ${s.status === "hoy" || s.status === "atrasado" ? "primary" : ""}" data-a="startRoutine" data-r="${s.rid}">Empezar</button></span>`}</div>`).join("")}</div>
-  <div class="card"><div class="card-t">Todas tus rutinas</div>${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${r.changes?.week === plan.week.key ? ' · <span class="red">modificada</span>' : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${r.id}">Ver</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Tu coach aún no carga tus rutinas.</p>`}</div>`;
+  ${has("train_self")
+    ? `<div class="card"><div class="card-t">Mis rutinas</div><p class="muted small">Tu asesoría es de nutrición: tú diseñas tus rutinas con los ejercicios de la biblioteca y sus tips. Elige qué días toca cada una y registra tus entrenamientos aquí.</p>
+      ${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${(r.days || []).length ? " · " + r.days.map((d) => D3[d]).join(", ") : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="myRoutine" data-r="${r.id}">Editar</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Aún no tienes rutinas.</p>`}
+      <button class="btn primary block mt" data-a="myRoutine">${I.plus} Crear rutina</button></div>`
+    : `<div class="card"><div class="card-t">Todas tus rutinas</div>${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${r.changes?.week === plan.week.key ? ' · <span class="red">modificada</span>' : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${r.id}">Ver</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Tu coach aún no carga tus rutinas.</p>`}</div>`}`;
 }
+// ---------- Solo nutrición: el cliente arma sus propias rutinas
+let MR = null;
+act("myRoutine", async (el) => {
+  const r = el.dataset.r ? (await getRoutines(S.cid)).find((x) => x.id === el.dataset.r) : null;
+  MR = r ? JSON.parse(JSON.stringify(r)) : { id: uid(), name: "", days: [], exercises: [], own: true, isNew: true };
+  openMR();
+});
+async function openMR() {
+  const lib = (await db.get("library/exercises"))?.items || [];
+  sheet(MR.isNew ? "Nueva rutina" : "Editar rutina", `<label>Nombre<input id="mrN" value="${esc(MR.name)}" placeholder="Ej: Tren inferior"></label>
+  <div class="small muted">¿Qué días la haces?</div><div class="row gap wrap mt">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button class="chip ${MR.days.includes(d) ? "on" : ""}" data-a="mrDay" data-d="${d}">${D3[d]}</button>`).join("")}</div>
+  <div class="card-t mt">Ejercicios</div>
+  ${MR.exercises.map((e, k) => `<div class="row gap mrx"><b>${k + 1}</b><span class="grow">${esc(e.name)}</span><span class="stepper-s"><button data-a="mrSets" data-k="${k}" data-n="-1">−</button><b>${e.sets.length}</b><button data-a="mrSets" data-k="${k}" data-n="1">+</button></span><small class="muted">series</small><button class="icon-btn" data-a="mrDel" data-k="${k}">✕</button></div>`).join("") || `<p class="muted small">Agrega ejercicios desde la biblioteca.</p>`}
+  <div class="row gap mt"><input id="mrE" list="mrLib" placeholder="Buscar ejercicio…"><button class="btn" data-a="mrAdd">Agregar</button></div>
+  <datalist id="mrLib">${lib.map((e) => `<option value="${esc(e.name)}">`).join("")}</datalist>
+  <button class="btn primary big" data-a="mrSave">Guardar rutina</button>${MR.isNew ? "" : `<button class="btn ghost block red" data-a="mrRemove">Eliminar rutina</button>`}`);
+}
+const mrName = () => { const n = $("#mrN"); if (n) MR.name = n.value; };
+act("mrDay", (el) => { mrName(); const d = +el.dataset.d; MR.days = MR.days.includes(d) ? MR.days.filter((x) => x !== d) : [...MR.days, d]; openMR(); });
+act("mrSets", (el) => { mrName(); const e = MR.exercises[+el.dataset.k]; const n = Math.max(1, Math.min(8, e.sets.length + +el.dataset.n)); e.sets = Array.from({ length: n }, () => ({ reps: "", rir: "" })); openMR(); });
+act("mrDel", (el) => { mrName(); MR.exercises.splice(+el.dataset.k, 1); openMR(); });
+act("mrAdd", async () => {
+  mrName(); const name = $("#mrE").value.trim(); if (!name) return;
+  const l = ((await db.get("library/exercises"))?.items || []).find((x) => x.name.toLowerCase() === name.toLowerCase());
+  MR.exercises.push({ id: l?.id || "x-" + uid(), name: l?.name || name, sets: [{ reps: "", rir: "" }, { reps: "", rir: "" }], notes: l?.tips || "", alts: (l?.alts || []).map((a) => ({ name: a.name })), inc: l?.inc || 2.5 });
+  openMR();
+});
+act("mrSave", async () => {
+  mrName(); if (!MR.name.trim()) return toast("Ponle un nombre a la rutina"); if (!MR.exercises.length) return toast("Agrega al menos un ejercicio");
+  const { id, isNew, ...data } = MR; await db.set(`${P()}/routines/${id}`, { ...data, name: MR.name.trim(), own: true, updatedAt: Date.now() }, false);
+  closeSheet(); toast("Rutina guardada ✓"); refresh();
+});
+act("mrRemove", async () => { if (!(await confirmBox("¿Eliminar esta rutina? Tus entrenamientos ya registrados se mantienen."))) return; await db.del(`${P()}/routines/${MR.id}`); closeSheet(); refresh(); });
 // Ver la rutina sin empezarla: ejercicios, series, reps, RIR e indicaciones
 act("viewRoutine", async (el) => {
   const r = (await getRoutines(S.cid)).find((x) => x.id === el.dataset.r); if (!r) return;
@@ -82,11 +120,11 @@ export async function sessionView(id) {
   <div class="extabs">${s.exercises.map((e, k) => { const done = e.sets.length && e.sets.every((x) => x.done); return `<button class="${k === i ? "on" : ""} ${done ? "done" : ""} ${e.extra ? "extra" : ""} ${e.changed ? "chg" : ""}" style="--exc:${exColor(k)}" data-a="exGo" data-i="${k}">${k + 1}</button>`; }).join("")}</div>
   <div class="card ex ${ex.extra ? "extra" : ""}" style="--exc:${exColor(i)}">
     <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra</span>' : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
-    <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
-    ${ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div></div>` : `<div class="goal"><small>Series libres</small></div>`}
-    <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span><span>Técnica</span></div>
+    <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video && has("train_videos") ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
+    ${!has("train_targets") ? `<div class="goal"><small>Registra el peso y las repeticiones de cada serie</small></div>` : ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div></div>` : `<div class="goal"><small>Series libres</small></div>`}
+    <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span>${has("train_tech") ? "<span>Técnica</span>" : ""}</div>
     ${ex.sets.map((st, j) => setRow(ex, i, j)).join("")}</div>
-    <div class="row gap"><button class="btn tiny" data-a="addSet">${I.plus} Serie</button>${ex.sets.length > (ex.target.length || 0) ? `<button class="btn tiny ghost" data-a="delSet">Quitar serie</button>` : ""}<span class="grow"></span><span class="muted small">Técnica vs. semana pasada</span></div>
+    <div class="row gap"><button class="btn tiny" data-a="addSet">${I.plus} Serie</button>${ex.sets.length > (ex.target.length || 0) ? `<button class="btn tiny ghost" data-a="delSet">Quitar serie</button>` : ""}<span class="grow"></span>${has("train_tech") ? '<span class="muted small">Técnica vs. semana pasada</span>' : ""}</div>
     <div id="sug-${i}">${sugHtml(ex)}</div>
   </div>
   <div class="row gap pad-x"><button class="btn ghost small grow" data-a="addExtra">${I.plus} Ejercicio extra</button><button class="btn ghost small grow" data-a="sessComment">${I.note} Comentario${s.comment ? " ●" : ""}</button></div>
@@ -101,7 +139,7 @@ function setRow(ex, i, j) {
   <input type="number" inputmode="decimal" step="0.5" value="${st.w}" placeholder="${ref?.w ?? ""}" data-a-change="setVal" data-j="${j}" data-k="w">
   <label class="repbox ${t.reps ? "" : "free"}">${t.reps ? `<span class="rt" title="Reps de tu plan">${esc(t.reps)}</span>` : ""}<input type="number" inputmode="numeric" value="${st.r}" placeholder="${ref?.r ?? (parseInt(t.reps) || "")}" data-a-change="setVal" data-j="${j}" data-k="r"></label>
   <button class="rirb ${st.rir === "" ? "" : "rir" + st.rir}" data-a="rirPick" data-j="${j}">${st.rir === "" ? "–" : st.rir}</button>
-  <button class="techb ${st.tech || ""}" data-a="techPick" data-j="${j}">${TECH_L[st.tech || ""]}</button>
+  ${!has("train_tech") ? "" : `<button class="techb ${st.tech || ""}" data-a="techPick" data-j="${j}">${TECH_L[st.tech || ""]}</button>`}
   <div class="setinfo" id="si-${i}-${j}">${setInfo(ex, j)}</div></div>`;
 }
 // Diferencia entre lados de una misma serie
@@ -121,11 +159,12 @@ function setInfo(ex, j) {
     if (dw) h += `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw} kg</span>`;
     if (dr) h += `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr} reps</span>`;
   }
-  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button><button class="lnk vid ${st.vid ? "on" : ""}" data-a="setVideo" data-j="${j}">${st.vid ? "🎥 Ver tu video" : "🎥 Subir video de tu serie"}</button>`;
+  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button>${!has("train_setvideo") ? "" : `<button class="lnk vid ${st.vid ? "on" : ""}" data-a="setVideo" data-j="${j}">${st.vid ? "🎥 Ver tu video" : "🎥 Subir video de tu serie"}</button>`}`;
   if (ref?.note) h += `<span class="lastnote">Tu nota de la semana pasada: ${esc(ref.note)}</span>`;
   return h;
 }
 function sugHtml(ex) {
+  if (!has("train_suggest")) return ""; // p. ej. solo nutrición: sin sugerencias de carga
   let last = null; ex.sets.forEach((s, j) => { if (s.w !== "" && s.r !== "") last = j; });
   if (last == null) return "";
   const sg = suggest(ex, last); if (!sg) return "";
@@ -218,8 +257,8 @@ act("tips", async () => {
   <textarea id="suT" rows="2" placeholder="Ej: asiento 3, respaldo 5, a 10 cm de la polea">${esc(n.text || "")}</textarea>
   <div class="thumbs">${(n.photos || []).map((p, k) => `<img src="${p}" data-a="setupPhotoDel" data-k="${k}">`).join("")}<label class="padd">＋<input type="file" accept="image/*" hidden data-a-change="setupPhoto"></label></div>
   <button class="btn primary block mt" data-a="setupSave">Guardar configuración</button>
-  <div class="card-t mt">${I.play}Ejecución</div>
-  ${e ? `<div class="video"><iframe src="${e}" allowfullscreen></iframe></div>` : ex.video ? `<a class="btn primary block" target="_blank" href="${esc(ex.video)}">${I.play} Ver video</a>` : `<p class="muted small">Tu coach aún no carga el video de este ejercicio.</p>`}
+  ${!has("train_videos") ? "" : `<div class="card-t mt">${I.play}Ejecución</div>
+  ${e ? `<div class="video"><iframe src="${e}" allowfullscreen></iframe></div>` : ex.video ? `<a class="btn primary block" target="_blank" href="${esc(ex.video)}">${I.play} Ver video</a>` : `<p class="muted small">Tu coach aún no carga el video de este ejercicio.</p>`}`}
   <div class="card-t mt">Tips de ejecución</div>
   ${tips.length ? `<ul class="tiplist">${tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : `<p class="muted small">Tu coach aún no carga los tips de este ejercicio.</p>`}
   ${ex.alts?.length ? `<div class="card-t mt">${I.swap}Reemplazos de emergencia</div><p class="muted small">Si la máquina está ocupada o no está disponible (mismo patrón de movimiento):</p>
@@ -353,11 +392,11 @@ export async function summaryView(id) {
   <div class="stats3 mt"><div><b>${s.exercises.filter((e) => e.sets.some((x) => x.w !== "" || x.done)).length}</b><small>Ejercicios</small></div><div><b>${sets}</b><small>Series</small></div><div><b>${sv.intensidad ?? sv.dureza ?? "—"}</b><small>Intensidad /10</small></div></div></div>
   ${s.exercises.map((e) => { const done = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!done.length) return ""; return `<div class="card ${e.extra ? "extra" : ""}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge b">Extra</span>' : ""}${e.replaced ? ` <small class="muted">(en vez de ${esc(e.replacedFrom)})</small>` : ""}
     ${e.sets.map((x, j) => { if (x.w === "" && x.r === "") return ""; const ref = refSet(prev, e.exId, j); const dw = ref && x.w !== "" && ref.w !== "" ? r1(x.w - ref.w) : 0, dr = ref && x.r !== "" && ref.r !== "" ? x.r - ref.r : 0;
-      return `<div class="li row between small"><span>${e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`}: <b>${x.w || "–"} kg × ${x.r || "–"}</b>${x.rir !== "" ? " RIR " + x.rir : ""}${x.tech ? ` <span class="badge tech-${x.tech}">Téc. ${x.tech}</span>` : ""}${(() => { const pg = setProgress(x, ref); return pg ? `<br><span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</span><span>${ref ? `<span class="muted">${ref.w}×${ref.r}</span> ${dw ? `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw}kg</span>` : ""} ${dr ? `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr}r</span>` : ""}` : ""}</span></div>`; }).join("")}</div>`; }).join("")}
+      return `<div class="li row between small"><span>${e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`}: <b>${x.w || "–"} kg × ${x.r || "–"}</b>${x.rir !== "" ? " RIR " + x.rir : ""}${x.tech ? ` <span class="badge tech-${x.tech}">Téc. ${x.tech}</span>` : ""}${(() => { const pg = !has("train_suggest") ? null : setProgress(x, ref); return pg ? `<br><span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</span><span>${ref ? `<span class="muted">${ref.w}×${ref.r}</span> ${dw ? `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw}kg</span>` : ""} ${dr ? `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr}r</span>` : ""}` : ""}</span></div>`; }).join("")}</div>`; }).join("")}
   ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} series con progreso</b><small class="muted">vs la semana pasada · cuenta subir peso, más reps, o mismas reps con más reserva (si la técnica no empeoró)</small></div>` : ""}
   ${s.comment ? `<div class="card note">${esc(s.comment)}</div>` : ""}
-  <div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
-    ${audio?.data ? `<audio controls src="${audio.data}"></audio><button class="btn primary big" data-a="audioShare">Enviar audio por WhatsApp</button><button class="btn ghost block" data-a="audioRec">Grabar de nuevo</button>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>
+  ${has("train_audio") ? `<div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
+    ${audio?.data ? `<audio controls src="${audio.data}"></audio><button class="btn primary big" data-a="audioShare">Enviar audio por WhatsApp</button><button class="btn ghost block" data-a="audioRec">Grabar de nuevo</button>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>` : ""}
   <div class="pad-x"><button class="btn primary big" data-a="shareImg">Compartir con tu coach</button><a class="btn block" href="#entreno">Volver</a><button class="btn ghost block red" data-a="sessDelete">Eliminar este entrenamiento</button>
   <p class="muted small center">Se abre el menú para compartir: elige WhatsApp y el chat de tu coach. Después de la primera vez, su chat aparece arriba como acceso directo.</p></div>`;
 }

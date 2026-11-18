@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.15.2**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.16.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -32,7 +32,9 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 | js/client.js | Vistas del cliente: inicio (campana de pendientes que se mueve, días con rutina abreviada), comida (Comida 1…N + "Agregar otra comida", sin mostrar hora, comidas con borde rojo brillante, voz, código de barras (lee una vez y espera ~1 s con "Cargando datos del producto…"), macros C/L/P de cada alimento bajo su nombre, renombrar alimento escaneado o registrado), agua (+200), peso (dos preguntas Sí/No: "¿En ayunas?" → `weightFast` y "¿Después de ir al baño?" → `weightBath`; obliga a responder ambas), progreso, ajustes (recordatorios, horario, avisos push, "Probar notificación"), pasos de ayer + informe de ayer en 3 niveles con confeti |
 | js/train.js | Entrenamiento: semana (botón **Ver** rutina sin empezarla, con la última vez), sesión (reps del plan pegadas a la izquierda del casillero de reps, estilo app de referencia) (objetivo destacado, técnica Mejor/Igual/Peor en azul/verde/rojo, unilaterales Izq/Der con diferencia, video por serie guardado en el celular, descanso ajustable con pantalla encendida y alarma a pantalla completa que suena y vibra, reiniciar/descartar), resumen con progreso por serie y botón "Eliminar este entrenamiento" (borra sesión + audio), imagen para compartir, audio para el coach (graba en m4a si se puede; se guarda en el panel y se comparte con un toque) |
 | js/data.js | Helpers de datos, `weekPlan`, `setVerdict` / `suggest` (progresión), `setProgress`, `mealList`, etapas (`applyStage`), CHECKIN |
-| js/coach.js | Panel coach: clientes, timeline, etapas, entrenamientos (con audio y progreso), rutinas, alimentación, check-ins, feedback, biblioteca |
+| js/coach.js | Panel coach: clientes (tabla por estado + campana), timeline, etapas, entrenamientos (con audio y progreso), rutinas, alimentación, check-ins (responder / marcar respondido), feedback, datos (acceso, asesoría, pendientes a mano, notas), biblioteca (+ casillas de servicios), importar clientes, clientes de ejemplo |
+| js/alerts.js | Pendientes del coach por cliente: `alertsFor(c, ctx)` → rojo (urgente) / amarillo (pendiente) / gris (info). `loadCtx` carga rutinas, sesiones, 7 días, check-ins, feedbacks y `access` |
+| js/features.js | **Qué incluye cada servicio**: lista `FEATURES` (32 funciones × 1-1 / solo entrenamiento / solo nutrición) con valores de fábrica; el coach las cambia con casillas (doc `library/services`). En la app del cliente todo se pregunta con `has("clave")` |
 | js/voice.js | Registro de comidas por voz o texto: separa los alimentos, cantidades, medidas caseras y gramos estimados |
 | js/menus.js | **Plan por opciones** (editor del coach + vista del cliente), **reemplazos** por grupo, **lista de compras** y **escala de hambre** con carita (`faceSvg`) |
 | js/push.js | Token de FCM para avisos con la app cerrada; `refreshPush` lo renueva al abrir la app (los tokens caducan) |
@@ -42,6 +44,28 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 | js/seed-jr.js | Rutina de Joaquín (Lun–Sáb, LD/PG; serie 1 8 reps @RIR1, serie 2 6 reps @RIR1) |
 | scripts/reminders.mjs + .github/workflows/reminders.yml | "Reloj" de avisos cada 15 min (GitHub Actions + firebase-admin + FCM). Necesita el secreto `FIREBASE_SERVICE_ACCOUNT` y la variable `PUSH_ON=1` (ya configurados). Borra tokens caducados y solo marca un aviso como enviado si llegó. Ojo: GitHub corre el cron más o menos cada hora, no cada 15 min |
 | firestore.rules | Plantilla (las reglas reales están publicadas en la consola con el correo del coach, incluida `barcodes`) |
+
+## Acceso de clientes (v1.16)
+- El coach crea la ficha (`clients/{id}` con id propio, ya no es el uid) y `access/{correo en minúsculas}` = `{cid, name, ok}`.
+- El cliente toca **"Crear mi cuenta"** con ese correo → Firebase le manda correo de verificación → entra solo si verificó y `ok == true` (si no, ve una pantalla de espera). El coach da/quita acceso en "Datos y objetivos" y copia la invitación para WhatsApp.
+- Fichas antiguas cuyo id = uid (el registro propio de Joaquín) siguen funcionando.
+- **Reglas nuevas** en `firestore.rules` (hay que pegarlas en la consola manteniendo su correo en `isCoach`): `access`, `hasAccess(cid)` con `email_verified`, y rutinas editables por el cliente si su `service == 'nutricion'`.
+- Archivar un cliente le quita el acceso.
+
+## Tipos de asesoría (v1.16)
+- `client.service`: `completa` (1-1), `entrenamiento`, `nutricion`. Otros campos nuevos: `modalidad`, `checkinDay` (0–6), `checkinForm` (usa Google Forms), `endDate`, `city`, `sheetUrl` (planilla anterior), `todo` (pendientes a mano; "!" = urgente), `notes` (internas), `ranges` (guía de macros g/kg), `planPdf`, `weightStart`, `seen.entrenos`, `example`.
+- **Solo entrenamiento**: sin plan de alimentación; "Mi guía de macros" con rangos por kg (`macroGuide` en data.js; por defecto P 1,6–2,2 · G 0,7–1 · C 3–5). Si no hay kcal/macros fijos, la meta del inicio es el punto medio.
+- **Solo nutrición**: el cliente arma sus rutinas (editor en Entreno: nombre, días, ejercicios de la biblioteca, n° de series; `routine.own`, `routine.days` → arma el calendario). Sin videos, rangos, sugerencias de carga, técnica, videos de series ni audio. Ve los **tips** de la biblioteca (`library/exercises[].tips`).
+- Todo esto se ajusta en Biblioteca → "Servicios" (casillas).
+
+## Panel del coach (v1.16)
+- Tabla de clientes ordenada por gravedad, con resumen (urgentes / pendientes / al día / con acceso), campana con todos los pendientes y punto de color por cliente en la barra lateral.
+- Check-in "respondido" = existe `feedbacks/{semana}` con `at` o `answered` (al publicar la retro o con "Marcar respondido").
+- La retro del coach le aparece al cliente en el inicio ("Tu coach respondió tu check-in") y en Progreso durante 9 días desde que se publica (`freshFb`).
+- **"Ver como cliente"**: abre la app del cliente (`S.preview`), con barra amarilla; no activa avisos ni pide pasos de ayer.
+- **Importar clientes**: sube un `ima-clientes.json` (no se guarda en el repo porque es público). Crea/actualiza fichas, rutinas, entrenamientos anteriores (`imported: true`), notas de configuración y la biblioteca. Nunca da acceso.
+- **Clientes de ejemplo**: uno por servicio, con 4 semanas de datos (`seedClient` en demo.js).
+- Importación del 18-nov-2026: 7 clientes desde "PANEL DE CONTROL - Asesorías" y sus planillas (Vicente, Felipe, Marian, René, Cristóbal, Gabriel, Déborah). La historia de entrenamiento se acomodó para que el último registro de la planilla quede en la semana pasada. Solo Vicente tenía su plan por opciones en el panel; los demás quedan con "plan en PDF: pásalo a la app".
 
 ## Datos (Firestore)
 - `users/{uid}`
@@ -108,7 +132,9 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **App Android (Capacitor) para leer los pasos desde Health Connect** (hoy se anotan a mano).
 - **Tips de ejecución por ejercicio** desde su hoja "Programa y tips".
 - **Plan de alimentación**: verificar en el celular las opciones, reemplazos y lista de compras (v1.13). Idea: mostrar la escala de hambre como gráfico semanal en el panel.
-- **Planificación desde el lado del coach.**
+- **Planificación por bloques (mesociclos de 6–8 semanas)** de entrenamiento y alimentación, conversada el 18-nov (ver propuesta en el chat): pendiente que Joaquín la apruebe.
+- Videos de los clientes al coach: Firebase Storage ya no es gratis; opción conversada: subirlos a su Google Drive con un Apps Script.
+- Pasar los planes en PDF de Felipe, Marian, René, Cristóbal y Déborah al plan por opciones.
 
 ## Forma de trabajar con Joaquín
 - Habla en español de Chile, informal. Prefiere ver el código en el chat y no como adjunto.

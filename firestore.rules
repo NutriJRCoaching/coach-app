@@ -4,10 +4,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isCoach() { return request.auth != null && request.auth.token.email == 'TU_CORREO@gmail.com'; }
-    function isOwner(cid) { return request.auth != null && request.auth.uid == cid; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    // Acceso v1.16: el coach crea access/{correo} = { cid, ok }. El cliente crea su propia cuenta con ese correo,
+    // lo verifica, y recién entonces (y solo si ok == true) puede leer y escribir su ficha.
+    function hasAccess(cid) {
+      return request.auth != null && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/access/$(myEmail()))
+        && get(/databases/$(database)/documents/access/$(myEmail())).data.ok == true
+        && get(/databases/$(database)/documents/access/$(myEmail())).data.cid == cid;
+    }
+    // Compatibilidad: fichas antiguas cuyo id es el uid de la cuenta (ej: tu propio registro)
+    function isOwner(cid) { return request.auth != null && (request.auth.uid == cid || hasAccess(cid)); }
 
+    match /access/{em} {
+      allow read: if isCoach() || (request.auth != null && myEmail() == em);
+      allow write: if isCoach();
+    }
     match /users/{uid} {
-      allow read: if isCoach() || isOwner(uid);
+      allow read: if isCoach() || (request.auth != null && request.auth.uid == uid);
       allow write: if isCoach();
     }
     // Códigos de barras escaneados: cualquiera con cuenta los lee y aporta
@@ -21,8 +35,12 @@ service cloud.firestore {
     match /clients/{cid} {
       allow read: if isCoach() || isOwner(cid);
       allow write: if isCoach();
-      // Rutinas y retroalimentaciones: solo el coach las edita
-      match /routines/{id} { allow read: if isCoach() || isOwner(cid); allow write: if isCoach(); }
+      // Rutinas: las edita el coach; en la asesoría "solo nutrición" el cliente arma las suyas
+      match /routines/{id} {
+        allow read: if isCoach() || isOwner(cid);
+        allow write: if isCoach() || (isOwner(cid) && get(/databases/$(database)/documents/clients/$(cid)).data.get('service', '') == 'nutricion');
+      }
+      // Retroalimentaciones: solo el coach
       match /feedbacks/{id} { allow read: if isCoach() || isOwner(cid); allow write: if isCoach(); }
       // Todo lo demás (días, sesiones, fotos, medidas, check-ins…): cliente y coach
       match /{sub}/{id} {

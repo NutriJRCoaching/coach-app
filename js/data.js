@@ -24,6 +24,21 @@ export const getRoutines = async (cid) => (await db.list(C(cid) + "/routines")).
 export const getSessions = async (cid) => (await db.list(C(cid) + "/sessions")).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
 export const getClient = async (cid) => (await db.get(C(cid))) || {};
 
+// ---------- Tipo de asesoría → qué ve el cliente
+// completa (1-1): todo · entrenamiento: plan de entrenamiento + registro de comida con guía de macros (sin plan de alimentación)
+// nutricion: plan de alimentación + diseña y registra su propio entrenamiento (sin videos, sin sugerencias de carga ni rangos)
+export const svc = (c) => c?.service || "completa";
+export const feat = (c) => { const s = svc(c); return { plan: s !== "entrenamiento", macroGuide: s === "entrenamiento", coachTrain: s !== "nutricion", selfTrain: s === "nutricion" }; };
+// Guía de macros por kg de peso (solo entrenamiento). ranges = { prot: [1.6, 2.2], fat: [0.8, 1], cho: [3, 5] }
+export const DEFAULT_RANGES = { prot: [1.6, 2.2], fat: [0.7, 1], cho: [3, 5] };
+export function macroGuide(c, kg) {
+  const R = { ...DEFAULT_RANGES, ...(c.ranges || {}) }, w = +kg || +c.weightStart || null;
+  if (!w) return null;
+  const g = (k) => [Math.round(R[k][0] * w), Math.round(R[k][1] * w)];
+  const prot = g("prot"), fat = g("fat"), cho = g("cho");
+  return { w, R, prot, fat, cho, kcal: [prot[0] * 4 + cho[0] * 4 + fat[0] * 9, prot[1] * 4 + cho[1] * 4 + fat[1] * 9].map((x) => Math.round(x / 50) * 50) };
+}
+
 // Base de alimentos: semilla + importados por el coach
 let foodCache = null;
 export async function getFoodBase() {

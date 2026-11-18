@@ -7,6 +7,8 @@ import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours
 import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
+import { macroGuide } from "./data.js";
+import { has, loadMatrix } from "./features.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
 import { menusHtml, shoppingView } from "./menus.js";
@@ -15,7 +17,7 @@ const P = () => "clients/" + S.cid;
 
 export function clientTabs() {
   const r = S.route[0];
-  const t = [["inicio", "Inicio", I.home], ["comida", "Comida", I.food], ["entreno", "Entreno", I.dumbbell], ["progreso", "Progreso", I.chart], ["mas", "Más", I.menu]];
+  const t = [["inicio", "Inicio", I.home], ["comida", "Comida", I.food], ["entreno", "Entreno", I.dumbbell], ["progreso", "Progreso", I.chart], ["mas", "Más", I.menu]].filter(([k]) => (k !== "comida" || has("food_log")) && (k !== "entreno" || has("train_tab")));
   const active = { sesion: "entreno", encuesta: "entreno", resumen: "entreno", peso: "progreso", sueno: "progreso", fotos: "progreso", medidas: "progreso", timeline: "progreso", plan: "mas", compras: "mas", checkin: "mas", guias: "mas", equipo: "mas", info: "mas", ajustes: "mas", agua: "comida" }[r] || r;
   return `${restBar()}<nav class="tabs">${t.map(([k, l, i]) => `<a href="#${k}" class="${active === k ? "on" : ""}">${i}${l}</a>`).join("")}</nav>`;
 }
@@ -23,6 +25,12 @@ export function clientTabs() {
 export async function clientView() {
   const [r, a] = S.route;
   S.client = applyStage(S.raw || {}, S.date); // objetivos de la etapa vigente
+  await loadMatrix();
+  S.feat = { macroGuide: has("macro_guide"), selfTrain: has("train_self") };
+  // Solo entrenamiento: si el coach no fijó metas exactas, las metas del día son el punto medio de su guía de macros
+  if (S.feat.macroGuide && !S.client.kcal) { const g = macroGuide(S.client, S.client.weightStart); if (g) Object.assign(S.client, { prot: Math.round((g.prot[0] + g.prot[1]) / 2), fat: Math.round((g.fat[0] + g.fat[1]) / 2), cho: Math.round((g.cho[0] + g.cho[1]) / 2), kcal: Math.round((g.kcal[0] + g.kcal[1]) / 2) }); }
+  // Solo nutrición: el calendario sale de los días que el cliente le puso a cada rutina suya
+  if (S.feat.selfTrain) { const rs = await getRoutines(S.cid); S.client.schedule = {}; rs.forEach((r) => (r.days || []).forEach((d) => (S.client.schedule[d] = r.id))); }
   if (["inicio", "comida", "agua", "peso", "sueno", undefined, ""].includes(r)) S.rtNames = Object.fromEntries((await getRoutines(S.cid)).map((x) => [x.id, x.name]));
   const views = { inicio: home, comida: food, agua: waterView, entreno: trainView, sesion: () => sessionView(a), encuesta: () => surveyView(a), resumen: () => summaryView(a),
     progreso: progress, timeline: timelineView, peso: weightView, sueno: sleepView, fotos: photosView, medidas: measuresView,
@@ -76,20 +84,21 @@ async function home() {
   return `<header class="topbar ima"><img src="icons/logo.png?v=ima2" class="hdr-logo" alt="IMA"><div class="brand-t">INTELIGENCIA MUSCULAR APLICADA</div>${bellBtn(pend)}</header>${dayStrip()}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
+  ${date === today && has("feedback") && freshFb(c) ? `<a class="card fbmini" href="#progreso"><div class="card-t">${I.info}Tu coach respondió tu check-in · Semana ${+freshFb(c).week.slice(1)}</div><div class="small">${esc(freshFb(c).text || freshFb(c).points?.[0] || "Toca para ver tu retroalimentación")}</div>${freshFb(c).videoUrl ? `<span class="badge">${I.play} Video</span>` : ""}</a>` : ""}
   <div class="grid2">
-    <a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div>${pctTxt(tot.kcal, c.kcal)}</a>
+    ${has("home_kcal") ? `<a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div>${pctTxt(tot.kcal, c.kcal)}</a>
     <a class="card tile" href="#comida"><div class="card-t">${I.macros}Macros</div>
-      ${[["C", tot.cho, c.cho, "y"], ["L", tot.fat, c.fat, "b"], ["P", tot.prot, c.prot, "g"]].map(([l, v, g, cl]) => `<div class="mrow"><b>${l}</b>${mini(v, g, cl)}<span>${r0(v)}/${g || "–"}${g && v >= g * 0.95 ? " ✓" : ""}</span></div>`).join("")}</a>
-    <a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div>${pctTxt(water, waterGoal)}<div class="foot"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>
-    <div class="card tile" data-a="stepsEdit"><div class="card-t">${I.steps}Pasos ${done(day.steps, c.steps)}</div><div class="big">${(day.steps || 0).toLocaleString("es-CL")}</div><div class="foot grow">${mini(day.steps || 0, c.steps || 8000, "g")}</div><div class="muted small">${day.steps ? `Llevas el <b class="pctv">${Math.round((day.steps / (c.steps || 8000)) * 100)} %</b> · ` : ""}Meta ${(c.steps || 8000).toLocaleString("es-CL")}</div></div>
-    <a class="card tile" href="#sueno"><div class="card-t">${I.moon}Sueño</div><div class="big" style="color:${sl != null ? sleepColor(sl) : "inherit"}">${sl != null ? fmtH(sl) : "—"}</div><div class="muted small">${day.sleep?.quality ? "Calidad " + day.sleep.quality + "/5" : "Registrar"} · meta ${c.sleep || 8} h</div></a>
-    <a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? [day.weightFast === false ? "Sin ayuno" : "Ayunas ✓", day.weightBath === false ? "sin baño" : day.weightBath ? "baño ✓" : ""].filter(Boolean).join(" · ") : "En ayunas"}</div></a>
-    <div class="card tile"><div class="card-t">${I.run}Cardio <span class="badge ${Object.keys(cardioDone).length >= (c.cardio?.perWeek || 0) && c.cardio?.perWeek ? "g" : ""}">${Object.keys(cardioDone).length}/${c.cardio?.perWeek || 0}</span></div>
+      ${[["C", tot.cho, c.cho, "y"], ["L", tot.fat, c.fat, "b"], ["P", tot.prot, c.prot, "g"]].map(([l, v, g, cl]) => `<div class="mrow"><b>${l}</b>${mini(v, g, cl)}<span>${r0(v)}/${g || "–"}${g && v >= g * 0.95 ? " ✓" : ""}</span></div>`).join("")}</a>` : ""}
+    ${has("home_water") ? `<a class="card tile" href="#agua"><div class="card-t">${I.drop}Agua ${done(water, waterGoal)}</div><div class="big">${r1(water / 1000)} <small>/ ${r1(waterGoal / 1000)} L</small></div>${pctTxt(water, waterGoal)}<div class="foot"><button class="btn tiny" data-a="water" data-ml="200">+200</button><button class="btn tiny" data-a="water" data-ml="500">+500</button></div></a>` : ""}
+    ${has("home_steps") ? `<div class="card tile" data-a="stepsEdit"><div class="card-t">${I.steps}Pasos ${done(day.steps, c.steps)}</div><div class="big">${(day.steps || 0).toLocaleString("es-CL")}</div><div class="foot grow">${mini(day.steps || 0, c.steps || 8000, "g")}</div><div class="muted small">${day.steps ? `Llevas el <b class="pctv">${Math.round((day.steps / (c.steps || 8000)) * 100)} %</b> · ` : ""}Meta ${(c.steps || 8000).toLocaleString("es-CL")}</div></div>` : ""}
+    ${has("home_sleep") ? `<a class="card tile" href="#sueno"><div class="card-t">${I.moon}Sueño</div><div class="big" style="color:${sl != null ? sleepColor(sl) : "inherit"}">${sl != null ? fmtH(sl) : "—"}</div><div class="muted small">${day.sleep?.quality ? "Calidad " + day.sleep.quality + "/5" : "Registrar"} · meta ${c.sleep || 8} h</div></a>` : ""}
+    ${has("home_weight") ? `<a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? [day.weightFast === false ? "Sin ayuno" : "Ayunas ✓", day.weightBath === false ? "sin baño" : day.weightBath ? "baño ✓" : ""].filter(Boolean).join(" · ") : "En ayunas"}</div></a>` : ""}
+    ${has("home_cardio") ? `<div class="card tile"><div class="card-t">${I.run}Cardio <span class="badge ${Object.keys(cardioDone).length >= (c.cardio?.perWeek || 0) && c.cardio?.perWeek ? "g" : ""}">${Object.keys(cardioDone).length}/${c.cardio?.perWeek || 0}</span></div>
       <div class="cweek">${w.days.map((d) => { const dw = new Date(d + "T12:00").getDay(); return `<span class="${cardioDone[d] ? "ok" : cdays.includes(dw) ? "plan" : ""} ${d === today ? "today" : ""}">${D1[dw]}</span>`; }).join("")}</div>
-      <div class="legend-mini"><span>● hecho</span><span>○ sugerido</span></div><div class="foot"><button class="btn tiny" data-a="cardioAdd">Registrar</button></div></div>
-    <div class="card tile"><div class="card-t">${I.gut}Digestión</div><div class="row between"><span class="small muted">Deposiciones</span><div class="stepper-s"><button data-a="depo" data-n="-1">−</button><b>${day.depos ?? 0}</b><button data-a="depo" data-n="1">+</button></div></div>
-      <div class="foot"><button class="btn tiny" data-a="gutNote">${day.gut ? "Molestias ●" : "¿Molestias?"}</button></div></div>
-    <a class="card tile wide train-tile" href="#${inProgress ? "sesion/" + inProgress.id : "entreno"}"><div class="card-t" style="margin:0">${I.dumbbell}</div><div class="tt">${trainTxt}<span class="muted small">${plan.doneCount} de ${plan.planned.length} entrenamientos esta semana</span></div>${slot && !slot.rest && slot.status !== "hecho" || inProgress ? `<span class="btn primary small">${inProgress ? "Continuar" : "Empezar"}</span>` : I.chev}</a>
+      <div class="legend-mini"><span>● hecho</span><span>○ sugerido</span></div><div class="foot"><button class="btn tiny" data-a="cardioAdd">Registrar</button></div></div>` : ""}
+    ${has("home_digest") ? `<div class="card tile"><div class="card-t">${I.gut}Digestión</div><div class="row between"><span class="small muted">Deposiciones</span><div class="stepper-s"><button data-a="depo" data-n="-1">−</button><b>${day.depos ?? 0}</b><button data-a="depo" data-n="1">+</button></div></div>
+      <div class="foot"><button class="btn tiny" data-a="gutNote">${day.gut ? "Molestias ●" : "¿Molestias?"}</button></div></div>` : ""}
+    ${has("home_train") && has("train_tab") ? `<a class="card tile wide train-tile" href="#${inProgress ? "sesion/" + inProgress.id : "entreno"}"><div class="card-t" style="margin:0">${I.dumbbell}</div><div class="tt">${trainTxt}<span class="muted small">${plan.doneCount} de ${plan.planned.length} entrenamientos esta semana</span></div>${slot && !slot.rest && slot.status !== "hecho" || inProgress ? `<span class="btn primary small">${inProgress ? "Continuar" : "Empezar"}</span>` : I.chev}</a>` : ""}
   </div>`;
 }
 
@@ -559,23 +568,25 @@ act("offSearch", async () => {
 });
 
 
+// La última retroalimentación del coach se muestra durante 9 días desde que la publica
+export const freshFb = (c) => (c.feedback && (c.feedback.points?.length || c.feedback.text || c.feedback.videoUrl) && Date.now() - (c.feedback.at || 0) < 9 * 864e5 ? c.feedback : null);
 // ================================================================ PROGRESO
 async function progress() {
   const c = S.client, w = weekInfo(c, ymd());
-  const fb = c.feedback?.week === w.key ? c.feedback : null;
+  const fb = freshFb(c);
   const days = await getDays(addDays(ymd(), -60), ymd());
   const keys = Object.keys(days).sort(), wv = keys.map((k) => days[k].weight ?? null);
   return `${head("Progreso")}
-  ${fb || (c.weeklyGoals || []).length ? `<div class="fbcard"><small>Tu retroalimentación · Semana ${w.n}</small><h3>${esc(fb?.text || "Esto es lo que trabajamos esta semana")}</h3>
+  ${has("feedback") && (fb || (c.weeklyGoals || []).length) ? `<div class="fbcard"><small>${fb ? `Respuesta de tu coach · Semana ${+fb.week.slice(1)}` : `Semana ${w.n}`}</small><h3>${esc(fb?.text || "Esto es lo que trabajamos esta semana")}</h3>
     ${(fb?.points || []).length ? `<ul>${fb.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
     ${(c.weeklyGoals || []).length ? `<div class="goals-t">Metas de la semana</div><ul>${c.weeklyGoals.map((g) => `<li>${esc(g)}</li>`).join("")}</ul>` : ""}
     ${fb?.videoUrl ? `<button class="btn small" data-a="openFeedback">${I.play} Ver video</button>` : ""}</div>` : ""}
   <a class="card" href="#peso"><div class="card-t">${I.scale}Peso corporal</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals: wv, color: "var(--dim)", dots: true, w: 1 }, { vals: trend(wv), color: "var(--acc)" }], { h: 130 })}</a>
-  <div class="list"><a href="#timeline"><span>Timeline y etapas<small>Tu calendario nutricional semana a semana</small></span>${I.chev}</a>
+  <div class="list">${has("prog_timeline") ? `<a href="#timeline"><span>Timeline y etapas<small>Tu calendario nutricional semana a semana</small></span>${I.chev}</a>` : ""}
   <a href="#sueno"><span>Sueño<small>Registro y estadísticas</small></span>${I.chev}</a>
-  <a href="#fotos"><span>Fotos<small>Por semana y comparador</small></span>${I.chev}</a>
-  <a href="#medidas"><span>Medidas<small>Una vez al mes</small></span>${I.chev}</a>
-  <a href="#checkin"><span>Check-in semanal<small>Semana ${w.n}</small></span>${I.chev}</a></div>`;
+  ${has("prog_photos") ? `<a href="#fotos"><span>Fotos<small>Por semana y comparador</small></span>${I.chev}</a>` : ""}
+  ${has("prog_measures") ? `<a href="#medidas"><span>Medidas<small>Una vez al mes</small></span>${I.chev}</a>` : ""}
+  ${has("checkin") ? `<a href="#checkin"><span>Check-in semanal<small>Semana ${w.n}</small></span>${I.chev}</a>` : ""}</div>`;
 }
 act("openFeedback", () => {
   const fb = S.client.feedback; if (!fb) return;
@@ -696,17 +707,30 @@ act("measureSave", async () => {
 // ================================================================ MÁS
 async function more() {
   return `${head("Más")}<div class="list">
-  <a href="#plan"><span>Mi plan de alimentación</span>${I.chev}</a><a href="#checkin"><span>Check-in semanal</span>${I.chev}</a><a href="#guias"><span>Guías</span>${I.chev}</a><a href="#equipo"><span>Mi equipamiento</span>${I.chev}</a>
+  ${has("macro_guide") ? `<a href="#plan"><span>Mi guía de macros</span>${I.chev}</a>` : has("plan_menus") || has("plan_pdf") || has("plan_pauta") ? `<a href="#plan"><span>Mi plan de alimentación</span>${I.chev}</a>` : ""}${has("checkin") ? `<a href="#checkin"><span>Check-in semanal</span>${I.chev}</a>` : ""}${has("guides") ? `<a href="#guias"><span>Guías</span>${I.chev}</a>` : ""}${has("equipment") ? `<a href="#equipo"><span>Mi equipamiento</span>${I.chev}</a>` : ""}
   <a href="#info"><span>Información personal</span>${I.chev}</a><a href="#ajustes"><span>Ajustes</span>${I.chev}</a>
   ${S.role === "coach" ? `<a data-a="asCoach"><span><b>Volver al panel de coach</b></span>${I.chev}</a>` : ""}<a data-a="logout"><span class="red">Cerrar sesión</span></a></div>
   <p class="muted small center">${navigator.onLine ? "Conectado · todo sincronizado" : "Sin conexión · tus datos se guardan y se suben al volver la señal"}${DEMO ? " · MODO DEMO" : ""}</p>`;
 }
 async function planView() {
-  const p = S.client.plan || {}, opts = menusHtml(S.client);
+  if (has("macro_guide")) return macroGuideView();
+  const p = has("plan_pdf") ? S.client.plan || {} : {}, opts = has("plan_menus") ? menusHtml(S.client) : "";
   return `${head("Mi plan de alimentación", "mas")}${opts}
   ${p.pdfUrl || p.notes || !opts ? `<div class="card">${p.pdfUrl ? `<a class="btn ${opts ? "" : "primary"} big block" target="_blank" href="${esc(p.pdfUrl)}">Abrir mi plan (PDF)</a>` : opts ? "" : `<p class="muted">Tu coach aún no sube tu plan.</p>`}
   ${p.notes ? `<div class="pre">${esc(p.notes)}</div>` : ""}</div>` : ""}
-  ${S.client.pauta ? `<details class="card"><summary class="card-t">Porciones por día</summary>${Object.entries(S.client.pauta).filter(([, v]) => +v > 0).map(([g, v]) => `<div class="li row between"><span>${esc(g)}</span><b>${v}</b></div>`).join("")}</details>` : ""}`;
+  ${has("plan_pauta") && S.client.pauta ? `<details class="card"><summary class="card-t">Porciones por día</summary>${Object.entries(S.client.pauta).filter(([, v]) => +v > 0).map(([g, v]) => `<div class="li row between"><span>${esc(g)}</span><b>${v}</b></div>`).join("")}</details>` : ""}`;
+}
+
+// Solo entrenamiento: sin plan de alimentación, con una guía de macros en rangos según su peso
+async function macroGuideView() {
+  const days = await getDays(addDays(ymd(), -30), ymd()), kg = Object.keys(days).sort().map((k) => days[k].weight).filter(Boolean).pop() || S.client.weightStart;
+  const g = macroGuide(S.client, kg), c = S.client;
+  const row = (l, k, unit, col) => `<div class="mg"><span class="mg-l" style="color:${col}">${l}</span><span class="mg-r"><b>${g[k][0]}–${g[k][1]} ${unit}</b>${k !== "kcal" ? `<small>${g.R[k][0]}–${g.R[k][1]} g por kg</small>` : ""}</span></div>`;
+  return `${head("Mi guía de macros", "mas")}
+  <div class="card"><p class="small">Tu asesoría es de <b>entrenamiento</b>, así que no tienes un plan de alimentación cerrado: tienes <b>rangos</b> para guiarte. Registra lo que comes en <b>Comida</b> y trata de quedar dentro de ellos, sobre todo en proteína.</p></div>
+  ${g ? `<div class="card"><div class="card-t">Para tu peso actual · ${r1(g.w)} kg</div>${row("Proteína", "prot", "g", "var(--g)")}${row("Carbohidratos", "cho", "g", "var(--y)")}${row("Grasas", "fat", "g", "var(--b)")}${row("Calorías", "kcal", "kcal", "var(--r)")}
+  <p class="muted small mt">Tu meta diaria en el inicio es ${(c.kcal || 0).toLocaleString("es-CL")} kcal · P ${c.prot} · C ${c.cho} · G ${c.fat}. Los rangos se ajustan solos cuando registras tu peso.</p></div>` : `<div class="card"><p class="muted">Registra tu peso para calcular tus rangos.</p></div>`}
+  ${c.plan?.notes ? `<div class="card"><div class="card-t">Indicaciones de tu coach</div><div class="pre">${esc(c.plan.notes)}</div></div>` : ""}`;
 }
 
 // ---------- Check-in semanal (igual al de la planilla)
@@ -817,6 +841,7 @@ const minTo = (m) => { m = ((m % 1440) + 1440) % 1440; return `${pad(Math.floor(
 const toMin = (t) => { const [h, m] = String(t || "0:0").split(":").map(Number); return h * 60 + (m || 0); };
 // Al entrar un día nuevo: 1) pide los pasos de ayer si faltan  2) muestra cómo te fue ayer
 async function askYesterdaySteps() {
+  if (S.preview) return; // el coach mirando la app de un cliente
   const today = ymd(), k = "ystep:" + today;
   if (LS.get(k) || !S.cid || document.querySelector(".sheet-bg")) return;
   LS.set(k, "1");
@@ -897,6 +922,7 @@ async function nightBox() {
 // Revisa qué falta registrar y avisa una sola vez por recordatorio
 let remSynced = false;
 export async function checkReminders() {
+  if (S.preview) return;
   try {
     // Mantiene al día la copia de tus recordatorios que usa el servidor de avisos
     if (!remSynced && S.cid && pushOn()) { remSynced = true; refreshPush(S.cid); db.set(`${P()}/settings/reminders`, { ...remCfg(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, at: Date.now() }, false); }

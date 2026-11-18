@@ -72,6 +72,7 @@ const local = {
     this.set("users/" + uid, { role: "client", email, name }); return uid;
   },
   whenSynced() { return Promise.resolve(); },
+  async signUp() { throw new Error("demo"); }, async sendVerify() {}, async reloadUser() {}, async freshToken() {},
   async resetData() { if (this.idb) this.idb.transaction("docs", "readwrite").objectStore("docs").clear(); try { localStorage.removeItem("demo-uid"); } catch {} }
 };
 
@@ -139,7 +140,14 @@ const fire = {
     await this.m.setPersistence(this.auth, keep ? this.m.indexedDBLocalPersistence : this.m.browserSessionPersistence);
     await this.m.signInWithEmailAndPassword(this.auth, email, pass);
   },
-  async signUp(email, pass) { await this.m.createUserWithEmailAndPassword(this.auth, email, pass); },
+  // Cuenta nueva del cliente: queda creada y se le manda el correo de verificación
+  async signUp(email, pass) {
+    const cred = await this.m.createUserWithEmailAndPassword(this.auth, email, pass);
+    try { this.auth.languageCode = "es"; await this.m.sendEmailVerification(cred.user); } catch (e) { console.warn(e); }
+  },
+  async sendVerify() { this.auth.languageCode = "es"; await this.m.sendEmailVerification(this.auth.currentUser); },
+  async reloadUser() { await this.auth.currentUser?.reload(); this.user = this.auth.currentUser; },
+  async freshToken() { await this.auth.currentUser?.getIdToken(true); },
   async resetPass(email) { await this.m.sendPasswordResetEmail(this.auth, email); },
   async signOut() { await this.m.signOut(this.auth); },
   // Crea la cuenta del cliente sin cerrar la sesión del coach (usa una 2ª instancia)
