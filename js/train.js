@@ -91,7 +91,7 @@ export async function sessionView(id) {
   </div>
   <div class="row gap pad-x"><button class="btn ghost small grow" data-a="addExtra">${I.plus} Ejercicio extra</button><button class="btn ghost small grow" data-a="sessComment">${I.note} Comentario${s.comment ? " ●" : ""}</button></div>
   <div class="sessbar"><button class="btn" data-a="exGo" data-i="${i - 1}" ${i === 0 ? "disabled" : ""}>${I.back} Anterior</button>
-    <button class="rest-btn ${S.rest ? "running" : ""}" data-a="${S.rest ? "restStop" : "restStart"}">${I.timer}<span id="restT">${S.rest ? fmtRest() : "Descanso " + fmtSec(restSec())}</span></button>
+    <button class="rest-btn ${S.rest ? (S.rest.fired ? "over" : "running") : ""}" data-a="${S.rest ? "restStop" : "restStart"}">${I.timer}<span id="restT">${S.rest ? fmtRest() : "Descanso " + fmtSec(restSec())}</span></button>
     <button class="btn" data-a="exGo" data-i="${i + 1}" ${i >= s.exercises.length - 1 ? "disabled" : ""}>Siguiente ${I.chev}</button></div>`;
 }
 function setRow(ex, i, j) {
@@ -273,7 +273,9 @@ act("finishOk", () => { closeSheet(); S.session.endedAt = Date.now(); save(); S.
 
 // ---------- Temporizador de descanso (se inicia a mano)
 const fmtSec = (s) => `${Math.floor(s / 60)}:${pad(s % 60)}`;
-const fmtRest = () => fmtSec(Math.max(0, Math.ceil((S.rest.end - Date.now()) / 1000)));
+// Al terminar el descanso sigue contando en positivo: "+0:12" = segundos que llevas después del descanso
+const restLeft = () => Math.ceil((S.rest.end - Date.now()) / 1000);
+const fmtRest = () => { const l = restLeft(); return l > 0 ? fmtSec(l) : "+" + fmtSec(-l); };
 const restSec = () => { const v = +LS.get("restSec"); return v > 0 ? v : cur()?.rest || S.client.rest || CONFIG.defaultRest; };
 act("restStart", () => {
   sheet("Descanso", `<div class="restpick"><button class="btn" data-a="restPickAdj" data-n="-15">−15 s</button><b id="rpT">${fmtSec(restSec())}</b><button class="btn" data-a="restPickAdj" data-n="15">+15 s</button></div>
@@ -302,16 +304,17 @@ function restAlarm() {
   const stop = () => { clearInterval(iv); navigator.vibrate?.(0); o.remove(); keepAwake(false); };
   o.onclick = stop;
 }
-act("restAdj", (el) => { if (S.rest) S.rest.end += +el.dataset.n * 1000; });
+act("restAdj", (el) => { if (!S.rest) return; S.rest.end += +el.dataset.n * 1000; if (S.rest.fired && restLeft() > 0) { S.rest.fired = false; refresh(); } });
 export function restBar() {
   if (!S.rest || S.route[0] === "sesion") return "";
-  return `<div class="restbar"><button data-a="restAdj" data-n="-15">−15</button><div><small>Descanso</small><b id="restT">${fmtRest()}</b></div><button data-a="restAdj" data-n="15">+15</button><button data-a="restStop">✕</button></div>`;
+  return `<div class="restbar ${S.rest.fired ? "over" : ""}"><button data-a="restAdj" data-n="-15">−15</button><div><small>${S.rest.fired ? "Después del descanso" : "Descanso"}</small><b id="restT">${fmtRest()}</b></div><button data-a="restAdj" data-n="15">+15</button><button data-a="restStop">✕</button></div>`;
 }
 setInterval(() => {
   const c = $("#clock"); if (c && S.session) c.textContent = timeSince(S.session.startedAt);
   if (!S.rest) return;
   const t = $("#restT"); if (t) t.textContent = fmtRest();
-  if (Date.now() >= S.rest.end && !S.rest.fired) { S.rest.fired = true; restAlarm(); if (document.hidden) notify("Terminó tu descanso", "Vamos con la siguiente serie 💪"); S.rest = null; refresh(); }
+  if (Date.now() >= S.rest.end && !S.rest.fired) { S.rest.fired = true; restAlarm(); if (document.hidden) notify("Terminó tu descanso", "Vamos con la siguiente serie 💪"); refresh(); }
+  else if (S.rest.fired && restLeft() < -600) { S.rest = null; refresh(); } // a los 10 min se apaga solo
 }, 500);
 
 // ================================================================ ENCUESTA
