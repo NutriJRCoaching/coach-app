@@ -477,3 +477,12 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .recbar .rdot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; animation: blink 1s infinite; } .recbar .rdot.p { animation: none; background: #eab308; } @keyframes blink { 50% { opacity: .25; } }
 .recout { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; align-items: start; margin: 8px 0; } .recout video { width: 100%; border-radius: 10px; background: #000; }
 .pdfview { height: calc(100vh - 160px); } .pdfview iframe { width: 100%; height: 100%; border: 0; border-radius: 10px; background: #fff; }
+.recbar { top: 10px; left: 50%; right: auto; transform: translateX(-50%); gap: 6px; padding: 5px 6px 5px 12px; font-size: 13px; }
+.recbar .rb { background: transparent; border: 0; color: #fff; font: inherit; padding: 5px 8px; border-radius: 8px; cursor: pointer; } .recbar .rb:hover, .recbar .rb.on { background: #333; }
+.recbar .rb.sw i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #666; vertical-align: middle; } .recbar .rb.stop { background: #d1262f; font-weight: 700; } .recbar .rsep { width: 1px; height: 20px; background: #444; }
+.recbub { position: fixed; z-index: 290; width: var(--bs, 200px); height: var(--bs, 200px); border-radius: 50%; overflow: hidden; border: 4px solid #d1262f; box-shadow: 0 8px 28px rgba(0,0,0,.5); cursor: grab; touch-action: none; background: #000; }
+.recbub video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; }
+.recdraw { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 280; pointer-events: none; } .recdraw.on { pointer-events: auto; cursor: crosshair; }
+.reccount { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; font-size: 140px; font-weight: 900; color: #fff; background: rgba(0,0,0,.35); pointer-events: none; }
+body.rec-on .side, body.rec-on .alertbar, body.rec-on.rec-pip .pre, body.rec-on .recc, body.rec-on [data-a="previewClient"] { display: none !important; } body.rec-on #app.coach { grid-template-columns: 1fr !important; }
+.pipbody { padding: 12px; background: var(--bg); color: var(--txt); font-family: inherit; } .recbar.inpip { position: static; transform: none; margin: 0 0 12px; flex-wrap: wrap; justify-content: center; } .pipguide .pre-g { grid-template-columns: 1fr; gap: 8px; } .pipguide .card { margin: 0; }

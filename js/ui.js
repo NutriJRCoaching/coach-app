@@ -6,15 +6,16 @@ export const act = (name, fn) => (actions[name] = fn);
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-// Cualquier elemento con data-a="nombre" ejecuta la acción registrada
-for (const type of ["click", "change", "input"]) {
-  document.addEventListener(type, (e) => {
+// Cualquier elemento con data-a="nombre" ejecuta la acción registrada (también en otra ventana, ej. la flotante del grabador)
+export function bindActions(doc) { for (const type of ["click", "change", "input"]) {
+  doc.addEventListener(type, (e) => {
     const el = e.target.closest(`[data-a${type === "click" ? "" : "-" + type}]`);
     if (!el) return;
     const name = el.dataset[type === "click" ? "a" : "a" + type[0].toUpperCase() + type.slice(1)];
     if (actions[name]) { if (type === "click" && el.tagName === "A" && !el.href) e.preventDefault(); actions[name](el, e); }
   });
-}
+} }
+bindActions(document);
 
 export function toast(msg, ms = 2200) {
   const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;

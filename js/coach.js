@@ -427,7 +427,8 @@ async function feedbackView(c, w) {
   const ciW = await db.get(`clients/${c.id}/checkins/${w.key}`), goals = c.feedback?.week === w.key ? c.weeklyGoals || [] : ciW?.foco ? [ciW.foco] : c.weeklyGoals || [];
   const L = LASTREC?.cid === c.id && LASTREC.week === w.key ? LASTREC : null;
   const rec = `<div class="card recc"><div class="row between"><div class="card-t">🎥 Video de retroalimentación</div>${recSupported() ? `<button class="btn primary" data-a="recStart" data-w="${w.key}">● Grabar</button>` : ""}</div>
-  ${recSupported() ? `<p class="muted small">Graba esta pestaña con tu cara en una burbuja abajo a la izquierda. Antes de partir, deja a la vista el preanálisis y la pestaña con el dato que vas a mostrar (Timeline, Entrenamientos). Mientras hablas se va transcribiendo. Si cambias a otra pestaña o ventana, elige “Pantalla completa” al compartir.</p>` : `<p class="muted small">Para grabar usa Chrome en el computador.</p>`}
+  ${recSupported() ? `<p class="muted small">Al apretar Grabar se abre una ventanita flotante con los controles y tu preanálisis (no sale en el video). En la página solo queda este cliente: se ocultan la lista de clientes y tus pendientes. Tu cara aparece en una burbuja que puedes arrastrar; hay cuenta regresiva 3-2-1, pausa y lápiz para marcar. Al compartir elige <b>“Esta pestaña”</b>.</p>` : `<p class="muted small">Para grabar usa Chrome en el computador.</p>`}
+  <label class="btn ghost small upfile">⬆ Subir un video que ya tengo<input type="file" accept="video/*" hidden data-a-change="vidFile"></label> <span id="upF" class="small muted"></span>
   ${L ? `<div class="recout"><video src="${L.url}" controls></video><div><p class="small">Duración <b>${Math.floor(L.secs / 60)}:${String(L.secs % 60).padStart(2, "0")}</b> · ${(L.blob.size / 1048576).toFixed(1)} MB</p>
     ${driveReady() ? `<button class="btn primary block" data-a="recUpload">Subir a mi Drive y poner el link</button>` : `<p class="small"><span class="badge y">Falta conectar Google Drive</span> Mientras, descárgalo y súbelo tú (o pídeme que te guíe para conectarlo).</p>`}
     <button class="btn block" data-a="recDownload">Descargar video</button><button class="btn ghost block" data-a="recDiscard">Descartar</button><div id="upP" class="small muted"></div></div></div>
@@ -457,7 +458,7 @@ act("fbPoints", () => {
 let LASTREC = null;
 act("recStart", async (el) => {
   const cid = CW.cid, week = el.dataset.w;
-  await startRecording({ onDone: ({ blob, secs, transcript }) => { if (LASTREC?.url) URL.revokeObjectURL(LASTREC.url); LASTREC = { cid, week, blob, secs, transcript, url: URL.createObjectURL(blob) }; refresh(); toast("Grabación lista ✓"); } });
+  await startRecording({ guideHtml: document.querySelector(".pre")?.outerHTML || "", onDone: ({ blob, secs, transcript }) => { if (LASTREC?.url) URL.revokeObjectURL(LASTREC.url); LASTREC = { cid, week, blob, secs, transcript, url: URL.createObjectURL(blob) }; refresh(); toast("Grabación lista ✓"); } });
 });
 act("recDownload", () => { if (!LASTREC) return; const a = document.createElement("a"); a.href = LASTREC.url; a.download = `Retro ${new Date().toISOString().slice(0, 10)}.webm`; a.click(); });
 act("recDiscard", async () => { if (!(await confirmBox("¿Descartar esta grabación?"))) return; URL.revokeObjectURL(LASTREC.url); LASTREC = null; refresh(); });
@@ -467,6 +468,16 @@ act("recUpload", async (el) => {
     const link = await uploadToDrive(LASTREC.blob, `Retro ${c.name} · semana ${+LASTREC.week.slice(1)}.webm`, (p) => { const u = $("#upP"); if (u) u.textContent = `Subiendo… ${Math.round(p * 100)} %`; });
     $("#fbV").value = link; toast("Video subido ✓ · revisa y publica"); $("#upP").textContent = "Subido ✓ · el link quedó puesto abajo";
   } catch (e) { toast("No se pudo subir: " + e.message); el.disabled = false; }
+});
+act("vidFile", async (el) => {
+  const f = el.files?.[0]; if (!f) return;
+  if (!driveReady()) return toast("Falta conectar Google Drive");
+  const c = await getClient(CW.cid), out = $("#upF");
+  try {
+    const link = await uploadToDrive(f, `Retro ${c.name} · ${f.name}`, (p) => { if (out) out.textContent = `Subiendo… ${Math.round(p * 100)} %`; });
+    $("#fbV").value = link; if (out) out.textContent = "Subido ✓ · el link quedó puesto abajo"; toast("Video subido ✓ · revisa y publica");
+  } catch (e) { toast("No se pudo subir: " + e.message); if (out) out.textContent = ""; }
+  el.value = "";
 });
 act("trPoints", () => {
   const t = ($("#fbTr")?.value || "").trim(); if (!t) return;

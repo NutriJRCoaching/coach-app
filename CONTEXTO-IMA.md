@@ -174,3 +174,11 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Habla en español de Chile, informal. Prefiere ver el código en el chat y no como adjunto.
 - Pedir permiso antes de acciones irreversibles o en sus cuentas.
 - Para ahorrar uso: chats nuevos, Sonnet para cambios chicos, varios pedidos juntos; "sin probar" para cambios simples.
+
+## v1.22.0 — Grabador tipo Loom/Zoom
+- Al grabar: ventana flotante (Document Picture-in-Picture de Chrome) con controles + preanálisis; no sale en el video. Sin PiP, la barra queda arriba al centro en la página.
+- body.rec-on oculta sidebar (otros clientes), alertbar y la tarjeta del grabador; solo se ve el cliente que se graba.
+- Burbuja de cámara visible (#recbub) arrastrable, 3 tamaños (LS bubSize/bubPos), ocultable. Si se comparte "Esta pestaña" se graba la pestaña tal cual (burbuja + dibujos incluidos); si es ventana/pantalla, se compone en canvas con la burbuja abajo-izq.
+- Dibujo (#recdraw): rojo, blanco, destacador; trazos se borran solos ~4 s. Pausa/reanudar. Cuenta regresiva 3-2-1 antes de empezar.
+- "⬆ Subir un video que ya tengo": sube cualquier archivo de video del computador a la carpeta de Drive y pone el link.
+- ui.js exporta bindActions(doc) para que data-a funcione en la ventana PiP.
