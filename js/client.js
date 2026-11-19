@@ -586,7 +586,7 @@ async function progress() {
   ${has("feedback") && (fb || (c.weeklyGoals || []).length) ? `<div class="fbcard"><small>${fb ? `Respuesta de tu coach · Semana ${+fb.week.slice(1)}` : `Semana ${w.n}`}</small><h3>${esc(fb?.text || "Esto es lo que trabajamos esta semana")}</h3>
     ${(fb?.points || []).length ? `<ul>${fb.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
     ${(c.weeklyGoals || []).length ? `<div class="goals-t">Metas de la semana</div><ul>${c.weeklyGoals.map((g) => `<li>${esc(g)}</li>`).join("")}</ul>` : ""}
-    ${fb?.videoUrl ? `<button class="btn small" data-a="openFeedback">${I.play} Ver video</button>` : ""}</div>` : ""}
+    ${fb?.videoUrl ? `<button class="btn small" data-a="openFeedback">${I.play} Ver video</button>` : fb ? `<button class="btn small ghost" data-a="openFeedback">Califica esta retroalimentación</button>` : ""}</div>` : ""}
   <a class="card" href="#peso"><div class="card-t">${I.scale}Peso corporal</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals: wv, color: "var(--dim)", dots: true, w: 1 }, { vals: trend(wv), color: "var(--acc)" }], { h: 130 })}</a>
   <div class="list">${has("prog_timeline") ? `<a href="#timeline"><span>Timeline y etapas<small>Tu calendario nutricional semana a semana</small></span>${I.chev}</a>` : ""}
   <a href="#sueno"><span>Sueño<small>Registro y estadísticas</small></span>${I.chev}</a>
@@ -594,10 +594,10 @@ async function progress() {
   ${has("prog_measures") ? `<a href="#medidas"><span>Medidas<small>Una vez al mes</small></span>${I.chev}</a>` : ""}
   ${has("checkin") ? `<a href="#checkin"><span>Check-in semanal<small>Semana ${w.n}</small></span>${I.chev}</a>` : ""}</div>`;
 }
-act("openFeedback", () => {
+act("openFeedback", async () => {
   const fb = S.client.feedback; if (!fb) return;
-  const emb = embedUrl(fb.videoUrl);
-  sheet("Tu retroalimentación", `${emb ? `<div class="video"><iframe src="${emb}" allowfullscreen></iframe></div>` : fb.videoUrl ? `<a class="btn primary" target="_blank" href="${esc(fb.videoUrl)}">Abrir video</a>` : ""}${fb.text ? `<p>${esc(fb.text)}</p>` : ""}`);
+  const { openFeedbackPlayer } = await import("./player.js");
+  openFeedbackPlayer(fb);
 });
 
 

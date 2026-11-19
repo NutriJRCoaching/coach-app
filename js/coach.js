@@ -426,7 +426,8 @@ async function feedbackView(c, w) {
   const fb = c.feedback?.week === w.key ? c.feedback : (await db.get(`clients/${c.id}/feedbacks/${w.key}`)) || {};
   const ciW = await db.get(`clients/${c.id}/checkins/${w.key}`), goals = c.feedback?.week === w.key ? c.weeklyGoals || [] : ciW?.foco ? [ciW.foco] : c.weeklyGoals || [];
   const L = LASTREC?.cid === c.id && LASTREC.week === w.key ? LASTREC : null;
-  const rec = `<div class="card recc"><div class="row between"><div class="card-t">🎥 Video de retroalimentación</div>${recSupported() ? `<button class="btn primary" data-a="recStart" data-w="${w.key}">● Grabar</button>` : ""}</div>
+  const reply = await db.get(`clients/${c.id}/fbreplies/${w.key}`);
+  const rec = replyCard(reply && { ...reply, id: w.key }) + `<div class="card recc"><div class="row between"><div class="card-t">🎥 Video de retroalimentación</div>${recSupported() ? `<button class="btn primary" data-a="recStart" data-w="${w.key}">● Grabar</button>` : ""}</div>
   ${recSupported() ? `<p class="muted small">Al apretar Grabar se abre una ventanita flotante con los controles y tu preanálisis (no sale en el video). En la página solo queda este cliente: se ocultan la lista de clientes y tus pendientes. Tu cara aparece en una burbuja que puedes arrastrar; hay cuenta regresiva 3-2-1, pausa y lápiz para marcar. Al compartir elige <b>“Esta pestaña”</b>.</p>` : `<p class="muted small">Para grabar usa Chrome en el computador.</p>`}
   <label class="btn ghost small upfile">⬆ Subir un video que ya tengo<input type="file" accept="video/*" hidden data-a-change="vidFile"></label> <span id="upF" class="small muted"></span>
   ${L ? `<div class="recout"><video src="${L.url}" controls></video><div><p class="small">Duración <b>${Math.floor(L.secs / 60)}:${String(L.secs % 60).padStart(2, "0")}</b> · ${(L.blob.size / 1048576).toFixed(1)} MB</p>
@@ -436,6 +437,7 @@ async function feedbackView(c, w) {
   return `${pre}${rec}<div class="card"><div class="card-t">Retroalimentación · Semana ${w.n}</div><p class="muted small">Le aparece en el inicio como “Tu coach respondió tu check-in” durante 9 días.</p>
   <label>Link del video (YouTube no listado, Drive, Loom…)<input id="fbV" value="${esc(fb.videoUrl || "")}"></label>
   <label>Puntos clave (uno por línea)<textarea id="fbP" rows="5">${esc((fb.points || []).join("\n"))}</textarea></label>
+  <label>Capítulos del video (uno por línea: <i>1:20 Sentadilla</i>) · el cliente toca uno y salta a esa parte<textarea id="fbCh" rows="3" placeholder="0:00 Lo mejor de tu semana&#10;1:15 Sentadilla">${esc(chaptersTxt(fb, L))}</textarea></label>
   <label>Mensaje (opcional)<textarea id="fbT" rows="4">${esc(fb.text || "")}</textarea></label>
   ${ciW?.foco ? `<p class="small">Foco que propuso en su check-in: <b>${esc(ciW.foco)}</b></p>` : ""}
   <label>Foco de la semana (la primera línea es la acción que le preguntamos en el próximo check-in)<textarea id="fbG" rows="3">${esc(goals.join("\n"))}</textarea></label>
@@ -456,9 +458,27 @@ act("fbPoints", () => {
   const cur = $("#fbP").value.trim(); $("#fbP").value = (cur ? cur + "\n" : "") + pts.join("\n"); toast(`${pts.length} puntos agregados: revísalos y edítalos`);
 });
 let LASTREC = null;
+const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, "0")}`;
+function chaptersTxt(fb, L) {
+  if (fb.chapters?.length) return fb.chapters.map((c) => `${mmss(c.s)} ${c.t}`).join("\n");
+  if (L?.marks?.length) return ["0:00 Inicio", ...L.marks.map((m, i) => `${mmss(m)} Tema ${i + 2}`)].join("\n");
+  return "";
+}
+function parseChapters(t) {
+  return t.split("\n").map((l) => l.trim().match(/^(\d{1,2}):(\d{2})\s+(.+)$/)).filter(Boolean).map((m) => ({ s: +m[1] * 60 + +m[2], t: m[3].trim() })).sort((a, b) => a.s - b.s);
+}
+// Lo que respondió el cliente al terminar de ver el video
+function replyCard(r) {
+  if (!r || !(r.rating || r.duda || r.falto)) return "";
+  return `<div class="card fbreply ${r.seen ? "" : "new"}"><div class="row between"><div class="card-t">💬 Respuesta del cliente a tu retro</div>${r.seen ? `<span class="badge">Leída</span>` : `<button class="btn small" data-a="replySeen" data-w="${r.id}">Marcar leída</button>`}</div>
+  ${r.rating ? `<p>Calificación: <b class="stars">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</b></p>` : ""}
+  ${r.duda ? `<p><b>Duda o consulta:</b> ${esc(r.duda)}</p>` : ""}${r.falto ? `<p><b>Sintió que faltó:</b> ${esc(r.falto)}</p>` : ""}
+  ${r.viewed ? `<p class="small muted">Vio el ${Math.round(r.viewed)} % del video</p>` : ""}</div>`;
+}
+act("replySeen", async (el) => { await db.set(`clients/${CW.cid}/fbreplies/${el.dataset.w}`, { seen: true }); resetAlerts(); refresh(); });
 act("recStart", async (el) => {
   const cid = CW.cid, week = el.dataset.w;
-  await startRecording({ guideHtml: document.querySelector(".pre")?.outerHTML || "", onDone: ({ blob, secs, transcript }) => { if (LASTREC?.url) URL.revokeObjectURL(LASTREC.url); LASTREC = { cid, week, blob, secs, transcript, url: URL.createObjectURL(blob) }; refresh(); toast("Grabación lista ✓"); } });
+  await startRecording({ guideHtml: document.querySelector(".pre")?.outerHTML || "", onDone: ({ blob, secs, transcript, cues, marks }) => { if (LASTREC?.url) URL.revokeObjectURL(LASTREC.url); LASTREC = { cid, week, blob, secs, transcript, cues, marks, url: URL.createObjectURL(blob) }; refresh(); toast("Grabación lista ✓"); } });
 });
 act("recDownload", () => { if (!LASTREC) return; const a = document.createElement("a"); a.href = LASTREC.url; a.download = `Retro ${new Date().toISOString().slice(0, 10)}.webm`; a.click(); });
 act("recDiscard", async () => { if (!(await confirmBox("¿Descartar esta grabación?"))) return; URL.revokeObjectURL(LASTREC.url); LASTREC = null; refresh(); });
@@ -485,7 +505,8 @@ act("trPoints", () => {
   const cur = $("#fbP").value.trim(); $("#fbP").value = (cur ? cur + "\n" : "") + pts.join("\n"); toast(`${pts.length} frases agregadas: deja solo las clave`);
 });
 act("fbSave", async (el) => {
-  const fb = { week: el.dataset.w, videoUrl: $("#fbV").value.trim(), points: $("#fbP").value.split("\n").map((x) => x.trim()).filter(Boolean), text: $("#fbT").value.trim(), at: Date.now() };
+  const L = LASTREC?.cid === CW.cid && LASTREC.week === el.dataset.w ? LASTREC : null;
+  const fb = { week: el.dataset.w, videoUrl: $("#fbV").value.trim(), chapters: parseChapters($("#fbCh")?.value || ""), ...(L?.cues?.length && $("#fbV").value.trim() ? { cues: L.cues } : {}), points: $("#fbP").value.split("\n").map((x) => x.trim()).filter(Boolean), text: $("#fbT").value.trim(), at: Date.now() };
   await db.set(`clients/${CW.cid}/feedbacks/${fb.week}`, { ...fb, answered: true });
   resetAlerts();
   await db.set("clients/" + CW.cid, { feedback: fb, weeklyGoals: $("#fbG").value.split("\n").map((x) => x.trim()).filter(Boolean) });

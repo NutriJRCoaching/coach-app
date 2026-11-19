@@ -14,13 +14,13 @@ export const emailKey = (e) => String(e || "").trim().toLowerCase();
 // Carga lo necesario para revisar a un cliente
 export async function loadCtx(c) {
   const today = ymd();
-  const [routines, sessions, days, checkins, feedbacks, access, onb] = await Promise.all([
+  const [routines, sessions, days, checkins, feedbacks, fbreplies, access, onb] = await Promise.all([
     getRoutines(c.id), getSessions(c.id), getDays(addDays(today, -6), today, c.id),
-    db.list(`clients/${c.id}/checkins`), db.list(`clients/${c.id}/feedbacks`),
+    db.list(`clients/${c.id}/checkins`), db.list(`clients/${c.id}/feedbacks`), db.list(`clients/${c.id}/fbreplies`),
     c.email ? db.get("access/" + emailKey(c.email)).catch(() => null) : null,
     db.get(`clients/${c.id}/settings/onboarding`).catch(() => null)
   ]);
-  return { routines, sessions, days, checkins, feedbacks, access, onb };
+  return { routines, sessions, days, checkins, feedbacks, fbreplies, access, onb };
 }
 
 export function alertsFor(c, x) {
@@ -69,6 +69,14 @@ export function alertsFor(c, x) {
   // Pendientes anotados a mano ("!" al inicio = urgente)
   (c.todo || []).forEach((t) => { const u = t.startsWith("!"); add(u ? "r" : "y", u ? t.slice(1).trim() : t); });
 
+  // Respuestas a tus videos de retroalimentación
+  for (const r of x.fbreplies || []) if (!r.seen && (r.rating || r.duda || r.falto)) {
+    const n = +r.id.slice(1);
+    if (r.duda) add("r", `Tiene una duda sobre tu retro de la semana ${n}`, "feedback");
+    else if (r.falto) add("y", `Sintió que faltó algo en tu retro de la semana ${n}`, "feedback");
+    else if (r.rating <= 3) add("y", `Calificó tu retro de la semana ${n} con ${r.rating}/5`, "feedback");
+    else add("i", `Calificó tu retro de la semana ${n} con ${r.rating}/5`, "feedback");
+  }
   // ---------- Semana en curso
   if (w && w.n >= 1) {
     const answered = (key) => x.feedbacks.some((f) => f.id === key && (f.at || f.answered));

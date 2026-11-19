@@ -71,18 +71,29 @@ export async function startRecording({ onDone, guideHtml }) {
   const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
   const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 64_000 });
   const chunks = []; rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-  R = { rec, chunks, t0: Date.now(), paused: 0, pausedAt: 0, transcript: "", interim: "", onDone, cam, color: "#ef4444", stopAll: () => { stopTick(); screen.getTracks().forEach((t) => t.stop()); cam.getTracks().forEach((t) => t.stop()); } };
+  R = { rec, chunks, t0: Date.now(), paused: 0, pausedAt: 0, transcript: "", interim: "", cues: [], marks: [], uStart: null, onDone, cam, color: "#ef4444", stopAll: () => { stopTick(); screen.getTracks().forEach((t) => t.stop()); cam.getTracks().forEach((t) => t.stop()); } };
   vt.onended = () => stopRecording(); // si toca "Dejar de compartir" en Chrome
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
     const sr = new SR(); sr.lang = "es-CL"; sr.continuous = true; sr.interimResults = true;
-    sr.onresult = (e) => { let it = ""; for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript.trim(); if (e.results[i].isFinal) R.transcript += (R.transcript ? " " : "") + t.charAt(0).toUpperCase() + t.slice(1) + "."; else it += t; } R.interim = it; };
+    sr.onresult = (e) => {
+      let it = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript.trim();
+        if (R.uStart == null) R.uStart = Math.max(0, elapsed() - 0.6);
+        if (e.results[i].isFinal) {
+          if (t) { const txt = t.charAt(0).toUpperCase() + t.slice(1) + "."; R.transcript += (R.transcript ? " " : "") + txt; R.cues.push({ s: +R.uStart.toFixed(1), e: +elapsed().toFixed(1), t: txt }); }
+          R.uStart = null;
+        } else it += t;
+      }
+      R.interim = it;
+    };
     sr.onend = () => { if (R && R.rec.state === "recording") try { sr.start(); } catch {} };
     try { sr.start(); R.sr = sr; } catch {}
   }
   drawLayer();
   await countdown();
-  rec.start(1000); R.t0 = Date.now();
+  rec.start(1000); R.t0 = Date.now(); R.started = true;
   bar();
 }
 
@@ -137,6 +148,9 @@ function countdown() {
 function cleanupUI() { ["recbub", "recdraw", "recbar"].forEach((id) => document.getElementById(id)?.remove()); }
 function endUI() { cleanupUI(); document.body.classList.remove("rec-on", "rec-pip"); try { PIP?.close(); } catch {} PIP = null; }
 
+// Segundos grabados sin contar las pausas
+function elapsed() { if (!R || !R.started) return 0; return ((R.pausedAt || Date.now()) - R.t0 - R.paused) / 1000; }
+act("recMark", () => { if (!R) return; R.marks.push(Math.round(elapsed())); toast(`Capítulo marcado en ${fmt(elapsed())}`); });
 function bar() {
   const host = PIP ? PIP.document.getElementById("pipbar") : document.body, doc = PIP ? PIP.document : document;
   if (PIP) document.getElementById("recbar")?.remove();
@@ -146,6 +160,7 @@ function bar() {
   const C = [["#ef4444", "Rojo"], ["#ffffff", "Blanco"], ["rgba(250,204,21,.45)", "Destacador"]];
   b.innerHTML = `<span class="rdot ${R.pausedAt ? "p" : ""}"></span><b id="recT">${fmt(secs())}</b>
     <button class="rb" data-a="recPause" title="Pausar">${R.pausedAt ? "▶" : "❚❚"}</button>
+    <button class="rb" data-a="recMark" title="Marcar un capítulo (ej. cuando cambias de tema)">🔖</button>
     <span class="rsep"></span><button class="rb ${R.drawing ? "on" : ""}" data-a="drawTog" title="Dibujar (se borra solo)">✏️</button>${C.map(([c, l]) => `<button class="rb sw ${R.drawing && R.color === c ? "on" : ""}" data-a="drawColor" data-c="${c}" title="${l}"><i style="background:${c}"></i></button>`).join("")}<button class="rb" data-a="drawClear" title="Borrar dibujos">⌫</button>
     <span class="rsep"></span><button class="rb" data-a="bubSize" title="Tamaño de la burbuja">◐</button><button class="rb ${R.camOff ? "on" : ""}" data-a="bubHide" title="Ocultar cámara">${R.camOff ? "🙈" : "📷"}</button>
     <button class="rb stop" data-a="recStop" title="Terminar">■ Terminar</button>`;
@@ -164,7 +179,7 @@ export function stopRecording() {
     r.stopAll(); clearInterval(r.iv); endUI();
     try { r.sr?.stop(); } catch {}
     const blob = new Blob(r.chunks, { type: "video/webm" }), secs = Math.round(((r.pausedAt || Date.now()) - r.t0 - r.paused) / 1000);
-    R = null; r.onDone?.({ blob, secs, transcript: (r.transcript + (r.interim ? " " + r.interim : "")).trim() });
+    R = null; r.onDone?.({ blob, secs, transcript: (r.transcript + (r.interim ? " " + r.interim : "")).trim(), cues: r.cues, marks: r.marks });
   };
   r.rec.stop();
 }

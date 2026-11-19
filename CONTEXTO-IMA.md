@@ -182,3 +182,10 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Dibujo (#recdraw): rojo, blanco, destacador; trazos se borran solos ~4 s. Pausa/reanudar. Cuenta regresiva 3-2-1 antes de empezar.
 - "⬆ Subir un video que ya tengo": sube cualquier archivo de video del computador a la carpeta de Drive y pone el link.
 - ui.js exporta bindActions(doc) para que data-a funcione en la ventana PiP.
+
+## v1.23.0 — Reproductor de retroalimentación + encuesta al terminar
+- js/player.js (cliente, se carga con import dinámico desde openFeedback): si videoUrl es archivo directo (firebasestorage/.webm/.mp4/blob:) usa <video> propio con velocidad 1/1,25/1,5/2x (LS fbSpeed), subtítulos WebVTT generados de fb.cues (LS fbCC), capítulos fb.chapters [{s,t}] clicables. Drive/YouTube siguen en iframe (capítulos solo como lista).
+- Encuesta al terminar (o abajo si es iframe): estrellas 1–5, "¿Tienes alguna duda o consulta?", "¿Sientes que hubo algo que faltó mencionar?" → clients/{cid}/fbreplies/{week} {rating, duda, falto, viewed %, at, seen}. Guarda % visto cada 20 %.
+- Grabador: cues con tiempo (Web Speech, sin contar pausas) y botón 🔖 para marcar capítulos → se prellenan en "Capítulos del video" (formato "1:20 Sentadilla").
+- Coach: tarjeta "Respuesta del cliente a tu retro" en Retroalimentación + "Marcar leída"; alertas: duda = rojo, faltó / ≤3★ = amarillo, resto = info.
+- Pendiente: activar Blaze + Storage (us-east1), subir grabaciones a Storage en vez de Drive, reglas de Storage y caché offline del último video.
