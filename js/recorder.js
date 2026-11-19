@@ -26,8 +26,9 @@ export async function startRecording({ onDone }) {
   const vs = Object.assign(document.createElement("video"), { muted: true, playsInline: true, srcObject: screen });
   const vc = Object.assign(document.createElement("video"), { muted: true, playsInline: true, srcObject: new MediaStream(cam.getVideoTracks()) });
   await Promise.all([vs.play(), vc.play()]);
-  const st = screen.getVideoTracks()[0].getSettings();
-  const W = st.width || 1920, H = st.height || 1080;
+  // Se graba en 720p a ~1,2 Mbps (≈ 9 MB por minuto): el texto de la pantalla se lee bien y el Drive no se llena
+  const st = screen.getVideoTracks()[0].getSettings(), sc = Math.min(1, 720 / (st.height || 1080));
+  const W = Math.round((st.width || 1920) * sc / 2) * 2, H = Math.round((st.height || 1080) * sc / 2) * 2;
   const cv = Object.assign(document.createElement("canvas"), { width: W, height: H }), g = cv.getContext("2d");
   const D = Math.round(Math.min(W, H) * 0.26), X = Math.round(W * 0.025), Y = H - D - Math.round(H * 0.04);
   const draw = () => {
@@ -41,7 +42,7 @@ export async function startRecording({ onDone }) {
   const stopTick = ticker(33, draw);
   const out = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...cam.getAudioTracks()]);
   const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
-  const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 2_500_000 });
+  const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 64_000 });
   const chunks = []; rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   R = { rec, chunks, t0: Date.now(), paused: 0, pausedAt: 0, transcript: "", interim: "", onDone, stopAll: () => { stopTick(); screen.getTracks().forEach((t) => t.stop()); cam.getTracks().forEach((t) => t.stop()); } };
   screen.getVideoTracks()[0].onended = () => stopRecording(); // si toca "Dejar de compartir" en Chrome
