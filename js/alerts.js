@@ -3,7 +3,7 @@ import { db } from "./db.js";
 import { S } from "./state.js";
 import { ymd, addDays, weekInfo, diffDays, fmtDate, DAYS } from "./util.js";
 import { getRoutines, getSessions, getDays } from "./data.js";
-import { weekPlan } from "./data.js";
+import { weekPlan, reviewWindow } from "./data.js";
 
 export const SERVICES = { completa: "Coaching 1-1", entrenamiento: "Entrenamiento", nutricion: "Nutrición" };
 export const SERVICE_GROUPS = [["completa", "Coaching 1-1"], ["entrenamiento", "Entrenamiento"], ["nutricion", "Nutrición"], ["", "Sin definir"]];
@@ -39,6 +39,8 @@ export function alertsFor(c, x) {
   if (trains(c)) {
     if (!x.routines.length) add("r", "Falta su plan de entrenamiento (rutinas)", "rutinas");
     else if (!Object.values(c.schedule || {}).some(Boolean)) add("y", "Falta el calendario semanal: qué rutina toca cada día", "rutinas");
+    const rv = reviewWindow(c, x.routines, x.sessions);
+    if (rv?.open && !rv.done) add(today === rv.w.last ? "r" : "y", `Revisa su rutina para la semana ${rv.next.n} (parte el ${fmtDate(rv.next.first)})`, "rutinas");
   }
   if (eats(c)) {
     if (!c.kcal || !c.prot) add("r", "Faltan los objetivos de calorías y macros");

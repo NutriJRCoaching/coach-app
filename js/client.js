@@ -88,7 +88,8 @@ async function home() {
   return `<header class="topbar ima"><img src="icons/logo.png?v=ima2" class="hdr-logo" alt="IMA"><div class="brand-t">INTELIGENCIA MUSCULAR APLICADA</div>${bellBtn(pend)}</header>${dayStrip()}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
-  ${date === today && c.payDate && diffDays(c.payDate, today) >= 0 && diffDays(c.payDate, today) <= 3 ? `<div class="card paycard">${payMsg(c)}</div>` : ""}
+  ${date === today && c.payDate && diffDays(c.payDate, today) === 0 ? `<div class="card paycard">${payMsg(c)}</div>` : ""}
+  ${date === today && c.payDate && diffDays(c.payDate, today) < 0 ? `<div class="card paycard late"><b>Pago pendiente</b><br>Tu asesoría se renovaba el ${fmtDate(c.payDate, true)} y aún no tengo registrado el pago. Si ya pagaste, ignora este mensaje 🙌 Si tienes algún problema, escríbeme y lo vemos.</div>` : ""}
   ${date === today && has("feedback") && freshFb(c) ? `<a class="card fbmini" href="#progreso"><div class="card-t">${I.info}Tu coach respondió tu check-in · Semana ${+freshFb(c).week.slice(1)}</div><div class="small">${esc(freshFb(c).text || freshFb(c).points?.[0] || "Toca para ver tu retroalimentación")}</div>${freshFb(c).videoUrl ? `<span class="badge">${I.play} Video</span>` : ""}</a>` : ""}
   <div class="grid2">
     ${has("home_kcal") ? `<a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div>${pctTxt(tot.kcal, c.kcal)}</a>
@@ -646,7 +647,7 @@ async function sleepView() {
   <div class="grid2" style="margin:0"><label>Me acosté a las<input id="sB" type="time" value="${s.bed || "23:00"}"></label><label>Desperté a las<input id="sW" type="time" value="${s.wake || "07:00"}"></label></div>
   <label>Minutos despierto durante la noche<input id="sA" type="number" inputmode="numeric" value="${s.awake || ""}" placeholder="0"></label>
   <div class="card-t">Calidad del sueño (1 a 5)</div>${chips("q", [1, 2, 3, 4, 5].map((n) => [n, n]), s.quality || "", "sleepQ")}
-  <div class="card-t">¿Tomaste café, té, bebida cola o energética el día anterior después de las 12:00?</div>${chips("caf", [["1", "Sí", "r"], ["0", "No", "g"]], d.cafPM == null ? "" : d.cafPM ? "1" : "0", "sleepCaf")}
+  <div class="card-t">¿Tomaste alguna fuente de cafeína después de las 12:00 el día de ayer?</div>${chips("caf", [["1", "Sí", "r"], ["0", "No", "g"]], d.cafPM == null ? "" : d.cafPM ? "1" : "0", "sleepCaf")}
   <button class="btn primary big" data-a="sleepSave">Guardar</button></div>
   <div class="card stats3"><div><b>${last7.length ? fmtH(avg(last7)) : "—"}</b><small>Prom. 7 días</small></div><div><b>${last30.length ? fmtH(avg(last30)) : "—"}</b><small>Prom. 30 días</small></div><div><b>${q7 ? r1(q7) + "/5" : "—"}</b><small>Calidad 7 días</small></div>
   <div><b>${last30.length ? fmtH(Math.max(...last30)) : "—"}</b><small>Mejor noche</small></div><div><b>${last30.length ? fmtH(Math.min(...last30)) : "—"}</b><small>Peor noche</small></div><div><b>${r1(sum(w.days.map(hrs).filter((x) => x != null)))} h</b><small>Total semana</small></div></div>

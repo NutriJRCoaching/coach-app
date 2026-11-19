@@ -82,7 +82,8 @@ act("viewRoutine", async (el) => {
     const lx = last?.exercises.find((x) => x.exId === e.id), done = (lx?.sets || []).filter((x) => x.w !== "" || x.r !== "");
     return `<div class="rvx" style="--exc:${exColor(k)}"><b>${k + 1}. ${esc(e.name)}</b>${e.changed ? ' <span class="badge r">Modificado</span>' : ""}
     <div class="small">${(e.sets || []).map((t, j) => `<span class="rvset">S${j + 1}: ${planTxt(t)}</span>`).join("") || '<span class="muted">Series libres</span>'}</div>
-    ${e.notes ? `<div class="muted small">${esc(e.notes)}</div>` : ""}
+    ${e.notes ? `<ul class="tiplist small">${String(e.notes).split(/\n|•/).map((x) => x.trim()).filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${e.weekNote || e.wSug ? `<div class="coachnote small">${e.weekNote ? esc(e.weekNote) : ""}${e.wSug ? ` · Peso sugerido ${esc(e.wSug)} kg` : ""}</div>` : ""}
     ${done.length ? `<div class="muted small">Última vez: ${done.map((x) => `${x.w || "–"}×${x.r || "–"}`).join(" · ")}</div>` : ""}</div>`;
   }).join("") || `<p class="muted">Esta rutina aún no tiene ejercicios.</p>`}
   <button class="btn primary big" data-a="startRoutine" data-r="${r.id}">Empezar esta rutina</button>`);
@@ -121,6 +122,7 @@ export async function sessionView(id) {
   <div class="card ex ${ex.extra ? "extra" : ""}" style="--exc:${exColor(i)}">
     <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra</span>' : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
     <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video && has("train_videos") ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
+    ${ex.weekNote || ex.wSug ? `<div class="coachnote">${ex.weekNote ? `<b>Tu coach:</b> ${esc(ex.weekNote)}` : ""}${ex.wSug ? `${ex.weekNote ? "<br>" : ""}<b>Peso sugerido:</b> ${esc(ex.wSug)} kg` : ""}</div>` : ""}
     ${!has("train_targets") ? `<div class="goal"><small>Registra el peso y las repeticiones de cada serie</small></div>` : ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div>${ex.tempo || ex.rest ? `<small class="muted">${ex.tempo ? `Tempo ${esc(ex.tempo)} (bajada-pausa-subida-pausa)` : ""}${ex.tempo && ex.rest ? " · " : ""}${ex.rest ? `Descanso ${Math.floor(ex.rest / 60)}:${String(ex.rest % 60).padStart(2, "0")}` : ""}</small>` : ""}</div>` : `<div class="goal"><small>Series libres</small></div>`}
     <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span>${has("train_tech") ? "<span>Técnica</span>" : ""}</div>
     ${ex.sets.map((st, j) => setRow(ex, i, j)).join("")}</div>

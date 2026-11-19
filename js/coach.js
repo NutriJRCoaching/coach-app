@@ -7,7 +7,7 @@ import { I } from "./icons.js";
 import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, dualChart, $, $$ } from "./ui.js";
 import { e1rm } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
-import { DEFAULT_RANGES, adjTxt, payMsg, monthCal, judge, weightCorr, STOOL_KG, waterAuto } from "./data.js";
+import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto } from "./data.js";
 import "./onboarding.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
 import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN, CHECKIN_OLD } from "./data.js";
@@ -27,7 +27,7 @@ async function allAlerts(clients) {
 }
 const chip = (a, cid) => `<a class="badge ${a.c === "i" ? "" : a.c}" href="#coach/c/${cid}/${a.tab}">${esc(a.t)}</a>`;
 
-const TABS = [["resumen", "Timeline semanal"], ["etapas", "Etapas"], ["entrenos", "Entrenamientos"], ["rutinas", "Rutinas"], ["comida", "Alimentación"], ["plan", "Plan alimentación"], ["progreso", "Progreso"], ["checkins", "Check-ins"], ["feedback", "Retroalimentación"], ["datos", "Datos y objetivos"]];
+const TABS = [["datos", "Datos y objetivos"], ["resumen", "Timeline semanal"], ["etapas", "Etapas"], ["entrenos", "Entrenamientos"], ["rutinas", "Rutinas"], ["comida", "Alimentación"], ["plan", "Plan alimentación"], ["progreso", "Progreso"], ["checkins", "Check-ins"], ["feedback", "Retroalimentación"]];
 let CW = null; // semana que está viendo el coach
 let PF = null; // último cliente precargado
 
@@ -206,13 +206,19 @@ async function routinesView(c) {
   const routines = await getRoutines(c.id), lib = (await db.get("library/exercises"))?.items || [];
   const sched = c.schedule || {};
   const ed = RE && RE.cid === c.id ? RE.r : null;
-  return `<div class="card"><div class="card-t">Calendario semanal (qué rutina toca cada día)</div><div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>
+  const rv = reviewWindow(c, routines, await getSessions(c.id));
+  return `${rv ? `<div class="card review ${rv.done ? "ok" : rv.open ? "due" : ""}"><div class="row between"><div><div class="card-t">Revisión de la semana ${rv.next.n} · parte el ${fmtDate(rv.next.first, true)}</div>
+    <p class="small">${rv.done ? `✓ Revisada${c.rutReview?.same ? " · sigue igual" : " · con cambios"}.` : rv.open ? "Ya terminó su semana de entrenamiento: revisa reps, intensidad, pesos sugeridos, indicaciones por ejercicio, orden y selección. Si queda igual, toca “Seguir igual”." : `Se abre el ${fmtDate(rv.lastTrain)} (su último entrenamiento de la semana). Igual puedes dejarla lista antes.`}</p></div>
+    ${rv.done ? `<button class="btn small ghost" data-a="rvUndo" data-w="${rv.next.key}">Deshacer</button>` : `<button class="btn primary small" data-a="rvSame" data-w="${rv.next.key}">Seguir igual la semana ${rv.next.n}</button>`}</div></div>` : ""}
+  <div class="card"><div class="card-t">Calendario semanal (qué rutina toca cada día)</div><div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>
   <div class="row gap"><label>Cardio: veces/semana<input type="number" value="${c.cardio?.perWeek || ""}" data-a-change="cardioSet" data-k="perWeek"></label><label>Tipo<input value="${esc(c.cardio?.type || "")}" data-a-change="cardioSet" data-k="type"></label><label>Minutos<input type="number" value="${c.cardio?.minutes || ""}" data-a-change="cardioSet" data-k="minutes"></label><label>Intensidad<input value="${esc(c.cardio?.intensity || "")}" data-a-change="cardioSet" data-k="intensity"></label></div>
   <div class="row gap small">Días sugeridos de cardio: ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="ck"><input type="checkbox" ${(c.cardio?.days || []).includes(d) ? "checked" : ""} data-a-change="cardioDay" data-d="${d}">${DAYS[d].slice(0, 3)}</label>`).join("")}</div></div>
   <div class="row gap"><div class="routine-list">${routines.map((r) => `<button class="btn ${ed?.id === r.id ? "primary" : ""}" data-a="rEdit" data-id="${r.id}">${esc(r.name)}</button>`).join("")}<button class="btn ghost" data-a="rNew">＋ Nueva rutina</button></div></div>
   ${ed ? routineEditor(ed, lib) : `<p class="muted">Elige una rutina para editarla.</p>`}
   <datalist id="exlib">${lib.map((e) => `<option value="${esc(e.name)}">`).join("")}</datalist>`;
 }
+act("rvSame", async (el) => { await db.set("clients/" + CW.cid, { rutReview: { week: el.dataset.w, same: true, at: Date.now() } }); resetAlerts(); toast("Listo: la rutina sigue igual"); refresh(); });
+act("rvUndo", async () => { await db.set("clients/" + CW.cid, { rutReview: null }); resetAlerts(); refresh(); });
 act("schedSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { schedule: { ...(c.schedule || {}), [el.dataset.d]: el.value || null } }); toast("Calendario guardado"); });
 act("cardioSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), [el.dataset.k]: el.type === "number" ? num(el.value) : el.value } }); toast("Guardado"); });
 act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = new Set(c.cardio?.days || []); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), days: [...s] } }); });
@@ -228,6 +234,7 @@ function routineEditor(r, lib) {
       <tr><td colspan="4"><button class="btn tiny" data-a="setAdd" data-k="${k}">＋ Serie</button></td></tr></table>
     <div><label>Descanso sugerido (s)<input type="number" value="${e.rest || ""}" data-a-change="exF" data-k="${k}" data-f="rest" placeholder="180"></label>
       <div class="small muted">Tempo (segundos)</div><div class="tempo">${T.map((l, i) => `<label>${l}<input type="number" min="0" value="${esc(tp[i] ?? "")}" data-a-change="tempoF" data-k="${k}" data-i="${i}" placeholder="–"></label>`).join("")}</div></div></div>
+    <div class="row gap wk-ind"><label class="grow">Indicación para esta semana (la ve arriba del ejercicio)<input value="${esc(e.weekNote || "")}" data-a-change="exF" data-k="${k}" data-f="weekNote" placeholder="Ej: hombro: baja el peso y controla la bajada"></label><label>Peso sugerido (kg)<input value="${esc(e.wSug || "")}" data-a-change="exF" data-k="${k}" data-f="wSug" placeholder="–" style="width:110px"></label></div>
     <label>Link del video (YouTube, Drive, Instagram…)<input value="${esc(e.video || "")}" data-a-change="exF" data-k="${k}" data-f="video"></label>
     <label>Tips de ejecución (uno por línea; el cliente los ve como punteo)<textarea rows="3" data-a-change="exF" data-k="${k}" data-f="notes">${esc(String(e.notes || "").split(/\s*(?:\n|•)\s*/).filter(Boolean).join("\n"))}</textarea></label>
     <details ${e.alts?.length ? "open" : ""}><summary class="small"><b>Reemplazos de emergencia (${(e.alts || []).length})</b> · si la máquina está ocupada</summary>
@@ -260,7 +267,7 @@ act("exAdd", () => { RE.r.exercises.push({ id: uid(), name: "", sets: [{ reps: "
 act("exDel", (el) => { RE.r.exercises.splice(+el.dataset.k, 1); refresh(); });
 act("exMove", (el) => { const a = RE.r.exercises, k = +el.dataset.k, n = k + +el.dataset.n; if (n < 0 || n >= a.length) return; [a[k], a[n]] = [a[n], a[k]]; refresh(); });
 act("rSave", async () => {
-  const c = await getClient(CW.cid), w = weekInfo(c, ymd());
+  const c = await getClient(CW.cid), rv0 = reviewWindow(c, await getRoutines(CW.cid), await getSessions(CW.cid)), w = rv0?.open ? rv0.next : weekInfo(c, ymd());
   const old = JSON.parse(RE.orig), r = RE.r, list = [];
   const fmtS = (s) => (s || []).map((x) => x.reps + (x.rir !== "" ? "@" + x.rir : "")).join(", ");
   if (!r.isNew) {
@@ -270,6 +277,8 @@ act("rSave", async () => {
       if (o.name !== e.name) { list.push(`${o.name} → ${e.name}`); e.changed = true; }
       if (fmtS(o.sets) !== fmtS(e.sets)) { list.push(`${e.name}: series ${fmtS(o.sets)} → ${fmtS(e.sets)}`); e.changed = true; }
       if (old.indexOf(o) !== k) { list.push(`${e.name}: cambió de orden`); e.changed = true; }
+      if ((o.weekNote || "") !== (e.weekNote || "") && e.weekNote) list.push(`${e.name}: ${e.weekNote}`);
+      if ((o.wSug || "") !== (e.wSug || "") && e.wSug) list.push(`${e.name}: peso sugerido ${e.wSug} kg`);
     });
     old.filter((o) => !r.exercises.find((e) => e.id === o.id)).forEach((o) => list.push(`Se quitó: ${o.name}`));
   }
@@ -277,6 +286,7 @@ act("rSave", async () => {
   const data = { name: r.name, exercises: r.exercises, order: r.order ?? 0, updatedAt: Date.now() };
   if (list.length) data.changes = { week: w.key, list: [...prevCh, ...list], at: Date.now() };
   await db.set(`clients/${CW.cid}/routines/${r.id}`, data);
+  if (rv0?.open) { await db.set("clients/" + CW.cid, { rutReview: { week: rv0.next.key, same: false, at: Date.now() } }); resetAlerts(); }
   RE.orig = JSON.stringify(r.exercises); r.isNew = false;
   toast(list.length ? `Guardado · ${list.length} cambio(s) marcados para el cliente` : "Guardado"); refresh();
 });
@@ -309,8 +319,7 @@ async function foodView(c0, w) {
 }
 
 // ---------- Progreso
-let cmp = {}, PEX = null;
-act("pexSel", (el) => { PEX = el.value; refresh(); });
+let cmp = {};
 async function progView(c) {
   const today = ymd(), days = await getDays(addDays(today, -120), today, c.id);
   const keys = Object.keys(days).sort(), vals = keys.map((k) => days[k].weight ?? null);
@@ -321,12 +330,15 @@ async function progView(c) {
   const meas = (await db.list(`clients/${c.id}/measures`)).sort((a, b) => a.id.localeCompare(b.id));
   const equip = (await db.list(`clients/${c.id}/photos`)).filter((p) => p.kind === "equipo");
   const sess = (await getSessions(c.id)).filter((x) => x.status === "fin").sort((a, b) => a.startedAt - b.startedAt);
-  const exNames = [...new Set(sess.flatMap((x) => x.exercises.map((e) => e.name)))].sort((a, b) => a.localeCompare(b, "es"));
-  if (!PEX || !exNames.includes(PEX)) PEX = exNames[0];
-  const pts = sess.map((x) => { const e = x.exercises.find((y) => y.name === PEX); if (!e) return null; const v = e.sets.filter((y) => +y.w && +y.r); if (!v.length) return null; const best = v.reduce((a, y) => (e1rm(y.w, y.r, y.rir) > e1rm(a.w, a.r, a.rir) ? y : a)); return { d: x.date, rm: r1(e1rm(best.w, best.r, best.rir)), top: best }; }).filter(Boolean);
+  // Progreso de cada ejercicio: su primera vez registrada vs la última (peso y repeticiones de la mejor serie)
+  const best = (e) => { const v = (e?.sets || []).filter((y) => +y.w || +y.r); return v.length ? v.reduce((a, y) => (+y.w > +a.w || (+y.w === +a.w && +y.r > +a.r) ? y : a)) : null; };
+  const byEx = {};
+  for (const x of sess) for (const e of x.exercises) { const b = best(e); if (!b) continue; (byEx[e.name] ||= []).push({ d: x.date, wk: x.weekKey, ...b }); }
+  const rows = Object.entries(byEx).filter(([, v]) => v.length).map(([n, v]) => ({ n, f: v[0], l: v[v.length - 1], k: v.length })).sort((a, b) => a.n.localeCompare(b.n, "es"));
+  const dd = (a, b, u) => { const d = r1((+a || 0) - (+b || 0)); return d ? `<b class="${d > 0 ? "g" : "r"}">${d > 0 ? "+" : ""}${d}${u}</b>` : '<span class="muted">=</span>'; };
   return `<div class="card"><div class="card-t">Peso (120 días)</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals, color: "var(--muted)", dots: true, w: 1 }, { vals: trend(vals), color: "var(--acc)" }], { h: 240, unit: " kg" })}</div>
-  <div class="card"><div class="row between"><div class="card-t">Progreso por ejercicio · fuerza estimada (1RM con RIR)</div><select data-a-change="pexSel">${exNames.map((n) => `<option ${n === PEX ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div>
-  ${pts.length ? `${lineChart(pts.map((p) => p.d.slice(8) + "/" + p.d.slice(5, 7)), [{ vals: pts.map((p) => p.rm), color: "var(--acc)", dots: true }], { h: 200, unit: " kg" })}<p class="small muted">Mejor serie de cada sesión: ${pts.slice(-6).map((p) => `${fmtDate(p.d)} <b>${p.top.w}×${p.top.r}</b>`).join(" · ")}${pts.length > 1 ? ` · cambio total: <b class="${pts[pts.length - 1].rm >= pts[0].rm ? "g" : "r"}">${pts[pts.length - 1].rm - pts[0].rm >= 0 ? "+" : ""}${r1(pts[pts.length - 1].rm - pts[0].rm)} kg</b>` : ""}</p>` : `<p class="muted">Sin registros de este ejercicio.</p>`}</div>
+  <div class="card scroll-x"><div class="card-t">Progreso por ejercicio · primera vez vs la última (mejor serie)</div>${rows.length ? `<table class="tbl"><tr><th>Ejercicio</th><th>Primera vez</th><th>Última vez</th><th>Carga</th><th>Reps</th><th>Sesiones</th></tr>
+  ${rows.map((r) => `<tr><td><b>${esc(r.n)}</b></td><td>${r.f.w || "–"} kg × ${r.f.r || "–"} <small class="muted">${fmtDate(r.f.d)}</small></td><td>${r.l.w || "–"} kg × ${r.l.r || "–"} <small class="muted">${fmtDate(r.l.d)}</small></td><td>${dd(r.l.w, r.f.w, " kg")}</td><td>${dd(r.l.r, r.f.r, "")}</td><td class="muted">${r.k}</td></tr>`).join("")}</table>` : `<p class="muted">Sin entrenamientos registrados.</p>`}</div>
   <div class="card"><div class="row between"><div class="card-t">Fotos</div><div class="row gap">${["a", "b"].map((k) => `<select data-a-change="cmpSel" data-k="${k}">${weeks.map((x) => `<option ${x === cmp[k] ? "selected" : ""} value="${x}">Semana ${+x.slice(1)}</option>`).join("")}</select>`).join(" vs ")}</div></div>
   ${weeks.length ? `<div class="cmp-grid">${PHOTO_TYPES.map(([t, l]) => { const a = pick(cmp.a, t), b = pick(cmp.b, t); return a || b ? `<div class="cmp"><div>${a ? `<img src="${a.data}">` : "—"}</div><div>${b ? `<img src="${b.data}">` : "—"}</div><small>${l}</small></div>` : ""; }).join("")}</div>` : `<p class="muted">Sin fotos aún.</p>`}</div>
   <div class="card scroll-x"><div class="card-t">Medidas (cm)</div>${meas.length ? `<table class="tbl"><tr><th>Zona</th>${meas.map((m) => `<th>${fmtDate(m.id)}</th>`).join("")}<th>Cambio</th></tr>${MEASURE_ZONES.map(([k, l]) => { const v = meas.map((m) => m[k]).filter((x) => x != null); return `<tr><td>${l}</td>${meas.map((m) => `<td>${m[k] ?? "—"}</td>`).join("")}<td>${v.length > 1 ? r1(v[v.length - 1] - v[0]) : ""}</td></tr>`; }).join("")}</table>` : `<p class="muted">Sin mediciones.</p>`}</div>
@@ -356,14 +368,66 @@ async function checkinsView(c) {
 act("ciAnswer", (el) => { CW.n = +el.dataset.n; go(`coach/c/${CW.cid}/feedback`); });
 act("ciMark", async (el) => { await db.set(`clients/${CW.cid}/feedbacks/${el.dataset.w}`, { answered: true, answeredAt: Date.now() }); resetAlerts(); toast("Marcado como respondido"); refresh(); });
 // ---------- Retroalimentación semanal
+// Preanálisis: lo que vale la pena decir en el video (y lo que se puede omitir), en el orden en que conviene decirlo
+async function preanalysis(c0, w) {
+  const c = applyStage(c0, w.first), ph = c.phase || "", pw = weekInfo(c, addDays(w.first, -7));
+  const [days, pdays, routines, sessions, ci, pci] = await Promise.all([getDays(w.first, w.last, c.id), getDays(pw.first, pw.last, c.id), getRoutines(c.id), getSessions(c.id), db.get(`clients/${c.id}/checkins/${w.key}`), pw.n >= 1 ? db.get(`clients/${c.id}/checkins/${pw.key}`) : null]);
+  const D = w.days.map((d) => days[d] || {}), P = pw.days.map((d) => pdays[d] || {});
+  const A = (arr, f) => avg(arr.map(f).filter((v) => v != null && v !== 0));
+  const food = D.filter((d) => Object.values(d.meals || {}).some((m) => m.length)), T = (k) => avg(food.map((d) => dayTotals(d)[k]));
+  const plan = weekPlan(c, routines, sessions, w.first);
+  const wk = sessions.filter((x) => x.status === "fin" && x.weekKey === w.key);
+  let up = 0, comp = 0; const gains = [];
+  for (const x of wk) { const pv = prevSession(sessions, x); for (const e of x.exercises) e.sets.forEach((y, j) => { const pg = setProgress(y, refSet(pv, e.exId, j)); if (pg && pg.k !== "new") { comp++; if (pg.k === "up") { up++; gains.push(e.name); } } }); }
+  const good = [], work = [], answer = [], skip = [];
+  const wA = A(D, (d) => weightCorr(d)), wP = A(P, (d) => weightCorr(d)), kcal = T("kcal"), prot = T("prot"), steps = A(D, (d) => d.steps), sl = A(D, (d) => sleepHours(d.sleep)), water = A(D, (d) => sum(d.water || [], (y) => y.ml));
+  // entrenamiento
+  if (plan.planned.length) (plan.doneCount >= plan.planned.length ? good : work).push(`Entrenamientos: <b>${plan.doneCount} de ${plan.planned.length}</b>`);
+  if (comp) (up / comp >= 0.3 ? good : skip).push(`Progresó en <b>${up} de ${comp}</b> series vs la semana pasada${gains.length ? ` (${[...new Set(gains)].slice(0, 3).map(esc).join(", ")})` : ""}`);
+  if (wk.some((x) => x.survey?.articular === "si") || /Moderado|Alto/.test(ci?.articular || "")) work.push(`Molestia articular: ${esc(ci?.articularDet || wk.find((x) => x.survey?.articularDet)?.survey?.articularDet || "revisar")}`);
+  if (wk.some((x) => x.exercises.some((e) => e.tech === "peor" || e.sets.some((y) => y.tech === "peor")))) work.push("Técnica peor en algún ejercicio: revisa sus videos");
+  // nutrición y hábitos
+  if (food.length) {
+    const jk = judge("kcal", kcal, c.kcal, ph);
+    (jk === "okc" ? skip : jk === "hic" ? work : skip).push(`Calorías: <b>${r0(kcal)}</b> de ${c.kcal || "—"} en promedio (${food.length} días registrados)`);
+    if (c.prot) (prot >= c.prot * 0.9 ? good : prot < c.prot * 0.75 ? work : skip).push(`Proteína: <b>${r0(prot)} g</b> de ${c.prot}`);
+  }
+  (food.length >= 5 ? good : food.length < 3 ? work : skip).push(`Registró su comida <b>${food.length} de 7</b> días`);
+  const nW = D.filter((d) => d.weight).length;
+  if (nW < 3) work.push(`Solo <b>${nW}</b> pesajes`);
+  if (wA && wP) { const d = r1(wA - wP), cut = /Déficit|Mini cut/.test(ph), bulk = /Superávit|reversa/.test(ph); const t = `Peso: <b>${r1(wA)} kg</b> (${d > 0 ? "+" : ""}${d} vs semana pasada)`; ((cut && d > 0.2) || (bulk && d < -0.2)) ? work.push(t + " · va en contra de la etapa") : ((cut && d < 0) || (bulk && d > 0) ? good : skip).push(t); }
+  if (steps && c.steps) (steps >= c.steps ? good : steps < c.steps * 0.7 ? work : skip).push(`Pasos: <b>${r0(steps).toLocaleString("es-CL")}</b> de ${c.steps.toLocaleString("es-CL")}`);
+  if (sl) (sl < (c.sleep || 8) - 1 ? work : skip).push(`Sueño: <b>${r1(sl)} h</b> en promedio`);
+  if (water && c.water) (water < c.water * 0.7 ? work : skip).push(`Agua: <b>${r1(water / 1000)} L</b> de ${r1(c.water / 1000)} L`);
+  // check-in
+  if (ci) {
+    if (ci.accionFoco) (ci.accion === "Lo logré" ? good : work).push(`Su foco “${esc(ci.accionFoco)}”: <b>${esc(ci.accion || "sin responder")}</b>${ci.accionDet ? ` · ${esc(ci.accionDet)}` : ""}`);
+    if (ci.orgullo) good.push(`Está orgulloso de: ${esc(ci.orgullo)}`);
+    if (ci.facil) good.push(`Más fácil que hace un mes: ${esc(ci.facil)}`);
+    if (ci.barrera) work.push(`Barreras: ${esc(ci.barrera)}`);
+    if (/Alto|Muy alto/.test(ci.estGen || "")) work.push(`Estrés general ${esc(ci.estGen).toLowerCase()}${ci.comEst ? `: ${esc(ci.comEst)}` : ""}`);
+    if (/Malo|Muy malo/.test(ci.digest || "") || ci.comDig) work.push(`Digestión ${esc(ci.digest || "")}${ci.comDig ? `: ${esc(ci.comDig)}` : ""}`);
+    if (/Bajo|Muy bajo/.test(ci.enerSes || "")) work.push(`Energía en las sesiones ${esc(ci.enerSes).toLowerCase()}`);
+    if (ci.consultas) answer.push(`Pregunta: ${esc(ci.consultas)}`);
+    if (ci.proxSemana) answer.push(`La próxima semana: ${esc(ci.proxSemana)}`);
+    if (ci.sugerencia) answer.push(`Sugerencia: ${esc(ci.sugerencia)}`);
+  }
+  const li = (arr) => arr.length ? `<ul>${arr.map((x) => `<li>${x}</li>`).join("")}</ul>` : `<p class="muted small">Nada que destacar.</p>`;
+  return `<div class="card pre"><div class="card-t">Preanálisis · semana ${w.n} ${ci ? "" : '<span class="badge y">sin check-in</span>'}</div>
+  <div class="pre-g"><div><h4 class="g">1 · Destacar (parte por aquí)</h4>${li(good)}</div><div><h4 class="r">2 · A trabajar (elige 1 o 2)</h4>${li(work)}</div>
+  <div><h4 class="b">3 · Responder</h4>${li(answer)}${ci?.foco ? `<h4>4 · Foco de la semana</h4><p><b>${esc(ci.foco)}</b> <small class="muted">(lo propuso en su check-in)</small></p>` : ""}</div>
+  <div><h4 class="muted">Puedes omitirlo (está normal)</h4>${li(skip)}</div></div>
+  <p class="small muted">Guion para un video de 3–4 min: <b>1)</b> saludo y su logro principal · <b>2)</b> 1 o 2 cosas a trabajar, mostrando el dato (Timeline o entrenamiento) · <b>3)</b> responde sus preguntas y lo que viene · <b>4)</b> cierra con un solo foco para la semana. Lo demás, si está normal, no hace falta mencionarlo.</p></div>`;
+}
+
 async function feedbackView(c, w) {
+  const pre = await preanalysis(c, w);
   const fb = c.feedback?.week === w.key ? c.feedback : (await db.get(`clients/${c.id}/feedbacks/${w.key}`)) || {};
   const ciW = await db.get(`clients/${c.id}/checkins/${w.key}`), goals = c.feedback?.week === w.key ? c.weeklyGoals || [] : ciW?.foco ? [ciW.foco] : c.weeklyGoals || [];
-  return `<div class="card"><div class="card-t">Retroalimentación · Semana ${w.n}</div><p class="muted small">Aparece como mensaje grande en la pantalla de inicio del cliente durante esa semana.</p>
+  return `${pre}<div class="card"><div class="card-t">Retroalimentación · Semana ${w.n}</div><p class="muted small">Le aparece en el inicio como “Tu coach respondió tu check-in” durante 9 días.</p>
   <label>Link del video (YouTube no listado, Drive, Loom…)<input id="fbV" value="${esc(fb.videoUrl || "")}"></label>
   <label>Puntos clave (uno por línea)<textarea id="fbP" rows="5">${esc((fb.points || []).join("\n"))}</textarea></label>
   <label>Mensaje (opcional)<textarea id="fbT" rows="4">${esc(fb.text || "")}</textarea></label>
-  <div class="row gap"><button type="button" class="btn small" data-a="fbDictate" id="fbDic">🎙 Dictar mensaje</button><button type="button" class="btn small ghost" data-a="fbPoints">Sacar puntos clave del mensaje</button><span class="muted small">Habla como si le grabaras un audio; después ordenas los puntos.</span></div>
   ${ciW?.foco ? `<p class="small">Foco que propuso en su check-in: <b>${esc(ciW.foco)}</b></p>` : ""}
   <label>Foco de la semana (la primera línea es la acción que le preguntamos en el próximo check-in)<textarea id="fbG" rows="3">${esc(goals.join("\n"))}</textarea></label>
   <button class="btn primary" data-a="fbSave" data-w="${w.key}">Publicar al cliente</button></div>`;
@@ -406,7 +470,7 @@ async function dataView(c) {
   ${f("city", "Ciudad / país (zona horaria)")}
   ${f("payDate", "Próximo pago", "date")}<label>Se renueva cada<select name="payEvery">${[["", "—"], ["30", "1 mes"], ["90", "3 meses"], ["180", "6 meses"]].map(([v, l]) => `<option value="${v}" ${String(c.payEvery ?? "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
   ${c.sheetUrl ? `<label>Planilla anterior<a class="btn small" target="_blank" href="${esc(c.sheetUrl)}">Abrir planilla</a></label>` : ""}</div>
-  ${c.payDate ? `<div class="note small"><b>Así le llega el recordatorio de pago</b> (le aparece en el inicio 3 días antes y el mismo día):<div class="paycard mt">${payMsg(c)}</div></div>` : ""}
+  ${c.payDate ? `<div class="note small"><b>Así le llega el recordatorio de pago</b> (le aparece en el inicio el mismo día; si pasa la fecha, le sale "Pago pendiente" en rojo). A ti te avisa 3 días antes:<div class="paycard mt">${payMsg(c)}</div></div>` : ""}
   <label>Pendientes (uno por línea · empieza con <b>!</b> si es urgente) — aparecen en amarillo o rojo<textarea name="todo" rows="3">${esc((c.todo || []).join("\n"))}</textarea></label>
   <label>Notas internas (solo las ves tú)<textarea name="notes" rows="3">${esc(c.notes || "")}</textarea></label>
   <div class="card-t mt">Información personal</div><div class="grid3">

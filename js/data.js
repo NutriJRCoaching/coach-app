@@ -109,7 +109,7 @@ export function newSession(client, routine, date = ymd()) {
     exercises: routine.exercises.map((e) => {
       const sides = e.uni ?? isUniName(e.name), tg = e.sets || [];
       return {
-        exId: e.id, name: e.name, video: e.video || "", inc: e.inc || 2.5, rest: e.rest || null, notes: e.notes || "", tempo: e.tempo || "",
+        exId: e.id, name: e.name, video: e.video || "", inc: e.inc || 2.5, rest: e.rest || null, notes: e.notes || "", tempo: e.tempo || "", weekNote: e.weekNote || "", wSug: e.wSug || "",
         target: sides ? splitSides(tg) : tg, alts: e.alts || [], changed: !!e.changed, sides,
         sets: sides ? splitSides(tg.map(blankSet), blankSet) : tg.map(blankSet), tech: ""
       };
@@ -363,5 +363,15 @@ export const waterAuto = (kg) => (kg ? Math.round((kg * 40) / 100) * 100 : null)
 // Recordatorio de pago que ve el cliente (mismo texto en el panel, para revisarlo antes)
 export function payMsg(c) {
   const first = (c.name || "").split(" ")[0];
-  return `<b>¡Hola${first ? " " + esc(first) : ""}! 💪</b><br>Te recuerdo que tu asesoría se renueva el <b>${fmtDate(c.payDate, true)}</b>. Gracias por seguir confiando en el proceso: lo que llevamos hasta ahora es puro trabajo tuyo.<br><small class="muted">Si tienes dudas con el pago o quieres cambiar algo de tu plan, escríbeme por WhatsApp.</small>`;
+  return `<b>¡Hola${first ? " " + esc(first) : ""}! 💪</b><br>Hoy, <b>${fmtDate(c.payDate, true)}</b>, se renueva tu asesoría. Gracias por seguir confiando en el proceso: lo que llevamos hasta ahora es puro trabajo tuyo.<br><small class="muted">Si tienes dudas con el pago o quieres cambiar algo de tu plan, escríbeme por WhatsApp.</small>`;
+}
+
+// Revisión semanal de la rutina: la ventana parte el día del último entrenamiento de la semana
+// (o 2 días antes de que termine si no hay calendario) y dura hasta que empieza la semana siguiente.
+export function reviewWindow(c, routines, sessions, today = ymd()) {
+  if (!c.startDate || !routines.length) return null;
+  const w = weekInfo(c, today), plan = weekPlan(c, routines, sessions, today);
+  const lastTrain = plan.planned.length ? plan.planned[plan.planned.length - 1].date : addDays(w.last, -1);
+  const next = weekInfo(c, addDays(w.last, 1));
+  return { open: today >= lastTrain, next, w, lastTrain, done: c.rutReview?.week === next.key };
 }

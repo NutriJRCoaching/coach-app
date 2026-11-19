@@ -468,3 +468,8 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .exed .exn { width: 22px; text-align: center; } .exname { font-weight: 700; } .exgrid { display: grid; grid-template-columns: minmax(280px, 1fr) 1fr; gap: 14px; margin: 8px 0; } .sets-t td, .sets-t th { padding: 4px 6px; }
 .tempo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; } .tempo label { margin: 2px 0; font-size: 10.5px; } .alt { border-left: 2px solid var(--line); padding-left: 10px; margin: 8px 0; }
 .fsum { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 16px; } .fsum h4 { margin: 4px 0 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; } @media (max-width: 1000px) { .fsum { grid-template-columns: 1fr; } }
+.paycard.late { border-color: var(--r); background: color-mix(in srgb, var(--r) 10%, var(--surf)); }
+.review { border-left: 3px solid var(--line); } .review.due { border-left-color: var(--y); background: color-mix(in srgb, var(--y) 6%, var(--surf)); } .review.ok { border-left-color: var(--g); }
+.coachnote { background: color-mix(in srgb, var(--b) 12%, var(--surf2)); border-radius: 10px; padding: 8px 10px; margin: 8px 0; font-size: 13px; } .wk-ind label { margin: 4px 0; }
+.pre-g { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; } .pre-g h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; margin: 4px 0 6px; } .pre-g h4.g { color: var(--g); } .pre-g h4.r { color: var(--r); } .pre-g h4.b { color: var(--b); }
+.pre-g ul { margin: 0; padding-left: 16px; font-size: 13px; line-height: 1.45; } .pre-g li { margin: 4px 0; } @media (max-width: 1100px) { .pre-g { grid-template-columns: 1fr 1fr; } }

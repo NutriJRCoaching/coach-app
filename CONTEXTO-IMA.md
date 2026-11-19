@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.19.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.20.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -90,6 +90,16 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Plan de alimentación** (editor y reemplazos del cliente): usa la **base de porciones de intercambio de Joaquín** (`js/intercambio.js`, 426 alimentos de su "Base de Datos NT": 1 porción = lo que aporta los macros del grupo) + alimentos propios de Biblioteca. El registro diario sigue con INTA + Open Food Facts.
 - **Datos**: inicio y fin del servicio arriba, sin "modalidad" ni "check-in por formulario"; objetivos del formulario de ingreso; muestra los objetivos vigentes por etapa; **próximo pago** (`payDate`, `payEvery`): aviso al coach 3 días antes y tarjeta amable al cliente en el inicio (`payMsg` en data.js; vista previa en Datos); **cumpleaños**: aviso el día antes y el mismo día.
 - **Retroalimentación**: botón para dictar el mensaje (Web Speech, Chrome) y "Sacar puntos clave del mensaje" (separa frases). **Progreso**: gráfico de fuerza estimada (1RM con RIR) por ejercicio.
+
+## v1.20 (18-nov, noche)
+- **Revisión semanal de rutina** (`reviewWindow` en data.js): desde el día del último entrenamiento de la semana hasta que parte la siguiente, el panel avisa "Revisa su rutina para la semana N" (rojo el último día). En Rutinas: "Seguir igual la semana N" o guardar cambios (marca `client.rutReview = {week, same}`). Los cambios guardados dentro de esa ventana se marcan para la semana siguiente. Por ejercicio: **indicación de la semana** (`weekNote`) y **peso sugerido** (`wSug`); el cliente los ve arriba del ejercicio y en "Ver rutina".
+- **Preanálisis** arriba de Retroalimentación: Destacar / A trabajar / Responder / Foco / Puedes omitir + guion de 3–4 min. Se quitaron los botones de dictado (Joaquín quiere video tipo Loom/Capso con burbuja).
+- Progreso por ejercicio: primera vez vs última (kg y reps de la mejor serie), sin 1RM.
+- Pago: el cliente ve el mensaje solo el día del pago; si pasó la fecha, "Pago pendiente" en rojo. Al coach se le avisa 3 días antes. Cumpleaños: solo aviso al coach.
+- Pestaña "Datos y objetivos" quedó primera.
+- Cafeína: "¿Tomaste alguna fuente de cafeína después de las 12:00 el día de ayer?".
+- Plan de Felipe pasado del PDF (08/11/2026) a la app: 4 alternativas (3 = 4 comidas, 4 = fin de semana KFC) con las porciones y gramos del PDF; archivo `ima-felipe-plan.json` (fuera del repo).
+- Pendiente acordado: **grabador de retro tipo Loom** (pantalla + burbuja de cámara, subir a su Google Drive, transcripción en vivo con el reconocimiento de voz de Chrome); **guías dentro de la app** como páginas de texto; revisar macros de alimentos de la base del registro (ej. lentejas con arroz); cues de Tracked para la biblioteca.
 
 ## Datos (Firestore)
 - `users/{uid}`
