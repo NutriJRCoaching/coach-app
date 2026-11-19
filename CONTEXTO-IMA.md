@@ -189,3 +189,4 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Grabador: cues con tiempo (Web Speech, sin contar pausas) y botón 🔖 para marcar capítulos → se prellenan en "Capítulos del video" (formato "1:20 Sentadilla").
 - Coach: tarjeta "Respuesta del cliente a tu retro" en Retroalimentación + "Marcar leída"; alertas: duda = rojo, faltó / ≤3★ = amarillo, resto = info.
 - Pendiente: activar Blaze + Storage (us-east1), subir grabaciones a Storage en vez de Drive, reglas de Storage y caché offline del último video.
+- 18-nov: Blaze NO activado (Google pidió prepago de $30.000; Joaquín no quiere dejarlo inmovilizado). Se sigue con Drive. RECORDARLE averiguar si puede activar Blaze con tarjeta de crédito sin prepago; cuando se active: Storage us-east1, alerta de presupuesto US$1, subir grabaciones a Storage y caché offline.
