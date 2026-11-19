@@ -20,6 +20,8 @@ function fr(q) {
 }
 export function homeMeasure(g, medida, medidaG) {
   if (!g || !medida || !medidaG) return "";
+  // "6 cdas o ½ taza": se escala cada parte por separado (si no, queda "12 cdas o ½ taza")
+  if (/\s+o\s+[\d¼½¾]/.test(medida)) return medida.split(/\s+o\s+/).map((m) => homeMeasure(g, m, medidaG)).filter(Boolean).join(" o ");
   // La medida puede traer cantidad propia ("1 ½ taza", "¾ taza", "5 unidades"): se multiplica
   const m = medida.match(/^(\d+(?:[.,]\d+)?)?\s*([¼½¾])?\s*(.*)$/), F = { "¼": 0.25, "½": 0.5, "¾": 0.75 };
   const amt = (m[1] ? parseFloat(m[1].replace(",", ".")) : 0) + (m[2] ? F[m[2]] : 0) || 1;
@@ -182,14 +184,15 @@ function totals(mn) {
 }
 function editorHtml(c) {
   const ms = MW.menus; if (MW.k >= ms.length) MW.k = Math.max(0, ms.length - 1);
-  const mn = ms[MW.k], pauta = c.pauta || {};
-  const head = `<div class="card"><div class="row between"><div class="card-t">Opciones del plan de alimentación</div><span class="row gap">${MW.dirty ? '<span class="badge y">Sin guardar</span>' : ""}<button class="btn primary" data-a="meSave">Guardar y publicar</button></span></div>
+  const mn = ms[MW.k], pauta = MW.pauta || c.pauta || {};
+  const head = `<div class="card"><div class="row between"><div class="card-t">Opciones del plan de alimentación</div><span class="row gap">${MW.dirty ? '<span class="badge y">Sin guardar</span>' : ""}<label class="btn" title="Archivo ima-planes.json con planes pasados desde PDF">Importar plan<input type="file" accept=".json,application/json" hidden data-a-change="meImport"></label><button class="btn primary" data-a="meSave">Guardar y publicar</button></span></div>
   <p class="muted small">Cada opción es una pauta alternativa (ej. día de entrenamiento / descanso / fin de semana). El cliente la ve en “Mi plan”, toca un alimento para ver los reemplazos de su grupo y arma su lista de compras.</p>
+  ${MW.pauta ? `<div class="note">Importado: al guardar también se actualiza la <b>pauta por porciones</b> del cliente (${Object.entries(MW.pauta).map(([g, n]) => `${esc(g)} ${r1(n).toLocaleString("es-CL")}`).join(" · ")}). Revisa las opciones y toca “Guardar y publicar”.</div>` : ""}
   <div class="seg scroll">${ms.map((x, k) => `<button class="${k === MW.k ? "on" : ""}" data-a="meOpt" data-k="${k}">${esc(x.name || "Opción " + (k + 1))}</button>`).join("")}<button data-a="meAdd">＋ Nueva opción</button></div></div>`;
   if (!mn) return head;
   const { t, por } = totals(mn);
   const groups = Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => g);
-  const cmp = groups.filter((g) => por[g] || pauta[g]).map((g) => { const a = r1(por[g] || 0), b = +pauta[g] || 0, ok = !b ? "" : Math.abs(a - b) < 0.01 ? "g" : a > b ? "r" : "y"; return `<span class="pill ${ok}">${esc(g)} ${a}${b ? "/" + b : ""}</span>`; }).join(" ");
+  const cmp = groups.filter((g) => por[g] || pauta[g]).map((g) => { const a = Math.round((por[g] || 0) * 100) / 100, b = +pauta[g] || 0, ok = !b ? "" : Math.abs(a - b) < 0.02 ? "g" : a > b ? "r" : "y"; return `<span class="pill ${ok}">${esc(g)} ${a}${b ? "/" + b : ""}</span>`; }).join(" ");
   return `${head}<div class="card"><div class="grid3"><label>Nombre de la opción<input value="${esc(mn.name || "")}" data-a-change="meF" data-f="name" placeholder="Ej: Día de entrenamiento"></label><label class="span2">Nota para el cliente (opcional)<input value="${esc(mn.note || "")}" data-a-change="meF" data-f="note"></label></div>
   <div class="small mt"><b>${r0(t.kcal)} kcal</b> · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)} <span class="muted">(por porciones de intercambio${c.kcal ? ` · meta ${c.kcal} kcal` : ""})</span></div>
   <div class="mt pills-wrap">${cmp || '<span class="muted small">Agrega alimentos para ver las porciones por grupo.</span>'}</div>
@@ -234,7 +237,29 @@ act("meIt", async (el) => {
 });
 act("meSave", async () => {
   const menus = MW.menus.map((mn) => ({ ...mn, meals: mn.meals.map((m) => ({ ...m, items: (m.items || []).filter((it) => it.name) })) }));
-  await db.set("clients/" + MW.cid, { menus }); MW.menus = clone(menus); MW.dirty = false;
-  if (S._coachClient) S._coachClient.menus = menus; redraw(false); toast("Plan publicado ✓");
+  const data = { menus }; if (MW.pauta) data.pauta = MW.pauta;
+  await db.set("clients/" + MW.cid, data); MW.menus = clone(menus); MW.dirty = false;
+  if (S._coachClient) Object.assign(S._coachClient, data); MW.pauta = null; redraw(false); toast("Plan publicado ✓");
 });
+// Importar un plan pasado desde PDF (archivo ima-planes.json, se prepara aparte: no queda en el repositorio público)
+const nameKey = (s) => nk(s).split(/\s+/).filter(Boolean);
+act("meImport", async (el) => {
+  let data; try { data = JSON.parse(await el.files[0].text()); } catch { return toast("El archivo no es válido"); } finally { el.value = ""; }
+  if (data.type !== "ima-planes" || !Array.isArray(data.plans)) return toast("Este archivo no es un plan de IMA");
+  const c = S._coachClient || {}, ck = nameKey(c.name);
+  // Mismo cliente = coinciden el primer nombre y el apellido (con o sin tildes)
+  const found = data.plans.find((p) => { const pk = nameKey(p.name); return pk[0] === ck[0] && pk.slice(1).some((w) => ck.includes(w)); });
+  if (found) return loadPlan(found);
+  sheet("Importar plan", `<p class="muted small">No encontré un plan con el nombre de <b>${esc(c.name || "este cliente")}</b>. ¿Cuál quieres cargar?</p>
+  ${data.plans.map((p, k) => `<button class="btn big block" data-a="meImportPick" data-k="${k}">${esc(p.name)} · ${p.menus.length} opciones</button>`).join("")}`);
+  MW.importData = data;
+});
+act("meImportPick", (el) => { closeSheet(); loadPlan(MW.importData.plans[+el.dataset.k]); });
+async function loadPlan(p) {
+  const n = p.menus.length, prev = MW.menus.length;
+  if (!(await confirmBox(`Cargar el plan de ${p.name}: ${n} opciones (${p.menus.map((m) => m.name).join(", ")}).${prev ? ` Reemplaza las ${prev} opciones que tiene ahora.` : ""} No se publica hasta que toques “Guardar y publicar”.`))) return;
+  MW.menus = clone(p.menus).map((mn) => ({ ...mn, id: uid() })); MW.k = 0;
+  MW.pauta = p.pauta && Object.keys(p.pauta).length ? { ...p.pauta } : null;
+  redraw(); toast("Plan cargado: revísalo y publícalo");
+}
 export const menusDirty = () => !!MW?.dirty;

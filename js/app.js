@@ -120,6 +120,12 @@ async function enterClient() {
   }
   // Objetivos pedidos por Joaquín (16-nov-2026): P 120 · C 380 · G 60 · 10.000 pasos
   if (!c.goals1611) { c = { ...c, prot: 120, cho: 380, fat: 60, kcal: 120 * 4 + 380 * 4 + 60 * 9, steps: 10000, goals1611: true }; db.set("clients/" + id, { prot: 120, cho: 380, fat: 60, kcal: c.kcal, steps: 10000, goals1611: true }); }
+  // Plan de ejemplo con 4 alternativas (19-nov-2026), solo si aún no tiene opciones: para ver cómo se ve "Mi plan"
+  if (!c.menus?.length && !c.planDemo1911) {
+    const { jrPlan } = await import("./seed-plan.js"), { menus, pauta } = jrPlan();
+    c = { ...c, menus, pauta: c.pauta && Object.keys(c.pauta).length ? c.pauta : pauta, planDemo1911: true };
+    db.set("clients/" + id, { menus, pauta: c.pauta, planDemo1911: true });
+  }
   S.viewAs = "client"; S.cid = id; S.raw = c; LS.set("viewAs", "client");
   db.watch("clients/" + id, (x) => { if (x && S.cid === id) S.raw = x; });
   if (!location.hash || location.hash.startsWith("#coach")) location.hash = "inicio";

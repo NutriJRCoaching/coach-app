@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 18-nov-2026, versión **1.21.2**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 19-nov-2026, versión **1.24.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -41,6 +41,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 | js/realfoods.js | **600 alimentos**: 514 de la Tabla de Composición de Alimentos **INTA 2018** + 86 del USDA que la tabla no trae. [nombre, grupo, kcal, CHO disponibles, lip, prot por 100 g, g por porción de intercambio, medida, g de la medida, fuente]. Carnes/pescados crudos dicen "(crudo)" |
 | js/offchile.js | **5.076 productos envasados chilenos** de Open Food Facts (ODbL), verificados (kcal cuadran con macros). Se carga al buscar/escanear; el escáner lo revisa antes de ir a internet (funciona sin señal) |
 | scripts/base-alimentos/ | Transcripción de la tabla INTA, scripts para regenerar ambas bases y LEEME con el proceso |
+| js/seed-plan.js | Plan de ejemplo de Joaquín (4 alternativas: Entreno AM, Entreno PM, Con legumbres, Entreno · 4 comidas; pauta ≈ P 120 · C 380 · G 60). Se carga una vez en "Mi registro" si no tiene opciones (`planDemo1911`) |
 | js/seed-jr.js | Rutina de Joaquín (Lun–Sáb, LD/PG; serie 1 8 reps @RIR1, serie 2 6 reps @RIR1) |
 | scripts/reminders.mjs + .github/workflows/reminders.yml | "Reloj" de avisos cada 15 min (GitHub Actions + firebase-admin + FCM). Necesita el secreto `FIREBASE_SERVICE_ACCOUNT` y la variable `PUSH_ON=1` (ya configurados). Borra tokens caducados y solo marca un aviso como enviado si llegó. Ojo: GitHub corre el cron más o menos cada hora, no cada 15 min |
 | firestore.rules | Plantilla (las reglas reales están publicadas en la consola con el correo del coach, incluida `barcodes`) |
@@ -118,7 +119,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - `pickFood`: con medida casera parte en 1 unidad; al cambiar a **Gramos el campo queda vacío ("–")**, no se convierte el número.
 - Ojo: los ids de la base (`r0`, `r1`…) cambiaron con la base INTA; los registros viejos guardan `fid` antiguos. Siempre buscar alimentos por **nombre** (Frecuentes ya lo hace).
 - Inicio: calorías, agua y pasos muestran "Llevas el X %".
-- Idea pendiente: mostrar los alimentos de las opciones del plan (`menus`) como atajo en el agregador.
+- ~~Idea pendiente: mostrar los alimentos de las opciones del plan como atajo en el agregador~~ (hecho en v1.24.0, pestaña "Mi plan").
 
 ## Base de alimentos (v1.12)
 - Búsqueda: genéricos (INTA) primero, después marcas; varias palabras deben aparecer todas (nombre o marca).
@@ -168,7 +169,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **App Android (Capacitor) para leer los pasos desde Health Connect** (hoy se anotan a mano).
 - **Tips de ejecución por ejercicio** desde su hoja "Programa y tips".
 - **Plan de alimentación**: verificar en el celular las opciones, reemplazos y lista de compras (v1.13). Idea: mostrar la escala de hambre como gráfico semanal en el panel.
-- Pasar los planes en PDF de Felipe, Marian, René, Cristóbal y Déborah al plan por opciones.
+- Importar `ima-planes.json` en la ficha de cada cliente (Felipe, Vicente, Marian, René, Cristóbal, Déborah) y publicar. Ojo: a Vicente le reemplaza el plan por opciones que ya tenía.
 
 ## Forma de trabajar con Joaquín
 - Habla en español de Chile, informal. Prefiere ver el código en el chat y no como adjunto.
@@ -195,3 +196,14 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Sin PiP. Al grabar: barra vertical fija a la izquierda (86 px: tiempo, pausa, capítulo, lápiz+colores, borrar, espejo, cámara, guion, terminar), guion (preanálisis) en panel derecho plegable (360 px, LS recGuide), y #recstage al medio: con "Esta pestaña" el track se recorta al escenario con Region Capture (CropTarget/cropTo), así barra y guion no salen en el video.
 - Burbuja: tamaño libre 90–460 px (esquina roja o rueda del mouse, LS bubPx), arrastrable dentro del escenario, espejo activable (LS bubMirror, por defecto espejo).
 - allAlerts: usa el último cálculo y recalcula por detrás cada 60 s (no durante la grabación); cambio de pestaña ~0,3 s.
+
+## v1.23.2 — Retro del cliente más limpia
+- Sin texto automático, miniatura, foco de la semana, tarjeta neutra y la pregunta "¿Sientes que me faltó mencionar algo?".
+
+## v1.24.0 (19-nov) — Planes desde PDF, plan de ejemplo y atajo "Mi plan"
+- **Importar plan** (Plan alimentación → botón "Importar plan"): sube `ima-planes.json` (`{type: "ima-planes", plans: [{name, pauta, menus}]}`; NO va en el repo, es público). Busca el plan por nombre y apellido del cliente (si no calza, deja elegir de la lista), avisa que reemplaza las opciones actuales y lo carga en la copia de trabajo; recién se publica con "Guardar y publicar", que también guarda la **pauta** (`MW.pauta`).
+- El archivo del 19-nov trae los 6 planes pasados de los PDF: Felipe (4 alt.: 3 = 4 comidas, 4 = fin de semana KFC), Vicente (4), Marian (4, 6 comidas), René (4), Cristóbal (alt. de 4, 5 y 6 comidas) y Déborah (5 alternativas + 2 opciones de 4 tiempos). Horarios desde "Tus horarios" (Vicente y Marian no tienen). El nombre del plato queda como nota de cada comida. Se extrajo con pdfplumber (globos de color = grupo y porciones; a la derecha alimento y medida) y se verificó contra las kcal impresas en cada tarjeta: calzan todas salvo los extras en gramos (chía, Nutella, KFC), que no tienen grupo y no suman en el editor.
+- René: el huevo va como carne baja en grasa (pauta carnes magras = 4 + 3 huevos = 7). La pauta del "día con legumbres" no se importa (la app tiene una sola pauta).
+- **Pestaña "Mi plan" en Agregar alimento** (si el servicio tiene `plan_menus` y hay opciones): alimentos de la opción elegida por tiempo de comida (recuerda la opción en LS `ima-plan-opt`). Al tocar uno: si el nombre (sin paréntesis) calza con la base real, abre la ficha con los gramos del plan; si no, busca (acorta la búsqueda si no hay resultados) y el alimento que elija queda con esos gramos (`FS.planG`). Se descartó el emparejamiento automático por palabras (daba errores tipo "Huevos" → clara de huevo).
+- `homeMeasure` escala cada parte de "6 cdas o ½ taza" (antes salía "12 cdas o ½ taza").
+- Editor del coach: el color de las porciones compara sin redondear (4,75 ya no sale rojo como 4,8).

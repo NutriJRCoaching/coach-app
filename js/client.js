@@ -13,7 +13,7 @@ import { has, loadMatrix } from "./features.js";
 import { maybeOnboard } from "./onboarding.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
-import { menusHtml, shoppingView } from "./menus.js";
+import { menusHtml, shoppingView, homeMeasure as homeMeasureC } from "./menus.js";
 
 const P = () => "clients/" + S.cid;
 
@@ -260,14 +260,17 @@ act("delPhoto", async (el) => { if (!(await confirmBox("¿Eliminar foto?"))) ret
 // Agregar alimento: pantalla completa, buscador siempre arriba (así lo que aparece no queda tapado por el teclado)
 let FS = { meal: "", tab: "frec", q: "", sel: null, results: [] };
 const FTABS = [["frec", "Frecuentes"], ["fav", "Favoritos"], ["recetas", "Recetas"], ["voz", "🎤 Por voz"], ["rapido", "Añadir rápido"], ["supl", "Suplementos"], ["crear", "Crear"]];
-act("addFood", (el) => { rescueScanned(); FS = { meal: el.dataset.m, tab: "frec", q: "", sel: null, results: [] }; openFoodSheet(); });
+act("addFood", (el) => { rescueScanned(); FS = { meal: el.dataset.m, tab: "frec", q: "", sel: null, results: [], planG: 0 }; openFoodSheet(); });
+// Pestaña "Mi plan": atajo a los alimentos de las opciones del plan (solo si el cliente tiene opciones)
+const planMenus = () => (has("plan_menus") && S.client?.menus?.length ? S.client.menus : null);
+const ftabs = () => (planMenus() ? [FTABS[0], ["plan", "Mi plan"], ...FTABS.slice(1)] : FTABS);
 async function openFoodSheet() {
   sheet(FS.meal, `<div class="fs-top"><div class="row gap"><div class="fsearch grow">${I.search}<input id="fq" type="search" placeholder="Buscar alimento o marca…" value="${esc(FS.q)}" data-a-input="foodSearch" autocomplete="off" enterkeyhint="search"></div><button class="btn" data-a="scan" title="Escanear código de barras">▥</button></div>
     <div class="seg scroll" id="ftabs">${ftabsHtml()}</div></div><div id="fsb"></div>`, { full: true });
   await renderFoodTab();
 }
-const ftabsHtml = () => FTABS.map(([k, l]) => `<button class="${FS.tab === k ? "on" : ""}" data-a="foodTab" data-t="${k}">${l}</button>`).join("");
-act("foodTab", (el) => { FS.tab = el.dataset.t; FS.sel = null; FS.q = ""; const q = $("#fq"); if (q) q.value = ""; $("#ftabs").innerHTML = ftabsHtml(); renderFoodTab(); });
+const ftabsHtml = () => ftabs().map(([k, l]) => `<button class="${FS.tab === k ? "on" : ""}" data-a="foodTab" data-t="${k}">${l}</button>`).join("");
+act("foodTab", (el) => { FS.tab = el.dataset.t; FS.sel = null; FS.q = ""; FS.planG = 0; const q = $("#fq"); if (q) q.value = ""; $("#ftabs").innerHTML = ftabsHtml(); renderFoodTab(); });
 async function renderFoodTab() {
   const box = $("#fsb"); if (!box) return;
   if (FS.sel) return (box.innerHTML = foodDetail(FS.sel), syncFood());
@@ -275,8 +278,10 @@ async function renderFoodTab() {
   if (FS.tab === "voz") {
     box.innerHTML = voiceTab(); if (FS.vitems?.length) drawVoice();
   } else if (FS.tab === "buscar") {
-    box.innerHTML = `<div id="fres"></div><button class="btn ghost small block" data-a="offSearch">¿No aparece? Buscar en internet (Open Food Facts)</button>`;
+    box.innerHTML = `${FS.planG ? `<p class="note small">Elige el alimento que vas a comer: queda con los <b>${r0(FS.planG)} g</b> de tu plan.</p>` : ""}<div id="fres"></div><button class="btn ghost small block" data-a="offSearch">¿No aparece? Buscar en internet (Open Food Facts)</button>`;
     showResults(custom);
+  } else if (FS.tab === "plan") {
+    box.innerHTML = planTab();
   } else if (FS.tab === "frec") {
     box.innerHTML = `<p class="muted small">Lo que más has registrado en el último mes. Tócalo y queda con la cantidad de la última vez.</p><div id="frecL"></div>`;
     drawFrequent();
@@ -323,7 +328,34 @@ async function showResults(custom) {
 act("foodSearch", (el) => {
   FS.q = el.value; FS.sel = null;
   if (FS.q.trim()) { if (FS.tab !== "buscar") { FS.prevTab = FS.tab; FS.tab = "buscar"; $("#ftabs").innerHTML = ftabsHtml(); return renderFoodTab(); } return showResults(); }
-  FS.tab = FS.prevTab || "frec"; $("#ftabs").innerHTML = ftabsHtml(); renderFoodTab();
+  FS.tab = FS.prevTab || "frec"; FS.planG = 0; $("#ftabs").innerHTML = ftabsHtml(); renderFoodTab();
+});
+// "Mi plan": alimentos de una opción del plan, por tiempo de comida. Al tocar uno queda con los gramos del plan:
+// si el nombre calza con la base de alimentos reales se abre directo; si no, se busca para que el cliente elija el real.
+const stripP = (s) => norm(String(s || "")).replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim();
+function planTab() {
+  const menus = planMenus() || []; let k = +LS.get("ima-plan-opt") || 0; if (k >= menus.length) k = 0;
+  const mn = menus[k];
+  return `<p class="muted small">Tus alimentos del plan. Tócalo y queda con los gramos que te tocan; cámbialos si comiste otra cantidad.</p>
+  ${menus.length > 1 ? `<div class="seg scroll">${menus.map((x, j) => `<button class="${j === k ? "on" : ""}" data-a="planOpt" data-k="${j}">${esc(x.name || "Opción " + (j + 1))}</button>`).join("")}</div>` : ""}
+  ${(mn.meals || []).map((m, i) => `<div class="shop-g">${esc(m.name)}</div>${(m.items || []).map((it, j) => `<div class="fi" data-a="planPick" data-i="${i}" data-j="${j}"><span>${esc(it.name)}<small>${it.g ? r0(it.g) + " g" : "a gusto"}${it.medida && it.g ? " · " + esc(planMeasure(it)) : ""}</small></span><span class="add">＋</span></div>`).join("")}`).join("")}`;
+}
+const planMeasure = (it) => { try { return homeMeasureC(it.g, it.medida, it.medidaG) || ""; } catch { return ""; } };
+act("planOpt", (el) => { LS.set("ima-plan-opt", el.dataset.k); renderFoodTab(); });
+act("planPick", async (el) => {
+  const menus = planMenus() || [], k = Math.min(+LS.get("ima-plan-opt") || 0, menus.length - 1);
+  const it = menus[k]?.meals?.[+el.dataset.i]?.items?.[+el.dataset.j]; if (!it) return;
+  const custom = (await db.list(P() + "/foods")).filter((f) => f.type !== "receta"), pool = [...custom, ...(await getFoodBase())];
+  const key = stripP(it.name), same = pool.filter((f) => stripP(f.name) === key);
+  const f = same.find((x) => x.cat === it.cat) || same[0];
+  FS.planG = it.g || 0;
+  if (f) return pickFood(f, FS.planG || undefined);
+  // Si el nombre completo no aparece, se acorta la búsqueda ("pan integral molde" → "pan integral")
+  const ws = key.split(" ").filter((w) => w.length > 1 && !["de", "del", "con", "sin", "en", "y", "o", "la", "el"].includes(w));
+  const hit = (w) => pool.some((x) => { const t = norm(x.name + " " + (x.brand || "")); return w.every((y) => t.includes(y)); });
+  while (ws.length > 1 && !hit(ws)) ws.pop();
+  const qq = ws.join(" ") || key;
+  FS.prevTab = "plan"; FS.tab = "buscar"; FS.q = qq; const q = $("#fq"); if (q) q.value = qq; $("#ftabs").innerHTML = ftabsHtml(); renderFoodTab();
 });
 // Frecuentes: lo más registrado en los últimos 30 días
 async function drawFrequent() {
@@ -345,6 +377,7 @@ act("frecPick", async (el) => {
 });
 // Elige un alimento: con medida casera parte en 1 unidad; en gramos parte vacío (salvo que venga de "Frecuentes")
 function pickFood(f, grams) {
+  if (!grams && FS.planG) grams = FS.planG;
   FS.sel = f; const mi = medidaInfo(f);
   if (grams) { FS.unit = "g"; FS.qty = grams; FS.selG = grams; }
   else if (mi) { FS.unit = "med"; FS.qty = 1; FS.selG = r1(mi.each); }
