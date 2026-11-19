@@ -25,9 +25,12 @@ export const CONFIG = {
   coachWhatsapp: "",
 
   appName: "IMA",
+  // ID de cliente OAuth de Google (Google Cloud → APIs y servicios → Credenciales) para subir
+  // los videos de retroalimentación a tu Google Drive. Es público por diseño (no es una clave secreta).
+  googleClientId: "",
   // Clave pública para avisos con la app cerrada (Firebase → Configuración → Cloud Messaging → Certificados web push)
   vapidKey: "BM_EJh8lKa6m4CNrG7l_Z7OIh8eGAr2MwJLrKfq0OrEVEGtAVNvedfJCGx4en_4zGRU-X8VI0s0jI0ORUyKsiJM",
-  appVersion: "1.20.0",
+  appVersion: "1.21.0",
 
   // Tiempos de comida
   meals: ["Comida 1", "Comida 2", "Comida 3", "Comida 4", "Comida 5"],

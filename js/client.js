@@ -793,8 +793,13 @@ act("ciSave", async () => {
 });
 async function guidesView() {
   const g = (await db.get("library/guides"))?.items || [];
-  return `${head("Guías", "mas")}<div class="list">${g.map((x) => `<a target="_blank" href="${esc(x.url)}"><span>${esc(x.title)}<small>${esc(x.desc || "")}</small></span>${I.chev}</a>`).join("") || `<p class="muted pad">Pronto encontrarás aquí tus guías.</p>`}</div>`;
+  return `${head("Guías", "mas")}<div class="list">${g.map((x, k) => `<a ${embedUrl(x.url) ? `data-a="guideOpen" data-k="${k}"` : `target="_blank" href="${esc(x.url)}"`}><span>${esc(x.title)}<small>${esc(x.desc || "")}</small></span>${I.chev}</a>`).join("") || `<p class="muted pad">Pronto encontrarás aquí tus guías.</p>`}</div>`;
 }
+// Las guías en PDF (Drive) se leen dentro de la app, sin salir
+act("guideOpen", async (el) => {
+  const g = ((await db.get("library/guides"))?.items || [])[+el.dataset.k]; if (!g) return;
+  sheet(g.title, `<div class="pdfview"><iframe src="${embedUrl(g.url)}" allow="autoplay"></iframe></div><a class="btn block" target="_blank" href="${esc(g.url)}">Abrir en Drive (para descargarla)</a>`, { full: true });
+});
 async function equipView() {
   const ph = (await db.list(P() + "/photos")).filter((p) => p.kind === "equipo");
   return `${head("Mi equipamiento", "mas")}<div class="card"><p class="muted small">Sube fotos de las máquinas y equipos que tienes disponibles. Así tu coach arma la rutina con lo que realmente hay.</p>

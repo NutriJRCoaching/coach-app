@@ -9,6 +9,7 @@ import { e1rm } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
 import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto } from "./data.js";
 import "./onboarding.js";
+import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
 import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN, CHECKIN_OLD } from "./data.js";
 import { weeksTable } from "./client.js";
@@ -424,7 +425,14 @@ async function feedbackView(c, w) {
   const pre = await preanalysis(c, w);
   const fb = c.feedback?.week === w.key ? c.feedback : (await db.get(`clients/${c.id}/feedbacks/${w.key}`)) || {};
   const ciW = await db.get(`clients/${c.id}/checkins/${w.key}`), goals = c.feedback?.week === w.key ? c.weeklyGoals || [] : ciW?.foco ? [ciW.foco] : c.weeklyGoals || [];
-  return `${pre}<div class="card"><div class="card-t">Retroalimentación · Semana ${w.n}</div><p class="muted small">Le aparece en el inicio como “Tu coach respondió tu check-in” durante 9 días.</p>
+  const L = LASTREC?.cid === c.id && LASTREC.week === w.key ? LASTREC : null;
+  const rec = `<div class="card recc"><div class="row between"><div class="card-t">🎥 Video de retroalimentación</div>${recSupported() ? `<button class="btn primary" data-a="recStart" data-w="${w.key}">● Grabar</button>` : ""}</div>
+  ${recSupported() ? `<p class="muted small">Graba esta pestaña con tu cara en una burbuja abajo a la izquierda. Antes de partir, deja a la vista el preanálisis y la pestaña con el dato que vas a mostrar (Timeline, Entrenamientos). Mientras hablas se va transcribiendo. Si cambias a otra pestaña o ventana, elige “Pantalla completa” al compartir.</p>` : `<p class="muted small">Para grabar usa Chrome en el computador.</p>`}
+  ${L ? `<div class="recout"><video src="${L.url}" controls></video><div><p class="small">Duración <b>${Math.floor(L.secs / 60)}:${String(L.secs % 60).padStart(2, "0")}</b> · ${(L.blob.size / 1048576).toFixed(1)} MB</p>
+    ${driveReady() ? `<button class="btn primary block" data-a="recUpload">Subir a mi Drive y poner el link</button>` : `<p class="small"><span class="badge y">Falta conectar Google Drive</span> Mientras, descárgalo y súbelo tú (o pídeme que te guíe para conectarlo).</p>`}
+    <button class="btn block" data-a="recDownload">Descargar video</button><button class="btn ghost block" data-a="recDiscard">Descartar</button><div id="upP" class="small muted"></div></div></div>
+    <label>Transcripción (lo que dijiste)<textarea id="fbTr" rows="5">${esc(L.transcript || "")}</textarea></label><button class="btn small" data-a="trPoints">Pasar a puntos clave</button>` : ""}</div>`;
+  return `${pre}${rec}<div class="card"><div class="card-t">Retroalimentación · Semana ${w.n}</div><p class="muted small">Le aparece en el inicio como “Tu coach respondió tu check-in” durante 9 días.</p>
   <label>Link del video (YouTube no listado, Drive, Loom…)<input id="fbV" value="${esc(fb.videoUrl || "")}"></label>
   <label>Puntos clave (uno por línea)<textarea id="fbP" rows="5">${esc((fb.points || []).join("\n"))}</textarea></label>
   <label>Mensaje (opcional)<textarea id="fbT" rows="4">${esc(fb.text || "")}</textarea></label>
@@ -445,6 +453,25 @@ act("fbPoints", () => {
   const t = $("#fbT").value.trim(); if (!t) return toast("Primero escribe o dicta el mensaje");
   const pts = t.split(/(?<=[.!?])\s+|\n+|,\s*(?:y |además |también |otra cosa )/i).map((x) => x.trim().replace(/^(y|además|también|otra cosa)[, ]+/i, "")).filter((x) => x.split(/\s+/).length >= 4).map((x) => x[0].toUpperCase() + x.slice(1).replace(/[.,;]+$/, ""));
   const cur = $("#fbP").value.trim(); $("#fbP").value = (cur ? cur + "\n" : "") + pts.join("\n"); toast(`${pts.length} puntos agregados: revísalos y edítalos`);
+});
+let LASTREC = null;
+act("recStart", async (el) => {
+  const cid = CW.cid, week = el.dataset.w;
+  await startRecording({ onDone: ({ blob, secs, transcript }) => { if (LASTREC?.url) URL.revokeObjectURL(LASTREC.url); LASTREC = { cid, week, blob, secs, transcript, url: URL.createObjectURL(blob) }; refresh(); toast("Grabación lista ✓"); } });
+});
+act("recDownload", () => { if (!LASTREC) return; const a = document.createElement("a"); a.href = LASTREC.url; a.download = `Retro ${new Date().toISOString().slice(0, 10)}.webm`; a.click(); });
+act("recDiscard", async () => { if (!(await confirmBox("¿Descartar esta grabación?"))) return; URL.revokeObjectURL(LASTREC.url); LASTREC = null; refresh(); });
+act("recUpload", async (el) => {
+  const c = await getClient(CW.cid); el.disabled = true;
+  try {
+    const link = await uploadToDrive(LASTREC.blob, `Retro ${c.name} · semana ${+LASTREC.week.slice(1)}.webm`, (p) => { const u = $("#upP"); if (u) u.textContent = `Subiendo… ${Math.round(p * 100)} %`; });
+    $("#fbV").value = link; toast("Video subido ✓ · revisa y publica"); $("#upP").textContent = "Subido ✓ · el link quedó puesto abajo";
+  } catch (e) { toast("No se pudo subir: " + e.message); el.disabled = false; }
+});
+act("trPoints", () => {
+  const t = ($("#fbTr")?.value || "").trim(); if (!t) return;
+  const pts = t.split(/(?<=[.!?])\s+/).map((x) => x.trim().replace(/[.]+$/, "")).filter((x) => x.split(/\s+/).length >= 5);
+  const cur = $("#fbP").value.trim(); $("#fbP").value = (cur ? cur + "\n" : "") + pts.join("\n"); toast(`${pts.length} frases agregadas: deja solo las clave`);
 });
 act("fbSave", async (el) => {
   const fb = { week: el.dataset.w, videoUrl: $("#fbV").value.trim(), points: $("#fbP").value.split("\n").map((x) => x.trim()).filter(Boolean), text: $("#fbT").value.trim(), at: Date.now() };

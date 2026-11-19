@@ -72,6 +72,8 @@ export function trend(vals, alpha = 0.25) { let t = null; return vals.map((v) =>
 // Video de YouTube → URL embebible
 export function embedUrl(u) {
   if (!u) return null;
+  const d = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([\w-]{20,})/);
+  if (d) return `https://drive.google.com/file/d/${d[1]}/preview`;
   const m = u.match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
   return m ? `https://www.youtube.com/embed/${m[1]}` : null;
 }
