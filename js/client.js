@@ -90,7 +90,7 @@ async function home() {
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   ${date === today && c.payDate && diffDays(c.payDate, today) === 0 ? `<div class="card paycard">${payMsg(c)}</div>` : ""}
   ${date === today && c.payDate && diffDays(c.payDate, today) < 0 ? `<div class="card paycard late"><b>Pago pendiente</b><br>Tu asesoría se renovaba el ${fmtDate(c.payDate, true)} y aún no tengo registrado el pago. Si ya pagaste, ignora este mensaje 🙌 Si tienes algún problema, escríbeme y lo vemos.</div>` : ""}
-  ${date === today && has("feedback") && freshFb(c) ? `<a class="card fbmini" href="#progreso"><div class="card-t">${I.info}Tu coach respondió tu check-in · Semana ${+freshFb(c).week.slice(1)}</div><div class="small">${esc(freshFb(c).text || freshFb(c).points?.[0] || "Toca para ver tu retroalimentación")}</div>${freshFb(c).videoUrl ? `<span class="badge">${I.play} Video</span>` : ""}</a>` : ""}
+  ${date === today && has("feedback") && freshFb(c) ? `<a class="card fbmini" href="#progreso"><div class="card-t">${I.info}Tu coach respondió tu check-in · Semana ${+freshFb(c).week.slice(1)}</div><div class="small muted">${freshFb(c).videoUrl ? "Tienes un video nuevo · toca para verlo" : "Toca para ver tu retroalimentación"}</div></a>` : ""}
   <div class="grid2">
     ${has("home_kcal") ? `<a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div>${pctTxt(tot.kcal, c.kcal)}</a>
     <a class="card tile" href="#comida"><div class="card-t">${I.macros}Macros</div>
@@ -574,6 +574,11 @@ act("offSearch", async () => {
 });
 
 
+// Miniatura del video (Drive o YouTube); si no carga, queda el botón de play
+function thumbUrl(u) {
+  const d = (u || "").match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([\w-]{20,})/); if (d) return `https://drive.google.com/thumbnail?id=${d[1]}&sz=w800`;
+  const y = (u || "").match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/); return y ? `https://img.youtube.com/vi/${y[1]}/hqdefault.jpg` : "";
+}
 // La última retroalimentación del coach se muestra durante 9 días desde que la publica
 export const freshFb = (c) => (c.feedback && (c.feedback.points?.length || c.feedback.text || c.feedback.videoUrl) && Date.now() - (c.feedback.at || 0) < 9 * 864e5 ? c.feedback : null);
 // ================================================================ PROGRESO
@@ -583,10 +588,12 @@ async function progress() {
   const days = await getDays(addDays(ymd(), -60), ymd());
   const keys = Object.keys(days).sort(), wv = keys.map((k) => days[k].weight ?? null);
   return `${head("Progreso")}
-  ${has("feedback") && (fb || (c.weeklyGoals || []).length) ? `<div class="fbcard"><small>${fb ? `Respuesta de tu coach · Semana ${+fb.week.slice(1)}` : `Semana ${w.n}`}</small><h3>${esc(fb?.text || "Esto es lo que trabajamos esta semana")}</h3>
-    ${(fb?.points || []).length ? `<ul>${fb.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
-    ${(c.weeklyGoals || []).length ? `<div class="goals-t">Metas de la semana</div><ul>${c.weeklyGoals.map((g) => `<li>${esc(g)}</li>`).join("")}</ul>` : ""}
-    ${fb?.videoUrl ? `<button class="btn small" data-a="openFeedback">${I.play} Ver video</button>` : fb ? `<button class="btn small ghost" data-a="openFeedback">Califica esta retroalimentación</button>` : ""}</div>` : ""}
+  ${has("feedback") && (fb || (c.weeklyGoals || []).length) ? `<div class="card fbcard">
+    ${fb ? `<div class="card-t">Tu retroalimentación · Semana ${+fb.week.slice(1)}</div>
+    ${fb.videoUrl ? `<button class="fbthumb" data-a="openFeedback">${thumbUrl(fb.videoUrl) ? `<img src="${thumbUrl(fb.videoUrl)}" alt="" onerror="this.remove()">` : ""}<span>${I.play}</span></button>` : ""}
+    ${fb.text ? `<p class="fbmsg">${esc(fb.text)}</p>` : ""}
+    ${!fb.videoUrl ? `<button class="btn small" data-a="openFeedback">Ver y calificar</button>` : ""}` : ""}
+    ${(c.weeklyGoals || []).length ? `<div class="goals-t">Tu foco esta semana</div><ul>${c.weeklyGoals.map((g) => `<li>${esc(g)}</li>`).join("")}</ul>` : ""}</div>` : ""}
   <a class="card" href="#peso"><div class="card-t">${I.scale}Peso corporal</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals: wv, color: "var(--dim)", dots: true, w: 1 }, { vals: trend(wv), color: "var(--acc)" }], { h: 130 })}</a>
   <div class="list">${has("prog_timeline") ? `<a href="#timeline"><span>Timeline y etapas<small>Tu calendario nutricional semana a semana</small></span>${I.chev}</a>` : ""}
   <a href="#sueno"><span>Sueño<small>Registro y estadísticas</small></span>${I.chev}</a>

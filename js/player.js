@@ -37,7 +37,7 @@ export async function openFeedbackPlayer(fb) {
   } else if (u) video = `<a class="btn primary" target="_blank" href="${esc(u)}">Abrir video</a>`;
   const done = prev.rating || prev.duda || prev.falto;
   sheet("Tu retroalimentación", `${video}
-    ${fb.text ? `<p>${esc(fb.text)}</p>` : ""}${(fb.points || []).length ? `<ul class="fbpts">${fb.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
+    ${(fb.points || []).length ? `<div class="goals-t">Resumen del video</div><ul class="fbpts">${fb.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
     <div id="fbSurvey">${done ? thanks() : isFile(u) && P.max < 90 ? `<p class="muted small center">Al terminar el video te haré 3 preguntas cortas 🙌</p>` : survey()}</div>`, { wide: true, onClose: saveViewed });
   const v = $("#fbVid");
   if (v) {
@@ -50,7 +50,7 @@ function survey(r = P?.prev || {}) {
   return `<div class="fbsv"><h3>¿Qué te pareció?</h3>
   <label>Califica esta retroalimentación</label><div class="stars-in">${[1, 2, 3, 4, 5].map((n) => `<button data-a="fbStar" data-n="${n}" class="${n <= (r.rating || 0) ? "on" : ""}">★</button>`).join("")}</div>
   <label>¿Tienes alguna duda o consulta?<textarea id="svDuda" rows="2" placeholder="Opcional">${esc(r.duda || "")}</textarea></label>
-  <label>¿Sientes que hubo algo que faltó mencionar?<textarea id="svFalto" rows="2" placeholder="Opcional">${esc(r.falto || "")}</textarea></label>
+  <label>¿Sientes que me faltó mencionar algo?<textarea id="svFalto" rows="2" placeholder="Opcional">${esc(r.falto || "")}</textarea></label>
   <button class="btn primary block" data-a="fbSend">Enviar a mi coach</button></div>`;
 }
 const thanks = () => `<div class="fbthanks">✅ Le enviaste tu respuesta a tu coach. <button class="btn ghost small" data-a="fbEdit">Editar</button></div>`;

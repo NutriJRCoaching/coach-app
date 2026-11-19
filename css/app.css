@@ -501,3 +501,9 @@ body.rec-on .recguide .pre { display: block !important; margin-top: 8px; } .recg
 body.rec-on .ctabs { flex-wrap: wrap; overflow: visible; }
 body.rec-on .cpanel { min-width: 0; overflow-x: hidden; } .recbar .rb.sw i { margin: 0 auto; }
 .recbar .rb.sw i { display: block; }
+.fbcard { margin: 8px 14px; background: var(--card); color: inherit; border: 1px solid var(--line, #2a2a2e); border-left: 3px solid var(--acc); padding: 14px; }
+.fbcard .btn { background: var(--card2, #1b1b1f); border-color: var(--line, #333); color: inherit; } .fbcard .goals-t { margin-top: 10px; color: var(--muted); opacity: 1; } .fbcard ul { margin: 4px 0 0; }
+.fbthumb { position: relative; display: block; width: 100%; aspect-ratio: 16/9; margin: 8px 0 4px; border: 0; border-radius: 12px; overflow: hidden; background: #000 center/cover; cursor: pointer; padding: 0; }
+.fbthumb img { width: 100%; height: 100%; object-fit: cover; display: block; } .fbthumb span { position: absolute; inset: 0; margin: auto; width: 56px; height: 56px; border-radius: 50%; background: rgba(209,38,47,.92); color: #fff; display: grid; place-items: center; } .fbthumb span svg { width: 26px; height: 26px; }
+.fbmsg { margin: 8px 0 0; } .fbpts { margin-top: 4px; }
+.sheet .goals-t { font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 6px; }

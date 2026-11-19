@@ -444,9 +444,9 @@ async function feedbackView(c, w) {
     <label>Transcripción (lo que dijiste)<textarea id="fbTr" rows="5">${esc(L.transcript || "")}</textarea></label><button class="btn small" data-a="trPoints">Pasar a puntos clave</button>` : ""}</div>`;
   return `${pre}${rec}<div class="card"><div class="card-t">Retroalimentación · Semana ${w.n}</div><p class="muted small">Le aparece en el inicio como “Tu coach respondió tu check-in” durante 9 días.</p>
   <label>Link del video (YouTube no listado, Drive, Loom…)<input id="fbV" value="${esc(fb.videoUrl || "")}"></label>
-  <label>Puntos clave (uno por línea)<textarea id="fbP" rows="5">${esc((fb.points || []).join("\n"))}</textarea></label>
+  <label>Resumen del video (opcional, uno por línea · el cliente lo ve debajo del video)<textarea id="fbP" rows="5">${esc((fb.points || []).join("\n"))}</textarea></label>
   <label>Capítulos del video (uno por línea: <i>1:20 Sentadilla</i>) · el cliente toca uno y salta a esa parte<textarea id="fbCh" rows="3" placeholder="0:00 Lo mejor de tu semana&#10;1:15 Sentadilla">${esc(chaptersTxt(fb, L))}</textarea></label>
-  <label>Mensaje (opcional)<textarea id="fbT" rows="4">${esc(fb.text || "")}</textarea></label>
+  <label>Mensaje tuyo (opcional · aparece arriba en su Progreso)<textarea id="fbT" rows="4">${esc(fb.text || "")}</textarea></label>
   ${ciW?.foco ? `<p class="small">Foco que propuso en su check-in: <b>${esc(ciW.foco)}</b></p>` : ""}
   <label>Foco de la semana (la primera línea es la acción que le preguntamos en el próximo check-in)<textarea id="fbG" rows="3">${esc(goals.join("\n"))}</textarea></label>
   <button class="btn primary" data-a="fbSave" data-w="${w.key}">Publicar al cliente</button></div>`;

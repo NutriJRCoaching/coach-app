@@ -47,7 +47,7 @@ export async function seedClient(set, cid, extra = {}) {
   ];
   const w = weekInfo(client, today);
   const pw = weekInfo(client, addDays(today, -7));
-  client.feedback = { week: pw.key, videoUrl: "", points: ["Buen progreso en press inclinado: +2,5 kg manteniendo técnica", "Faltó registrar la once 3 días", "Esta semana subimos a 9.000 pasos"], text: "¡Muy buena semana! Cumpliste los 4 entrenamientos. Ahora el foco es registrar la once.", at: Date.now() - 864e5 };
+  client.feedback = { week: pw.key, videoUrl: "", points: ["Buen progreso en press inclinado: +2,5 kg manteniendo técnica", "Faltó registrar la once 3 días", "Esta semana subimos a 9.000 pasos"], text: "", at: Date.now() - 864e5 };
   Object.assign(client, extra);
   const sv = client.service || "completa";
   if (sv === "entrenamiento") { // sin plan de alimentación: guía de macros en rangos
