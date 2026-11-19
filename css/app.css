@@ -477,16 +477,27 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .recbar .rdot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; animation: blink 1s infinite; } .recbar .rdot.p { animation: none; background: #eab308; } @keyframes blink { 50% { opacity: .25; } }
 .recout { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; align-items: start; margin: 8px 0; } .recout video { width: 100%; border-radius: 10px; background: #000; }
 .pdfview { height: calc(100vh - 160px); } .pdfview iframe { width: 100%; height: 100%; border: 0; border-radius: 10px; background: #fff; }
-.recbar { top: 10px; left: 50%; right: auto; transform: translateX(-50%); gap: 6px; padding: 5px 6px 5px 12px; font-size: 13px; }
 .recbar .rb { background: transparent; border: 0; color: #fff; font: inherit; padding: 5px 8px; border-radius: 8px; cursor: pointer; } .recbar .rb:hover, .recbar .rb.on { background: #333; }
 .recbar .rb.sw i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #666; vertical-align: middle; } .recbar .rb.stop { background: #d1262f; font-weight: 700; } .recbar .rsep { width: 1px; height: 20px; background: #444; }
-.recbub { position: fixed; z-index: 290; width: var(--bs, 200px); height: var(--bs, 200px); border-radius: 50%; overflow: hidden; border: 4px solid #d1262f; box-shadow: 0 8px 28px rgba(0,0,0,.5); cursor: grab; touch-action: none; background: #000; }
-.recbub video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; }
+.recbub { position: fixed; z-index: 290; width: var(--bs, 200px); height: var(--bs, 200px); cursor: grab; touch-action: none; }
+.recbub .bc { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; border: 4px solid #d1262f; box-shadow: 0 8px 28px rgba(0,0,0,.5); background: #000; }
+.recbub video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; } .recbub.nomirror video { transform: none; }
+.recbub .rz { position: absolute; right: 4%; bottom: 4%; width: 22px; height: 22px; border-radius: 50%; background: #d1262f; border: 2px solid #fff; cursor: nwse-resize; opacity: 0; transition: opacity .15s; } .recbub:hover .rz { opacity: 1; }
 .recdraw { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 280; pointer-events: none; } .recdraw.on { pointer-events: auto; cursor: crosshair; }
-.reccount { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; font-size: 140px; font-weight: 900; color: #fff; background: rgba(0,0,0,.35); pointer-events: none; }
-body.rec-on .side, body.rec-on .alertbar, body.rec-on.rec-pip .pre, body.rec-on .recc, body.rec-on [data-a="previewClient"] { display: none !important; } body.rec-on #app.coach { grid-template-columns: 1fr !important; }
+.reccount { position: fixed; inset: 0 0 0 86px; z-index: 400; display: grid; place-items: center; font-size: 140px; font-weight: 900; color: #fff; background: rgba(0,0,0,.35); pointer-events: none; }
+body.rec-on .side, body.rec-on .alertbar, body.rec-on .pre, body.rec-on .recc, body.rec-on [data-a="previewClient"] { display: none !important; } body.rec-on #app.coach { grid-template-columns: 1fr !important; padding-left: 86px; }
+body.rec-on.rec-guide #app.coach { padding-right: 360px; }
+.recstage { position: fixed; top: 0; bottom: 0; left: 86px; right: 0; pointer-events: none; z-index: 1; } body.rec-guide .recstage { right: 360px; }
+.recguide { position: fixed; top: 0; right: 0; bottom: 0; width: 360px; z-index: 300; overflow: auto; padding: 12px; background: var(--bg, #0b0b0c); border-left: 1px solid #333; display: none; } body.rec-guide .recguide { display: block; }
+body.rec-on .recguide .pre { display: block !important; margin-top: 8px; } .recguide .pre-g { grid-template-columns: 1fr !important; gap: 8px; }
+.recbar { top: 0; left: 0; bottom: 0; right: auto; width: 86px; border-radius: 0; flex-direction: column; justify-content: flex-start; gap: 4px; padding: 12px 6px; border-width: 0 1px 0 0; overflow-y: auto; }
+.recbar .rb { display: flex; flex-direction: column; align-items: center; width: 100%; font-size: 18px; line-height: 1.1; } .recbar .rb small { font-size: 10px; color: #aaa; margin-top: 2px; } .recbar .rb.big { font-size: 22px; }
+.recbar .rb.sw { padding: 3px; } .recbar .rsep { width: 60%; height: 1px; margin: 4px 0; } .recbar .grow { flex: 1; } .recbar .rb.stop small { color: #fff; } .recbar #recT { font-variant-numeric: tabular-nums; }
 .pipbody { padding: 12px; background: var(--bg); color: var(--txt); font-family: inherit; } .recbar.inpip { position: static; transform: none; margin: 0 0 12px; flex-wrap: wrap; justify-content: center; } .pipguide .pre-g { grid-template-columns: 1fr; gap: 8px; } .pipguide .card { margin: 0; }
 .fbplayer video { width: 100%; border-radius: 12px; background: #000; max-height: 60vh; } .fbplayer video::cue { font-size: 18px; background: rgba(0,0,0,.75); }
 .fbctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; } .fbch { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 10px; } .fbch button, .fbch span { text-align: left; background: var(--card2, #1b1b1f); border: 1px solid var(--line, #333); color: inherit; border-radius: 10px; padding: 8px 10px; font: inherit; cursor: pointer; } .fbch b { color: var(--acc); margin-right: 6px; } .fbch.static span { cursor: default; }
 .fbsv { border-top: 1px solid var(--line, #333); margin-top: 12px; padding-top: 10px; } .stars-in { display: flex; gap: 4px; margin: 4px 0 10px; } .stars-in button { background: none; border: 0; font-size: 34px; color: #555; cursor: pointer; padding: 0 2px; } .stars-in button.on { color: #facc15; }
 .fbthanks { margin-top: 12px; padding: 10px; border-radius: 10px; background: rgba(34,197,94,.12); } .fbreply.new { border-color: var(--acc); } .fbreply .stars { color: #facc15; letter-spacing: 2px; }
+body.rec-on .ctabs { flex-wrap: wrap; overflow: visible; }
+body.rec-on .cpanel { min-width: 0; overflow-x: hidden; } .recbar .rb.sw i { margin: 0 auto; }
+.recbar .rb.sw i { display: block; }

@@ -190,3 +190,8 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Coach: tarjeta "Respuesta del cliente a tu retro" en Retroalimentación + "Marcar leída"; alertas: duda = rojo, faltó / ≤3★ = amarillo, resto = info.
 - Pendiente: activar Blaze + Storage (us-east1), subir grabaciones a Storage en vez de Drive, reglas de Storage y caché offline del último video.
 - 18-nov: Blaze NO activado (Google pidió prepago de $30.000; Joaquín no quiere dejarlo inmovilizado). Se sigue con Drive. RECORDARLE averiguar si puede activar Blaze con tarjeta de crédito sin prepago; cuando se active: Storage us-east1, alerta de presupuesto US$1, subir grabaciones a Storage y caché offline.
+
+## v1.23.1 — Grabador: controles a la izquierda, guion a la derecha
+- Sin PiP. Al grabar: barra vertical fija a la izquierda (86 px: tiempo, pausa, capítulo, lápiz+colores, borrar, espejo, cámara, guion, terminar), guion (preanálisis) en panel derecho plegable (360 px, LS recGuide), y #recstage al medio: con "Esta pestaña" el track se recorta al escenario con Region Capture (CropTarget/cropTo), así barra y guion no salen en el video.
+- Burbuja: tamaño libre 90–460 px (esquina roja o rueda del mouse, LS bubPx), arrastrable dentro del escenario, espejo activable (LS bubMirror, por defecto espejo).
+- allAlerts: usa el último cálculo y recalcula por detrás cada 60 s (no durante la grabación); cambio de pestaña ~0,3 s.

@@ -18,13 +18,21 @@ import { menusEditor } from "./menus.js";
 import { loadCtx, alertsFor, levelOf, SERVICES, SERVICE_GROUPS, emailKey, checkinDayTxt } from "./alerts.js";
 
 // Pendientes de todos los clientes (se recalculan como máximo cada 30 s o al guardar algo)
-let AL = { at: 0, map: {} };
-export const resetAlerts = () => (AL.at = 0);
-async function allAlerts(clients) {
-  if (Date.now() - AL.at < 30000 && clients.every((c) => AL.map[c.id])) return AL.map;
+let AL = { at: 0, map: {}, dirty: true, busy: null };
+export const resetAlerts = () => { AL.at = 0; AL.dirty = true; };
+async function computeAlerts(clients) {
   const out = {};
   await Promise.all(clients.map(async (c) => { const x = await loadCtx(c); out[c.id] = { x, A: alertsFor(c, x) }; }));
-  AL = { at: Date.now(), map: out }; return out;
+  AL = { at: Date.now(), map: out, dirty: false, busy: null }; return out;
+}
+// Cambiar de pestaña no espera a recalcular los pendientes de todos: usa lo último y lo actualiza por detrás
+async function allAlerts(clients) {
+  const have = clients.every((c) => AL.map[c.id]);
+  if (have && !AL.dirty) {
+    if (Date.now() - AL.at > 60000 && !AL.busy && !document.body.classList.contains("rec-on")) AL.busy = computeAlerts(clients).catch(() => (AL.busy = null));
+    return AL.map;
+  }
+  return AL.busy && !AL.dirty ? AL.busy : computeAlerts(clients);
 }
 const chip = (a, cid) => `<a class="badge ${a.c === "i" ? "" : a.c}" href="#coach/c/${cid}/${a.tab}">${esc(a.t)}</a>`;
 
