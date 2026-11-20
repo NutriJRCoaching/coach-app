@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.26.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.27.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -220,3 +220,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Lista de compras:** queda guardada en el celular (LS `ima-shop-{cid}`): los días por opción y lo tachado se mantienen hasta "Nueva lista" (pide confirmar, desmarca todo y guarda la fecha `started`, que se muestra). No se reinicia sola.
 - **Agregar alimento:** la pestaña "Mi plan" resaltada en rojo (`.plantab`); el botón del escáner ahora es un ícono de código de barras con el texto "Escanear" (`BARCODE`, `.scanbtn`). La medida casera muestra sus gramos ("1 cda (15 g)"); la porción de intercambio no aparece (decisión de Joaquín: el cliente ya la ve en su plan).
 - **Crear → Preparación casera:** guía de 3 pasos; ingredientes crudos con gramos (datalist de la base + alimentos propios), peso total de la preparación lista → guarda un alimento propio por 100 g (`prep: true`, `ings`, `cookedG`) y abre la ficha para registrar los gramos servidos. "Producto con etiqueta" tiene su guía de cuándo usarlo. Las preparaciones aparecen también en la pestaña Recetas.
+
+## v1.27.0 (20-nov) — Sin horario, comida libre, colores por comida y lista en crudo
+- **Opción sin horario** (`menu.noTime`, casilla en el editor): el cliente no ve las horas y ve "Sin horario fijo: come cada 3 a 4 horas".
+- **Comida libre durante el día** (`meal.free`, casilla por comida): sin hora; el cliente ve "Libre durante el día". Puede llevar un **aporte total** (`meal.budget` {kcal, cho, fat, prot}) que reemplaza la suma de los extras de esa comida en los totales del editor (`hasBudget`).
+- Felipe alt. 4: `noTime` y "Durante el día (KFC)" libre con el total de su PDF (1431 kcal · C 111 · L 68 · P 99); los productos KFC quedan como referencia sin macros propios (antes se repartía el total por gramos y se veía raro).
+- **Colores por tiempo de comida** en Mi plan (`mealColor`): desayuno ámbar, colación AM turquesa, almuerzo rojo, colación PM violeta, once azul, cena índigo, pre entreno verde, libre gris; borde y cápsula con `--mc`.
+- **Lista de compras en crudo** (`toRaw`): lo cocido con par crudo en la base de intercambio y del mismo grupo se pasa a crudo con las mismas porciones (arroz, fideos, quínoa, cous cous, legumbres). Las carnes quedan como están hasta que Joaquín defina si las porciones de su base son en crudo o cocido (por los macros, 50 g = 11 g de proteína calza más con carne cruda).
+- Import: el PDF guarda "(" y "×" como caracteres privados (U+E081, U+E09F); `fixtxt` los convierte. Ya no quedan medidas con "(" suelto.
+- Casillas del editor con estilo `label.chk`.

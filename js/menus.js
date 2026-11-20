@@ -62,8 +62,9 @@ export function menusHtml(c) {
   return `<div class="card"><div class="card-t">Opciones de tu plan</div>
   ${menus.length > 1 || legTab ? optSeg(menus, legTab) : `<b>${esc(mn.name || "Opción 1")}</b>`}
   ${mn.note ? `<div class="note">${esc(mn.note)}</div>` : ""}
+  ${mn.noTime ? `<div class="note">🕒 <b>Sin horario fijo:</b> come cada 3 a 4 horas, como te acomode ese día.</div>` : ""}
   <p class="muted small">Toca un alimento para ver con qué lo puedes reemplazar.</p></div>
-  ${(mn.meals || []).map((m, i) => `<div class="card pmeal"><div class="pmh"><b>${esc(m.name)}</b>${m.time ? `<span class="ptime">${esc(m.time)} hrs</span>` : ""}</div>
+  ${(mn.meals || []).map((m, i) => `<div class="card pmeal" style="--mc:${mealColor(m, i)}"><div class="pmh"><b>${esc(m.name)}</b>${m.free ? `<span class="ptime">Libre durante el día</span>` : m.time && !mn.noTime ? `<span class="ptime">${esc(m.time)} hrs</span>` : ""}</div>
     ${(m.items || []).map((it, j) => `<div class="fi" data-a="pvSwap" data-i="${i}" data-j="${j}"><span>${esc(it.name)}<small>${esc(itemLine(it))}</small>${isExtra(it) ? `<small class="pgrp">Extra</small>` : `<small class="pgrp">${esc(it.cat)}</small>`}</span>${isExtra(it) ? "" : '<span class="swap">⇄</span>'}</div>`).join("") || `<div class="muted small">Sin alimentos</div>`}
     ${m.note ? `<div class="note">${esc(m.note)}</div>` : ""}</div>`).join("")}
   ${has("plan_shop") ? `<a class="btn big block" href="#compras">🛒 Lista de compras</a>` : ""}`;
@@ -108,11 +109,21 @@ const shopState = (menus) => {
 };
 const shopSave = (st) => LS.set(shopKey(), JSON.stringify(st));
 
+// Lista de compras en crudo: lo cocido que tiene su par crudo en la base de intercambio (arroz, fideos, quínoa,
+// legumbres…) se pasa a crudo con la misma cantidad de porciones (ej. 100 g de arroz cocido = 40 g de arroz crudo).
+const RAWW = [[/\bcocidos\b/, "crudos"], [/\bcocidas\b/, "crudas"], [/\bcocido\b/, "crudo"], [/\bcocida\b/, "cruda"]];
+function toRaw(it) {
+  const n = nk(it.name); if (!/cocid/.test(n) || / o crud/.test(n)) return it;
+  const ck = IC.find((f) => nk(f.name) === n), rk = RAWW.reduce((x, [re, r]) => x.replace(re, r), n), raw = IC.find((f) => nk(f.name) === rk);
+  if (!ck?.portion || !raw?.portion || ck.cat !== raw.cat) return it;
+  return { ...it, name: raw.name, g: ((+it.g || 0) / ck.portion) * raw.portion, medida: raw.medida, medidaG: raw.medidaG, raw: true };
+}
 function shopItems(menus, st) {
   const m = new Map();
   for (const mn of menus) {
     const d = +st.days[mn.id] || 0; if (!d) continue;
-    for (const meal of mn.meals || []) for (const it of meal.items || []) {
+    for (const meal of mn.meals || []) for (const it0 of meal.items || []) {
+      const it = toRaw(it0);
       if (!it.name) continue;
       const k = nk(it.name), x = m.get(k) || { name: it.name, cat: it.cat || "", g: 0, medida: it.medida, medidaG: it.medidaG };
       x.g += (+it.g || 0) * d; m.set(k, x);
@@ -130,7 +141,7 @@ export async function shoppingView(head) {
   return `${head("Lista de compras", "plan")}
   <div class="card"><div class="card-t">¿Cuántos días de cada opción?</div>
   ${menus.map((mn, k) => `<div class="row between li"><span>${esc(mn.name || "Opción " + (k + 1))}</span><span class="row gap"><button class="btn tiny" data-a="shopDays" data-id="${mn.id}" data-n="-1">−</button><b class="shop-d">${+st.days[mn.id] || 0}</b><button class="btn tiny" data-a="shopDays" data-id="${mn.id}" data-n="1">＋</button></span></div>`).join("")}
-  <p class="muted small">${totalDays} día${totalDays === 1 ? "" : "s"} en total · cantidades según los alimentos de ejemplo de tu plan.</p>
+  <p class="muted small">${totalDays} día${totalDays === 1 ? "" : "s"} en total · cantidades según los alimentos de ejemplo de tu plan. El arroz, los fideos, la quínoa y las legumbres ya vienen en <b>crudo</b> (lo que compras).</p>
   <p class="muted small">La lista queda guardada en tu celular: lo que vas tachando y los días de cada opción se mantienen hasta que toques <b>Nueva lista</b> (por ejemplo, cada vez que vas a comprar).${st.started ? ` Esta lista la empezaste el ${new Date(st.started).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}.` : ""}</p></div>
   ${items.length ? `<div class="card"><div class="row between"><div class="card-t">Por comprar · ${left} de ${items.length}</div><span class="row gap"><button class="btn tiny" data-a="shopShare">Compartir</button><button class="btn tiny ghost" data-a="shopReset">Nueva lista</button></span></div>
   ${order.map((g) => `<div class="shop-g">${esc(g)}</div>${groups[g].sort((a, b) => a.name.localeCompare(b.name, "es")).map((it) => { const hm = homeMeasure(it.g, it.medida, it.medidaG);
@@ -198,12 +209,19 @@ export async function menusEditor(c) {
 function totals(mn) {
   const t = { kcal: 0, cho: 0, fat: 0, prot: 0 }, por = {};
   for (const m of mn.meals || []) for (const it of m.items || []) {
+    if (isExtra(it) && hasBudget(m)) continue; // la comida libre cuenta con su total, no por ítem
     if (isExtra(it)) { for (const k of ["kcal", "cho", "fat", "prot"]) t[k] += +it[k] || 0; continue; }
     const g = GROUPS[it.cat]; if (!g || !it.por) continue;
     t.kcal += g[0] * it.por; t.cho += g[1] * it.por; t.fat += g[2] * it.por; t.prot += g[3] * it.por; por[it.cat] = (por[it.cat] || 0) + +it.por;
   }
+  for (const m of mn.meals || []) if (hasBudget(m)) for (const k of ["kcal", "cho", "fat", "prot"]) t[k] += +m.budget[k] || 0;
   return { t, por };
 }
+const hasBudget = (m) => m.free && +m.budget?.kcal > 0;
+// Color de cada tiempo de comida (borde y cápsula en "Mi plan")
+const MCOL = [[/libre|durante el d/, "#94a3b8"], [/^pre ?entreno/, "#22c55e"], [/desayuno/, "#f59e0b"], [/colaci[oó]n (am|1)|media ma/, "#14b8a6"], [/almuerzo/, "#ef4444"], [/colaci[oó]n (pm|2)/, "#a855f7"], [/once|merienda/, "#3b82f6"], [/cena/, "#6366f1"], [/colaci[oó]n 3/, "#ec4899"], [/colaci[oó]n/, "#14b8a6"]];
+const MPAL = ["#f59e0b", "#14b8a6", "#ef4444", "#a855f7", "#3b82f6", "#6366f1", "#ec4899"];
+export const mealColor = (m, i) => (m.free ? "#94a3b8" : (MCOL.find(([re]) => re.test(nk(m.name))) || [])[1] || MPAL[i % MPAL.length]);
 function editorHtml(c) {
   const ms = MW.menus; if (MW.k >= ms.length) MW.k = Math.max(0, ms.length - 1);
   const mn = ms[MW.k], pauta = MW.pauta || c.pauta || {};
@@ -220,17 +238,20 @@ function editorHtml(c) {
   <div class="small mt"><b>${r0(t.kcal)} kcal</b> · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)} <span class="muted">(por porciones de intercambio${c.kcal ? ` · meta ${c.kcal} kcal` : ""})</span></div>
   <div class="mt pills-wrap">${cmp || '<span class="muted small">Agrega alimentos para ver las porciones por grupo.</span>'}</div>
   ${Object.keys(pz).length ? `<p class="muted small">Porciones de la opción / pauta ${mn.leg ? "del <b>día con legumbres</b>" : "del cliente"} (verde = igual, amarillo = faltan, rojo = sobran). Los extras suman a las kcal pero no a las porciones.</p>` : ""}
-  <label class="row gap small mt"><input type="checkbox" ${mn.leg ? "checked" : ""} data-a-change="meLeg"> Es el día con legumbres (se compara con la pauta del día con legumbres${pautaLeg ? "" : ": llénala en Datos y objetivos"})</label>
+  <label class="chk mt"><input type="checkbox" ${mn.noTime ? "checked" : ""} data-a-change="meNoTime"> Sin horario fijo (el cliente ve “come cada 3 a 4 horas” en vez de las horas)</label>
+  <label class="chk"><input type="checkbox" ${mn.leg ? "checked" : ""} data-a-change="meLeg"> Es el día con legumbres (se compara con la pauta del día con legumbres${pautaLeg ? "" : ": llénala en Datos y objetivos"})</label>
   <div class="row gap mt"><button class="btn small" data-a="meDup">⧉ Duplicar opción</button><button class="btn small danger ghost" data-a="meDel">Eliminar opción</button></div></div>
   ${(mn.meals || []).map((m, i) => `<div class="card"><div class="row gap"><input class="grow" value="${esc(m.name)}" data-a-change="meMeal" data-i="${i}" data-f="name" style="font-weight:700"><input type="time" value="${esc(m.time || "")}" data-a-change="meMeal" data-i="${i}" data-f="time" style="width:120px">
     <button class="icon-btn" data-a="meMealMove" data-i="${i}" data-n="-1" title="Subir">↑</button><button class="icon-btn" data-a="meMealMove" data-i="${i}" data-n="1" title="Bajar">↓</button><button class="icon-btn" data-a="meMealDel" data-i="${i}" title="Quitar">✕</button></div>
+    <label class="chk mt"><input type="checkbox" ${m.free ? "checked" : ""} data-a-change="meFree" data-i="${i}"> Libre durante el día (sin horario: lo reparte como pueda, ej. turno de trabajo)</label>
+    ${m.free ? `<div class="small mt"><span class="muted">Aporte total de esta comida (opcional; si lo llenas, reemplaza la suma de los extras):</span> ${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([k, l]) => `<label class="exin">${l}<input type="number" step="1" min="0" value="${m.budget?.[k] ?? ""}" data-a-change="meBudget" data-i="${i}" data-f="${k}"></label>`).join("")}</div>` : ""}
     <table class="tbl me-t"><tr><th>Alimento</th><th>Grupo</th><th>Porciones</th><th>Gramos</th><th>Medida casera</th><th></th></tr>
     ${(m.items || []).map((it, j) => `<tr><td><input list="foodDL" value="${esc(it.name)}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="name" placeholder="Escribe y elige…"></td>
       <td><select data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="cat"><option value="">—</option>${Object.keys(GROUPS).map((g) => `<option ${g === it.cat ? "selected" : ""}>${esc(g)}</option>`).join("")}</select></td>
       <td><input type="number" step="0.25" min="0" value="${it.por ?? ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="por" style="width:80px" ${it.gp ? "" : 'disabled title="Sin porción de intercambio: usa gramos"'}></td>
       <td><input type="number" step="1" min="0" value="${it.g ? r0(it.g) : ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="g" style="width:80px"></td>
       <td class="muted small">${esc(homeMeasure(it.g, it.medida, it.medidaG) || "")}</td><td><button class="icon-btn" data-a="meItDel" data-i="${i}" data-j="${j}">✕</button></td></tr>
-      ${isExtra(it) ? `<tr class="exrow"><td colspan="6"><span class="badge">Extra</span> <span class="small muted">Aporte de ${it.g ? r0(it.g) + " g" : "esta cantidad"}:</span>
+      ${isExtra(it) && !hasBudget(m) ? `<tr class="exrow"><td colspan="6"><span class="badge">Extra</span> <span class="small muted">Aporte de ${it.g ? r0(it.g) + " g" : "esta cantidad"}:</span>
         ${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([k, l]) => `<label class="exin">${l}<input type="number" step="0.1" min="0" value="${it[k] ?? ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="${k}"></label>`).join("")}
         ${it.p100 ? '<span class="muted small">(sale de la base por 100 g: cambia solo con los gramos)</span>' : ""}</td></tr>` : ""}`).join("")}</table>
     <div class="row gap"><button class="btn small" data-a="meItAdd" data-i="${i}">＋ Alimento</button><button class="btn small" data-a="meExAdd" data-i="${i}" title="Alimento sin grupo de intercambio, con sus propios macros">＋ Extra</button><input class="grow small" value="${esc(m.note || "")}" placeholder="Nota de esta comida (opcional)" data-a-change="meMeal" data-i="${i}" data-f="note"></div></div>`).join("")}
@@ -251,6 +272,9 @@ act("meMealMove", (el) => { const a = cur().meals, i = +el.dataset.i, j = i + +e
 act("meItAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).push({ name: "", cat: "", por: 1, g: 0 }); redraw(); setTimeout(() => { const ins = $$(`#menuEd [data-i="${el.dataset.i}"][data-f="name"][list]`); ins[ins.length - 1]?.focus(); }, 0); });
 act("meExAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).push({ name: "", cat: "", por: null, gp: null, g: 0, kcal: 0, cho: 0, fat: 0, prot: 0 }); redraw(); });
 act("meLeg", (el) => { cur().leg = el.checked; redraw(); });
+act("meNoTime", (el) => { cur().noTime = el.checked; redraw(); });
+act("meFree", (el) => { const m = cur().meals[+el.dataset.i]; m.free = el.checked; if (m.free) m.time = ""; redraw(); });
+act("meBudget", (el) => { const m = cur().meals[+el.dataset.i]; (m.budget ||= {})[el.dataset.f] = el.value === "" ? null : num(el.value); redraw(); });
 act("meItDel", (el) => { cur().meals[+el.dataset.i].items.splice(+el.dataset.j, 1); redraw(); });
 act("meIt", async (el) => {
   const it = cur().meals[+el.dataset.i].items[+el.dataset.j], f = el.dataset.f, v = el.value;
