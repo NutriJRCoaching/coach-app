@@ -254,6 +254,7 @@ act("delPhoto", async (el) => { if (!(await confirmBox("¿Eliminar foto?"))) ret
 
 
 // ---------- Agregar alimento
+const BARCODE = `<svg viewBox="0 0 26 20" fill="currentColor" aria-hidden="true"><rect x="1" y="2" width="2" height="16"/><rect x="5" y="2" width="1" height="16"/><rect x="8" y="2" width="3" height="16"/><rect x="13" y="2" width="1" height="16"/><rect x="16" y="2" width="2" height="16"/><rect x="20" y="2" width="1" height="16"/><rect x="23" y="2" width="2" height="16"/></svg>`;
 // Agregar alimento: pantalla completa, buscador siempre arriba (así lo que aparece no queda tapado por el teclado)
 let FS = { meal: "", tab: "frec", q: "", sel: null, results: [] };
 const FTABS = [["frec", "Frecuentes"], ["fav", "Favoritos"], ["recetas", "Recetas"], ["voz", "🎤 Por voz"], ["rapido", "Añadir rápido"], ["supl", "Suplementos"], ["crear", "Crear"]];
@@ -262,11 +263,11 @@ act("addFood", (el) => { rescueScanned(); FS = { meal: el.dataset.m, tab: "frec"
 const planMenus = () => (has("plan_menus") && S.client?.menus?.length ? S.client.menus : null);
 const ftabs = () => (planMenus() ? [FTABS[0], ["plan", "Mi plan"], ...FTABS.slice(1)] : FTABS);
 async function openFoodSheet() {
-  sheet(FS.meal, `<div class="fs-top"><div class="row gap"><div class="fsearch grow">${I.search}<input id="fq" type="search" placeholder="Buscar alimento o marca…" value="${esc(FS.q)}" data-a-input="foodSearch" autocomplete="off" enterkeyhint="search"></div><button class="btn" data-a="scan" title="Escanear código de barras">▥</button></div>
+  sheet(FS.meal, `<div class="fs-top"><div class="row gap"><div class="fsearch grow">${I.search}<input id="fq" type="search" placeholder="Buscar alimento o marca…" value="${esc(FS.q)}" data-a-input="foodSearch" autocomplete="off" enterkeyhint="search"></div><button class="btn scanbtn" data-a="scan" title="Escanear el código de barras del envase">${BARCODE}<span>Escanear</span></button></div>
     <div class="seg scroll" id="ftabs">${ftabsHtml()}</div></div><div id="fsb"></div>`, { full: true });
   await renderFoodTab();
 }
-const ftabsHtml = () => ftabs().map(([k, l]) => `<button class="${FS.tab === k ? "on" : ""}" data-a="foodTab" data-t="${k}">${l}</button>`).join("");
+const ftabsHtml = () => ftabs().map(([k, l]) => `<button class="${FS.tab === k ? "on" : ""} ${k === "plan" ? "plantab" : ""}" data-a="foodTab" data-t="${k}">${l}</button>`).join("");
 act("foodTab", (el) => { FS.tab = el.dataset.t; FS.sel = null; FS.q = ""; FS.planG = 0; const q = $("#fq"); if (q) q.value = ""; $("#ftabs").innerHTML = ftabsHtml(); renderFoodTab(); });
 async function renderFoodTab() {
   const box = $("#fsb"); if (!box) return;
@@ -292,14 +293,18 @@ async function renderFoodTab() {
     FS.results = favs;
   } else if (FS.tab === "recetas") {
     const rec = custom.filter((f) => f.type === "receta");
-    box.innerHTML = rec.length ? rec.map((r) => `<div class="fi" data-a="addRecipe" data-id="${r.id}"><span>${esc(r.name)}<small>${r.items.length} alimentos</small></span><span>${r0(sum(r.items, (it) => itemMacros(it).kcal))} kcal ＋</span></div>`).join("") : `<p class="muted center pad">Arma una comida y usa “⋯ → Guardar como receta”.</p>`;
+    const preps = custom.filter((f) => f.prep); FS.results = preps;
+    box.innerHTML = (preps.length ? `<div class="shop-g">Preparaciones caseras</div>${preps.map((f) => resRow(f)).join("")}<div class="shop-g">Recetas (comidas guardadas)</div>` : "") + (rec.length ? rec.map((r) => `<div class="fi" data-a="addRecipe" data-id="${r.id}"><span>${esc(r.name)}<small>${r.items.length} alimentos</small></span><span>${r0(sum(r.items, (it) => itemMacros(it).kcal))} kcal ＋</span></div>`).join("") : `<p class="muted center pad">Arma una comida y usa “⋯ → Guardar como receta”. Para algo que cocinas en casa (ej. lentejas) usa Crear → Preparación casera.</p>`);
   } else if (FS.tab === "supl") {
     const sup = custom.filter((f) => f.type === "supl");
     FS.results = sup;
     box.innerHTML = `${sup.map((f) => resRow(f)).join("") || `<p class="muted small">Aún no tienes suplementos.</p>`}<button class="btn block" data-a="foodTab" data-t="crear" data-supl="1">＋ Crear suplemento</button>`;
   } else if (FS.tab === "crear") {
-    box.innerHTML = `<label>Tipo<select id="nT"><option value="alimento">Alimento</option><option value="supl">Suplemento</option></select></label>
-    <label>Nombre *<input id="nN"></label><label>Marca<input id="nB"></label><div class="row gap"><label class="grow">Código de barras<input id="nCode" inputmode="numeric"></label><button class="btn" data-a="scan" data-into="nCode" style="align-self:end">▥</button></div>
+    FS.cmode ||= "prod";
+    const seg = `<div class="seg"><button class="${FS.cmode === "prod" ? "on" : ""}" data-a="cMode" data-m="prod">Producto con etiqueta</button><button class="${FS.cmode === "prep" ? "on" : ""}" data-a="cMode" data-m="prep">Preparación casera</button></div>`;
+    if (FS.cmode === "prep") { box.innerHTML = seg + prepHtml(); return drawPrep(); }
+    box.innerHTML = seg + `<div class="guide"><b>¿Cuándo usarlo?</b> Para un producto envasado que no aparece al buscar ni al escanear. Copia la tabla nutricional del envase: si viene “por porción”, anota de cuántos gramos es la porción; si no, anota los valores por 100 g. Para algo que cocinas en casa (lentejas, cazuela, queque) usa <b>Preparación casera</b>.</div><label>Tipo<select id="nT"><option value="alimento">Alimento</option><option value="supl">Suplemento</option></select></label>
+    <label>Nombre *<input id="nN"></label><label>Marca<input id="nB"></label><div class="row gap"><label class="grow">Código de barras<input id="nCode" inputmode="numeric"></label><button class="btn scanbtn" data-a="scan" data-into="nCode" style="align-self:end">${BARCODE}<span>Escanear</span></button></div>
     <label>Tamaño de la porción (g)<input id="nPor" type="number" inputmode="decimal" placeholder="Ej: 30 (1 scoop)"></label>
     <p class="muted small">Aporte por porción indicada (o por 100 g si no indicas porción):</p>
     <div class="grid4"><label>Kcal<input id="nK" type="number" inputmode="decimal"></label><label>CHO<input id="nC" type="number" inputmode="decimal"></label><label>Lípidos<input id="nF" type="number" inputmode="decimal"></label><label>Proteína<input id="nP" type="number" inputmode="decimal"></label></div>
@@ -386,7 +391,7 @@ act("selFood", (el) => pickFood(FS.results.find((f) => String(f.id) === el.datas
 // Sin "porción de intercambio" (20-nov): el aporte real no calza con la porción y confunde. Sí queda la porción propia
 // de un producto creado o escaneado (ej. 1 scoop de 30 g), que no es de intercambio.
 const ownPor = (f) => (f.portion && f.src !== "base" && !medidaInfo(f) ? f.portion : null);
-const unitOpts = (f) => { const mi = medidaInfo(f), op = ownPor(f); return [["g", "Gramos", 1], ...(mi ? [["med", mi.label, mi.each]] : []), ...(op ? [["por", `Porción (${r0(op)} g)`, op]] : [])]; };
+const unitOpts = (f) => { const mi = medidaInfo(f), op = ownPor(f); return [["g", "Gramos", 1], ...(mi ? [["med", `${mi.label} (${r0(mi.each)} g)`, mi.each]] : []), ...(op ? [["por", `Porción (${r0(op)} g)`, op]] : [])]; };
 function foodDetail(f) {
   const opts = unitOpts(f), u = opts.find((o) => o[0] === FS.unit) || opts[0];
   return `<button class="btn ghost small" data-a="foodBack">‹ Volver</button><div class="row between"><h3>${esc(f.name)}</h3>${f.src !== "base" ? `<button class="btn tiny" data-a="foodRename">✎ Nombre</button>` : ""}</div><div class="muted small">${f.brand ? esc(f.brand) + " · " : ""}${f.cat ? `Grupo: ${esc(f.cat)} · ` : ""}por 100 g: ${r0(f.kcal)} kcal · C ${r1(f.cho)} · L ${r1(f.fat)} · P ${r1(f.prot)}${f.fuente ? `<br>Fuente: ${esc(f.fuente)}` : ""}</div>
@@ -494,6 +499,54 @@ act("quickAdd", async () => {
   const name = $("#qN").value.trim() || "Añadido rápido", k = num($("#qK").value);
   if (k == null) return toast("Indica al menos las calorías");
   await addItems([{ name, g: num($("#qG").value) || 0, kcal: k, cho: num($("#qC").value) || 0, fat: num($("#qF").value) || 0, prot: num($("#qP").value) || 0, per100: false, quick: true }]);
+});
+// ---------- Preparación casera: suma los ingredientes crudos y divide por el peso final cocido → aporte por 100 g
+let PREP_POOL = null;
+function prepHtml() {
+  const p = (FS.prep ||= { ings: [{ name: "", g: "" }], cooked: "", name: "" }); PREP_POOL = null;
+  return `<div class="guide"><b>Para lo que cocinas en casa y comes en varias porciones</b> (lentejas, cazuela, queque, salsa…).<ol>
+    <li>Anota cada ingrediente <b>crudo</b> con lo que pesó: todo lo que echaste a la olla, incluido el aceite.</li>
+    <li>Cuando esté lista, <b>pesa la preparación completa</b> (sin la olla: pesa la olla vacía antes y réstala).</li>
+    <li>Guárdala. Después registras solo los gramos que te sirves, y la app calcula sus macros.</li></ol></div>
+  <label>Nombre de la preparación<input id="pN" value="${esc(p.name)}" placeholder="Ej: Lentejas con arroz" data-a-input="prepName"></label>
+  <div class="card-t mt">Ingredientes crudos</div><div id="prepL"></div>
+  <button class="btn small" data-a="prepAdd">＋ Ingrediente</button>
+  <label class="mt">Peso total de la preparación lista (g)<input id="pW" type="number" inputmode="decimal" value="${p.cooked}" placeholder="Ej: 1850" data-a-input="prepW"></label>
+  <div id="prepT" class="prep-tot"></div>
+  <button class="btn primary big" data-a="prepSave">Guardar preparación</button>`;
+}
+async function drawPrep() {
+  if (!PREP_POOL) { const custom = (await db.list(P() + "/foods")).filter((f) => f.type !== "receta" && !f.prep); PREP_POOL = [...custom, ...(await getFoodBase())]; }
+  const L = $("#prepL"); if (!L) return;
+  if (!$("#prepDL")) L.insertAdjacentHTML("beforebegin", `<datalist id="prepDL">${PREP_POOL.map((f) => `<option value="${esc(f.name)}">`).join("")}</datalist>`);
+  L.innerHTML = FS.prep.ings.map((it, k) => { const f = prepFood(it.name); return `<div class="prep-row"><input class="grow" list="prepDL" value="${esc(it.name)}" placeholder="Escribe y elige…" data-a-change="prepIng" data-k="${k}" data-f="name"><input type="number" inputmode="decimal" value="${it.g}" placeholder="g" data-a-input="prepIng" data-k="${k}" data-f="g"><button class="icon-btn" data-a="prepDel" data-k="${k}">✕</button></div><small class="warn" id="pw${k}">${it.name && !f ? PREP_WARN : ""}</small>`; }).join("");
+  prepTot();
+}
+const PREP_WARN = "No está en la base: elige uno de la lista o créalo antes como producto.";
+const prepFood = (n) => { const k = norm(String(n || "").trim()); return k ? PREP_POOL?.find((f) => norm(f.name) === k) : null; };
+function prepCalc() {
+  const t = { kcal: 0, cho: 0, fat: 0, prot: 0, g: 0 };
+  for (const it of FS.prep.ings) { const f = prepFood(it.name), g = num(it.g) || 0; if (!f || !g) continue; const m = itemMacros({ ...f, g }); for (const k of ["kcal", "cho", "fat", "prot"]) t[k] += m[k]; t.g += g; }
+  return t;
+}
+function prepTot() {
+  const t = prepCalc(), w = num(FS.prep.cooked) || 0, el = $("#prepT"); if (!el) return;
+  el.innerHTML = t.g ? `Toda la olla: <b>${r0(t.kcal)} kcal</b> · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)} (${r0(t.g)} g crudos)${w ? `<br>Por 100 g de preparación lista: <b>${r0((t.kcal * 100) / w)} kcal</b> · C ${r1((t.cho * 100) / w)} · L ${r1((t.fat * 100) / w)} · P ${r1((t.prot * 100) / w)}` : `<br><span class="muted">Falta el peso total de la preparación lista.</span>`}` : `<span class="muted">Agrega los ingredientes con sus gramos.</span>`;
+}
+act("cMode", (el) => { FS.cmode = el.dataset.m; renderFoodTab(); });
+act("prepName", (el) => { FS.prep.name = el.value; });
+act("prepW", (el) => { FS.prep.cooked = el.value; prepTot(); });
+act("prepIng", (el) => { const k = +el.dataset.k, it = FS.prep.ings[k]; it[el.dataset.f] = el.value; if (el.dataset.f === "name") { const w = $("#pw" + k); if (w) w.textContent = it.name && !prepFood(it.name) ? PREP_WARN : ""; } prepTot(); });
+act("prepAdd", () => { FS.prep.ings.push({ name: "", g: "" }); drawPrep(); setTimeout(() => { const x = $$("#prepL input[list]"); x[x.length - 1]?.focus(); }, 0); });
+act("prepDel", (el) => { FS.prep.ings.splice(+el.dataset.k, 1); if (!FS.prep.ings.length) FS.prep.ings.push({ name: "", g: "" }); drawPrep(); });
+act("prepSave", async () => {
+  const name = ($("#pN")?.value || "").trim(), t = prepCalc(), w = num(FS.prep.cooked) || 0;
+  if (!name) return toast("Ponle nombre a la preparación"); if (!t.g) return toast("Agrega los ingredientes con sus gramos"); if (!w) return toast("Falta el peso total de la preparación lista");
+  const food = { type: "alimento", prep: true, name, src: "custom", kcal: (t.kcal * 100) / w, cho: (t.cho * 100) / w, fat: (t.fat * 100) / w, prot: (t.prot * 100) / w, cookedG: w,
+    ings: FS.prep.ings.filter((x) => prepFood(x.name) && num(x.g)).map((x) => ({ name: x.name, g: num(x.g) })) };
+  const id = uid(); await db.set(`${P()}/foods/${id}`, food); toast("Preparación guardada ✓");
+  FS.prep = { ings: [{ name: "", g: "" }], cooked: "", name: "" }; PREP_POOL = null; FS.cmode = "prod";
+  FS.tab = "frec"; $("#ftabs").innerHTML = ftabsHtml(); pickFood({ ...food, id });
 });
 act("createFood", async () => {
   const name = $("#nN").value.trim(); if (!name) return toast("Falta el nombre");

@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.25.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.26.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -214,3 +214,9 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - `ima-planes.json` regenerado: chía (INTA, por 100 g), Nutella (etiqueta 539/57,5/30,9/6,3), jalea sin azúcar = 0, y los 3 extras KFC de Felipe con el total de la tarjeta del PDF (1431 kcal · C 111 · L 68 · P 99) **repartido según gramos** (aproximado: corregir en el editor si tiene los valores por producto). Se quitó el "(" que quedaba al final de algunas medidas.
 - **Día con legumbres:** `client.pautaLeg` (se edita en Datos y objetivos junto a la pauta normal; viene en el import desde la 2ª columna de la pauta del PDF; `applyStage` le aplica el mismo ajuste de etapa). Una opción con `leg: true` ("Es el día con legumbres" en el editor) se compara con esa pauta (Déborah alt. 5 y la opción "Con legumbres" del plan de ejemplo de Joaquín, migración `planLeg2011`). Si ninguna opción es de legumbres, el cliente ve una pestaña "Día con legumbres" en Mi plan con lo que cambia (−2 cereales, −1 carnes, +2 legumbres…) y la tabla normal vs legumbres (`legHtml`).
 - **Coach → Alimentación (resumen semanal):** macros del día a día vs meta (verde ±5 %, amarillo 6–10 %, rojo >10 %; proteína sobre la meta = bien) con promedio; cuánto comió de cada grupo en la semana (gramos reales + ≈ porciones/día vs pauta, aproximadas); lo más consumido (días y gramos promedio) y **lo que no está en su plan** (comparando nombres con las opciones `menus`; "habitual" si lo comió 3+ días) para ajustar el plan.
+
+## v1.26.0 (20-nov) — Mi plan más visual, lista de compras y preparaciones caseras
+- **Mi plan (cliente):** cada tiempo de comida en su tarjeta con borde rojo (como en Comida) y el nombre ("Desayuno · pre entreno") en una cápsula roja (`.card.pmeal`, `.pmh b`). Sin macros: Joaquín prefiere solo cantidades.
+- **Lista de compras:** queda guardada en el celular (LS `ima-shop-{cid}`): los días por opción y lo tachado se mantienen hasta "Nueva lista" (pide confirmar, desmarca todo y guarda la fecha `started`, que se muestra). No se reinicia sola.
+- **Agregar alimento:** la pestaña "Mi plan" resaltada en rojo (`.plantab`); el botón del escáner ahora es un ícono de código de barras con el texto "Escanear" (`BARCODE`, `.scanbtn`). La medida casera muestra sus gramos ("1 cda (15 g)"); la porción de intercambio no aparece (decisión de Joaquín: el cliente ya la ve en su plan).
+- **Crear → Preparación casera:** guía de 3 pasos; ingredientes crudos con gramos (datalist de la base + alimentos propios), peso total de la preparación lista → guarda un alimento propio por 100 g (`prep: true`, `ings`, `cookedG`) y abre la ficha para registrar los gramos servidos. "Producto con etiqueta" tiene su guía de cuándo usarlo. Las preparaciones aparecen también en la pestaña Recetas.

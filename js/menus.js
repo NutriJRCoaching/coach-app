@@ -130,15 +130,16 @@ export async function shoppingView(head) {
   return `${head("Lista de compras", "plan")}
   <div class="card"><div class="card-t">¿Cuántos días de cada opción?</div>
   ${menus.map((mn, k) => `<div class="row between li"><span>${esc(mn.name || "Opción " + (k + 1))}</span><span class="row gap"><button class="btn tiny" data-a="shopDays" data-id="${mn.id}" data-n="-1">−</button><b class="shop-d">${+st.days[mn.id] || 0}</b><button class="btn tiny" data-a="shopDays" data-id="${mn.id}" data-n="1">＋</button></span></div>`).join("")}
-  <p class="muted small">${totalDays} día${totalDays === 1 ? "" : "s"} en total · cantidades según los alimentos de ejemplo de tu plan.</p></div>
-  ${items.length ? `<div class="card"><div class="row between"><div class="card-t">Por comprar · ${left} de ${items.length}</div><span class="row gap"><button class="btn tiny" data-a="shopShare">Compartir</button><button class="btn tiny ghost" data-a="shopReset">Desmarcar</button></span></div>
+  <p class="muted small">${totalDays} día${totalDays === 1 ? "" : "s"} en total · cantidades según los alimentos de ejemplo de tu plan.</p>
+  <p class="muted small">La lista queda guardada en tu celular: lo que vas tachando y los días de cada opción se mantienen hasta que toques <b>Nueva lista</b> (por ejemplo, cada vez que vas a comprar).${st.started ? ` Esta lista la empezaste el ${new Date(st.started).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}.` : ""}</p></div>
+  ${items.length ? `<div class="card"><div class="row between"><div class="card-t">Por comprar · ${left} de ${items.length}</div><span class="row gap"><button class="btn tiny" data-a="shopShare">Compartir</button><button class="btn tiny ghost" data-a="shopReset">Nueva lista</button></span></div>
   ${order.map((g) => `<div class="shop-g">${esc(g)}</div>${groups[g].sort((a, b) => a.name.localeCompare(b.name, "es")).map((it) => { const hm = homeMeasure(it.g, it.medida, it.medidaG);
     return `<label class="shop-i ${st.checked[it.k] ? "done" : ""}"><input type="checkbox" ${st.checked[it.k] ? "checked" : ""} data-a-change="shopCheck" data-k="${esc(it.k)}"><span>${esc(it.name)}</span><span class="sw-q"><b>${fmtG(it.g)}</b>${hm ? `<small>≈ ${esc(hm)}</small>` : ""}</span></label>`; }).join("")}`).join("")}</div>`
   : `<div class="card"><p class="muted">Elige cuántos días vas a seguir cada opción para armar la lista.</p></div>`}`;
 }
 act("shopDays", (el) => { const menus = S.client.menus || [], st = shopState(menus); st.days[el.dataset.id] = Math.max(0, Math.min(31, (+st.days[el.dataset.id] || 0) + +el.dataset.n)); shopSave(st); refresh(); });
-act("shopCheck", (el) => { const st = shopState(S.client.menus || []); if (el.checked) st.checked[el.dataset.k] = 1; else delete st.checked[el.dataset.k]; shopSave(st); refresh(); });
-act("shopReset", () => { const st = shopState(S.client.menus || []); st.checked = {}; shopSave(st); refresh(); });
+act("shopCheck", (el) => { const st = shopState(S.client.menus || []); st.started ||= Date.now(); if (el.checked) st.checked[el.dataset.k] = 1; else delete st.checked[el.dataset.k]; shopSave(st); refresh(); });
+act("shopReset", async () => { if (!(await confirmBox("¿Empezar una lista nueva? Se desmarca todo lo que tachaste (los días de cada opción se mantienen)."))) return; const st = shopState(S.client.menus || []); st.checked = {}; st.started = Date.now(); shopSave(st); refresh(); });
 act("shopShare", async () => {
   const menus = S.client.menus || [], st = shopState(menus), items = shopItems(menus, st).filter((x) => !st.checked[x.k]);
   const txt = "🛒 Lista de compras\n" + items.map((it) => `• ${it.name}: ${fmtG(it.g)}${homeMeasure(it.g, it.medida, it.medidaG) ? ` (≈ ${homeMeasure(it.g, it.medida, it.medidaG)})` : ""}`).join("\n");
