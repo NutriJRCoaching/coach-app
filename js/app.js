@@ -126,6 +126,13 @@ async function enterClient() {
     c = { ...c, menus, pauta: c.pauta && Object.keys(c.pauta).length ? c.pauta : pauta, planDemo1911: true };
     db.set("clients/" + id, { menus, pauta: c.pauta, planDemo1911: true });
   }
+  // 20-nov: la opción "Con legumbres" del plan de ejemplo se compara con la pauta del día con legumbres
+  if (c.planDemo1911 && !c.planLeg2011) {
+    const { JR_PAUTA_LEG } = await import("./seed-plan.js");
+    const menus = (c.menus || []).map((m) => (m.id === "jr-ej-3" ? { ...m, leg: true } : m));
+    c = { ...c, menus, pautaLeg: c.pautaLeg || JR_PAUTA_LEG, planLeg2011: true };
+    db.set("clients/" + id, { menus, pautaLeg: c.pautaLeg, planLeg2011: true });
+  }
   S.viewAs = "client"; S.cid = id; S.raw = c; LS.set("viewAs", "client");
   db.watch("clients/" + id, (x) => { if (x && S.cid === id) S.raw = x; });
   if (!location.hash || location.hash.startsWith("#coach")) location.hash = "inicio";

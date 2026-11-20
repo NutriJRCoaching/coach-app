@@ -3,6 +3,7 @@
 // Formato: [tiempo de comida, hora, [[alimento de la base de intercambio, porciones], ...]]
 import { INTERCAMBIO } from "./intercambio.js";
 
+export const JR_PAUTA_LEG = { "Cereales": 6, "Verduras generales": 2, "Verduras libre consumo": 2, "Frutas": 4, "Lácteos altos en grasa": 1, "Lácteos bajos en grasa": 2, "Carnes magras": 4, "Legumbres": 2, "Aceites y grasas": 1, "Alimentos ricos en lípidos": 1, "Azúcar": 3 };
 export const JR_PAUTA = { "Cereales": 8, "Verduras generales": 2, "Verduras libre consumo": 2, "Frutas": 4, "Lácteos altos en grasa": 1, "Lácteos bajos en grasa": 2, "Carnes magras": 6, "Aceites y grasas": 1, "Alimentos ricos en lípidos": 1, "Azúcar": 3 };
 
 const OPTS = [
@@ -38,6 +39,6 @@ export function jrPlan() {
     const [n, cat, medida, gp] = r;
     return { name: n, cat, por, gp, g: Math.round(por * gp * 10) / 10, medida, medidaG: gp };
   };
-  const menus = OPTS.map(([name, note, meals], k) => ({ id: "jr-ej-" + (k + 1), name, note, meals: meals.map(([m, time, items]) => ({ name: m, time, items: items.map(item) })) }));
-  return { menus, pauta: JR_PAUTA };
+  const menus = OPTS.map(([name, note, meals], k) => ({ id: "jr-ej-" + (k + 1), name, note, leg: k === 2, meals: meals.map(([m, time, items]) => ({ name: m, time, items: items.map(item) })) }));
+  return { menus, pauta: JR_PAUTA, pautaLeg: JR_PAUTA_LEG };
 }

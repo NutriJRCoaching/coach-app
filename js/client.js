@@ -10,10 +10,11 @@ import { trainView, sessionView, surveyView, summaryView, restBar } from "./trai
 import { I } from "./icons.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg } from "./data.js";
 import { has, loadMatrix } from "./features.js";
+import { GROUPS } from "./foods.js";
 import { maybeOnboard } from "./onboarding.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
-import { menusHtml, shoppingView, homeMeasure as homeMeasureC } from "./menus.js";
+import { menusHtml, shoppingView, homeMeasure as homeMeasureC, legPauta, legHtml } from "./menus.js";
 
 const P = () => "clients/" + S.cid;
 
@@ -201,19 +202,15 @@ async function waterView() {
 async function food() {
   const c = S.client, day = await getDay(S.date), tot = dayTotals(day);
   const water = sum(day.water || [], (x) => x.ml);
-  const pauta = c.pauta && Object.values(c.pauta).some((v) => +v > 0) ? c.pauta : null;
-  let used = {};
-  if (pauta) for (const items of Object.values(day.meals || {})) for (const it of items) if (it.cat && it.por && pauta[it.cat] != null) used[it.cat] = (used[it.cat] || 0) + (+it.g || 0) / it.por;
   const photos = (await db.list(P() + "/photos")).filter((p) => p.kind === "comida" && p.date === S.date);
   return `${head("Alimentación")}${dayStrip()}
   <div class="card sticky-macros">${bar("Calorías", tot.kcal, c.kcal, "kcal", "c-k")}${bar("CHO", tot.cho, c.cho, "g", "c-c")}${bar("Lípidos", tot.fat, c.fat, "g", "c-l")}${bar("Proteína", tot.prot, c.prot, "g", "c-p")}</div>
-  ${pauta ? `<details class="card"><summary class="card-t">Porciones de tu pauta</summary>${Object.entries(pauta).filter(([, v]) => +v > 0).map(([g, v]) => bar(g, r1(used[g] || 0), +v, "porc.")).join("")}<p class="muted small">Los alimentos de grupos fuera de la pauta suman calorías y macros, pero no descuentan porciones.</p></details>` : ""}
   ${mealList(day).map((m) => {
     const items = day.meals?.[m] || [], mt = items.reduce((t, it) => { const x = itemMacros(it); for (const k in t) t[k] += x[k]; return t; }, { kcal: 0, cho: 0, fat: 0, prot: 0 });
     const ph = photos.filter((p) => p.meal === m);
     return `<div class="card meal ${items.length ? "" : "empty"}"><div class="mh"><div><b>${m}</b><small>${r0(mt.kcal)} kcal · C ${r0(mt.cho)} · L ${r0(mt.fat)} · P ${r0(mt.prot)}</small></div>
     <div class="row"><button class="icon-btn" data-a="mealMenu" data-m="${m}">⋯</button><button class="icon-btn add" data-a="addFood" data-m="${m}">${I.plus}</button></div></div>
-    ${items.map((it, i) => `<div class="fi" data-a="editItem" data-m="${m}" data-i="${i}">${(() => { const x = itemMacros(it); return `<span>${esc(it.name)}<small>${r0(it.g)} g${it.por ? ` · ${r1(it.g / it.por)} porc.` : ""}</small><small class="imac"><i class="mc">C ${r1(x.cho)}</i><i class="ml">L ${r1(x.fat)}</i><i class="mp">P ${r1(x.prot)}</i></small></span><span>${r0(x.kcal)} kcal</span>`; })()}</div>`).join("")}
+    ${items.map((it, i) => `<div class="fi" data-a="editItem" data-m="${m}" data-i="${i}">${(() => { const x = itemMacros(it); return `<span>${esc(it.name)}<small>${r0(it.g)} g</small><small class="imac"><i class="mc">C ${r1(x.cho)}</i><i class="ml">L ${r1(x.fat)}</i><i class="mp">P ${r1(x.prot)}</i></small></span><span>${r0(x.kcal)} kcal</span>`; })()}</div>`).join("")}
     ${day.mealNotes?.[m] ? `<div class="note">📝 ${esc(day.mealNotes[m])}</div>` : ""}
     ${ph.length ? `<div class="thumbs">${ph.map((p) => `<img src="${p.data}" data-a="viewPhoto" data-id="${p.id}">`).join("")}</div>` : ""}</div>`;
   }).join("")}
@@ -381,12 +378,15 @@ function pickFood(f, grams) {
   FS.sel = f; const mi = medidaInfo(f);
   if (grams) { FS.unit = "g"; FS.qty = grams; FS.selG = grams; }
   else if (mi) { FS.unit = "med"; FS.qty = 1; FS.selG = r1(mi.each); }
-  else if (f.portion) { FS.unit = "por"; FS.qty = 1; FS.selG = f.portion; }
+  else if (ownPor(f)) { FS.unit = "por"; FS.qty = 1; FS.selG = ownPor(f); }
   else { FS.unit = "g"; FS.qty = ""; FS.selG = 0; }
   renderFoodTab();
 }
 act("selFood", (el) => pickFood(FS.results.find((f) => String(f.id) === el.dataset.id)));
-const unitOpts = (f) => { const mi = medidaInfo(f); return [["g", "Gramos", 1], ...(mi ? [["med", mi.label, mi.each]] : []), ...(f.portion ? [["por", "Porción de intercambio", f.portion]] : [])]; };
+// Sin "porción de intercambio" (20-nov): el aporte real no calza con la porción y confunde. Sí queda la porción propia
+// de un producto creado o escaneado (ej. 1 scoop de 30 g), que no es de intercambio.
+const ownPor = (f) => (f.portion && f.src !== "base" && !medidaInfo(f) ? f.portion : null);
+const unitOpts = (f) => { const mi = medidaInfo(f), op = ownPor(f); return [["g", "Gramos", 1], ...(mi ? [["med", mi.label, mi.each]] : []), ...(op ? [["por", `Porción (${r0(op)} g)`, op]] : [])]; };
 function foodDetail(f) {
   const opts = unitOpts(f), u = opts.find((o) => o[0] === FS.unit) || opts[0];
   return `<button class="btn ghost small" data-a="foodBack">‹ Volver</button><div class="row between"><h3>${esc(f.name)}</h3>${f.src !== "base" ? `<button class="btn tiny" data-a="foodRename">✎ Nombre</button>` : ""}</div><div class="muted small">${f.brand ? esc(f.brand) + " · " : ""}${f.cat ? `Grupo: ${esc(f.cat)} · ` : ""}por 100 g: ${r0(f.kcal)} kcal · C ${r1(f.cho)} · L ${r1(f.fat)} · P ${r1(f.prot)}${f.fuente ? `<br>Fuente: ${esc(f.fuente)}` : ""}</div>
@@ -767,7 +767,8 @@ async function planView() {
   return `${head("Mi plan de alimentación", "mas")}${aj ? `<div class="card fbmini"><div class="card-t">Etapa: ${esc(st.phase)} · semanas ${st.from}–${st.to}</div><div class="small">Tu plan ya viene ajustado para esta etapa: <b>${esc(aj)}</b> porciones al día. Los gramos de abajo ya incluyen el cambio.</div>${st.note ? `<div class="muted small mt">${esc(st.note)}</div>` : ""}</div>` : ""}${opts}
   ${p.pdfUrl || p.notes || !opts ? `<div class="card">${p.pdfUrl ? `<a class="btn ${opts ? "" : "primary"} big block" target="_blank" href="${esc(p.pdfUrl)}">Abrir mi plan (PDF)</a>` : opts ? "" : `<p class="muted">Tu coach aún no sube tu plan.</p>`}
   ${p.notes ? `<div class="pre">${esc(p.notes)}</div>` : ""}</div>` : ""}
-  ${has("plan_pauta") && S.client.pauta ? `<details class="card"><summary class="card-t">Porciones por día</summary>${Object.entries(S.client.pauta).filter(([, v]) => +v > 0).map(([g, v]) => `<div class="li row between"><span>${esc(g)}</span><b>${v}</b></div>`).join("")}</details>` : ""}`;
+  ${has("plan_pauta") && S.client.pauta ? `<details class="card"><summary class="card-t">Porciones por día</summary>${legPauta(S.client) ? `<div class="li row between muted small"><span>Grupo</span><span>Normal · Con legumbres</span></div>` : ""}${Object.keys(GROUPS).filter((g) => +S.client.pauta[g] > 0 || +legPauta(S.client)?.[g] > 0).map((g) => `<div class="li row between"><span>${esc(g)}</span><b>${S.client.pauta[g] ?? 0}${legPauta(S.client) ? ` · ${legPauta(S.client)[g] ?? 0}` : ""}</b></div>`).join("")}</details>` : ""}
+  ${has("plan_pauta") && !(S.client.menus || []).length ? legHtml(S.client) : ""}`;
 }
 
 // Solo entrenamiento: sin plan de alimentación, con una guía de macros en rangos según su peso

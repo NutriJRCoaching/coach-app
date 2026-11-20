@@ -229,6 +229,7 @@ export function applyStage(c, date = ymd()) {
       const G = GROUPS[g]; if (G) { const real = nu - old; dm.kcal += real * G[0]; dm.cho += real * G[1]; dm.fat += real * G[2]; dm.prot += real * G[3]; }
     }
     o.pauta = pauta;
+    if (c.pautaLeg) { o.pautaLeg = { ...c.pautaLeg }; for (const [g, d] of adj) if (o.pautaLeg[g] != null) o.pautaLeg[g] = Math.max(0, +o.pautaLeg[g] + +d); }
     if (c.menus) o.menus = c.menus.map((m) => ({ ...m, meals: m.meals.map((ml) => ({ ...ml, items: ml.items.map((it) => (f[it.cat] != null && f[it.cat] !== 1 ? { ...it, por: it.por != null ? Math.round(it.por * f[it.cat] * 100) / 100 : it.por, g: it.g != null ? Math.round(it.g * f[it.cat]) : it.g, adj: true } : it)).filter((it) => !(it.adj && !it.g)) })) }));
     for (const k of ["kcal", "cho", "fat", "prot"]) if ((s[k] === "" || s[k] == null) && c[k]) o[k] = Math.round(c[k] + dm[k]);
   }

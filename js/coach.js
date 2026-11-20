@@ -307,19 +307,39 @@ async function foodView(c0, w) {
   const c = applyStage(c0, w.first);
   const days = await getDays(w.first, w.last, c.id);
   const photos = (await db.list(`clients/${c.id}/photos`)).filter((p) => p.kind === "comida" && p.week === w.key);
-  // Resumen de la semana: porciones por grupo, alimentos más frecuentes y lo que quedó fuera de la pauta
+  // Resumen de la semana (19-nov): macros del día a día vs meta, cuánto comió de cada grupo en la semana,
+  // lo más consumido y lo que comió que NO está en su plan (para ver si es habitual y ajustar el plan)
   const regDays = w.days.filter((d) => Object.values(days[d]?.meals || {}).some((m) => m.length));
-  const por = {}, freq = {}, extra = {};
+  const grp = {}, freq = {};
+  const stripN = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim();
+  const planItems = []; for (const mn of c.menus || []) for (const m of mn.meals || []) for (const it of m.items || []) planItems.push({ n: stripN(it.name), cat: it.cat || "" });
+  const inPlan = (it) => { const n = stripN(it.name), w0 = n.split(" ")[0]; return planItems.some((p) => p.n === n || n.startsWith(p.n + " ") || p.n.startsWith(n + " ") || (p.cat && p.cat === it.cat && p.n.split(" ")[0] === w0)); };
   for (const d of regDays) for (const items of Object.values(days[d].meals || {})) for (const it of items) {
-    freq[it.name] = (freq[it.name] || 0) + 1;
-    if (it.cat && GROUPS[it.cat]?.[4] && it.por) por[it.cat] = (por[it.cat] || 0) + (+it.g || 0) / it.por;
-    else { const k = itemMacros(it).kcal; extra[it.name] = (extra[it.name] || 0) + k; }
+    const f = (freq[it.name] ||= { n: 0, days: new Set(), g: 0, kcal: 0, it }); f.n++; f.days.add(d); f.g += +it.g || 0; f.kcal += itemMacros(it).kcal;
+    if (it.cat && GROUPS[it.cat]?.[4]) { const x = (grp[it.cat] ||= { g: 0, por: 0 }); x.g += +it.g || 0; if (it.por) x.por += (+it.g || 0) / it.por; }
   }
-  const n = regDays.length || 1, groups = Object.keys({ ...(c.pauta || {}), ...por }).filter((g) => GROUPS[g]?.[4]);
+  const n = regDays.length || 1, meta = { kcal: c.kcal, cho: c.cho, fat: c.fat, prot: c.prot };
+  const cls = (v, m, k) => { if (!m) return ""; const e = Math.abs(v - m) / m; if (k === "prot" && v > m) return "okc"; return e <= 0.05 ? "okc" : e <= 0.1 ? "lowc" : "hic"; };
+  const tot = regDays.map((d) => [d, dayTotals(days[d])]), avgT = {}; for (const k of ["kcal", "cho", "fat", "prot"]) avgT[k] = tot.reduce((a, [, t]) => a + t[k], 0) / n;
+  const macroT = `<table class="tbl"><tr><th>Día</th><th>Kcal</th><th>CHO</th><th>Lípidos</th><th>Proteína</th></tr>
+    ${tot.map(([d, t]) => `<tr><td>${fmtDate(d, true)}</td>${["kcal", "cho", "fat", "prot"].map((k) => `<td class="${cls(t[k], meta[k], k)}">${r0(t[k])}</td>`).join("")}</tr>`).join("")}
+    <tr><td><b>Promedio</b></td>${["kcal", "cho", "fat", "prot"].map((k) => `<td class="${cls(avgT[k], meta[k], k)}"><b>${r0(avgT[k])}</b></td>`).join("")}</tr>
+    <tr class="muted"><td>Meta</td>${["kcal", "cho", "fat", "prot"].map((k) => `<td>${meta[k] || "–"}</td>`).join("")}</tr></table>
+    <p class="muted small">Verde ±5 % · amarillo 6–10 % · rojo más de 10 % de la meta (proteína sobre la meta cuenta como bien).</p>`;
+  const groups = Object.keys(GROUPS).filter((g) => GROUPS[g][4] && (grp[g] || c.pauta?.[g]));
+  const grpT = `<table class="tbl"><tr><th>Grupo</th><th>En la semana</th><th>≈ Porc./día</th><th>Pauta/día</th></tr>${groups.map((g) => { const x = grp[g] || { g: 0, por: 0 }, v = x.por / n, pp = +(c.pauta?.[g] || 0), dd = v - pp;
+    return `<tr><td>${esc(g)}</td><td>${x.g >= 1000 ? r1(x.g / 1000).toLocaleString("es-CL") + " kg" : r0(x.g) + " g"}</td><td class="${pp ? (Math.abs(dd) <= 0.5 ? "okc" : Math.abs(dd) <= 1.5 ? "lowc" : "hic") : ""}">${r1(v)}</td><td class="muted">${pp || "—"}</td></tr>`; }).join("")}</table>
+    <p class="muted small">Gramos reales registrados. Las porciones son aproximadas (el aporte real no siempre calza con la porción de intercambio). El cliente no ve esto.</p>`;
+  const fl = Object.entries(freq).map(([k, v]) => ({ k, ...v, d: v.days.size }));
+  const top = fl.sort((a, b) => b.d - a.d || b.n - a.n).slice(0, 12);
+  const out = fl.filter((x) => !inPlan(x.it)).sort((a, b) => b.d - a.d || b.kcal - a.kcal).slice(0, 15);
   const summary = regDays.length ? `<div class="card"><div class="card-t">Resumen de la semana · ${regDays.length} días con registro</div><div class="fsum">
-    <div><h4>Porciones promedio por día vs pauta</h4><table class="tbl"><tr><th>Grupo</th><th>Comió</th><th>Pauta</th></tr>${groups.map((g) => { const v = (por[g] || 0) / n, p = +(c.pauta?.[g] || 0), d = v - p; return `<tr><td>${esc(g)}</td><td class="${p ? (Math.abs(d) <= 0.5 ? "okc" : Math.abs(d) <= 1.5 ? "lowc" : "hic") : ""}">${r1(v)}</td><td class="muted">${p || "—"}</td></tr>`; }).join("")}</table></div>
-    <div><h4>Lo que más comió</h4>${Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `<div class="li row between small"><span>${esc(k)}</span><b>${v}×</b></div>`).join("")}</div>
-    <div><h4>Fuera de la pauta (no descuentan porciones)</h4>${Object.entries(extra).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `<div class="li row between small"><span>${esc(k)}</span><b>${r0(v)} kcal</b></div>`).join("") || '<p class="muted small">Nada fuera de la pauta.</p>'}</div></div></div>` : "";
+    <div><h4>Macros del día a día</h4>${macroT}</div>
+    <div><h4>Cuánto comió de cada grupo</h4>${grpT}</div></div>
+    <div class="fsum mt">
+    <div><h4>Lo más consumido</h4>${top.map((x) => `<div class="li row between small"><span>${esc(x.k)}</span><b>${x.d} día${x.d === 1 ? "" : "s"} · ${r0(x.g / x.n)} g</b></div>`).join("")}</div>
+    <div><h4>No está en su plan${(c.menus || []).length ? "" : " (aún no tiene opciones)"}</h4>${out.map((x) => `<div class="li row between small"><span>${esc(x.k)}${x.d >= 3 ? ' <span class="badge y">habitual</span>' : ""}</span><b>${x.d} día${x.d === 1 ? "" : "s"} · ${r0(x.kcal / x.d)} kcal/día</b></div>`).join("") || '<p class="muted small">Todo lo que registró está en su plan.</p>'}
+    <p class="muted small">"Habitual" = lo comió 3 días o más: puede valer la pena sumarlo a su plan.</p></div></div></div>` : "";
   return summary + w.days.map((d) => {
     const x = days[d] || {}, t = dayTotals(x), has = Object.values(x.meals || {}).some((m) => m.length);
     return `<details class="card" ${has ? "" : ""}><summary class="row between"><b>${fmtDate(d, true)}</b><span class="small">${has ? `${r0(t.kcal)} / ${c.kcal || "–"} kcal · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)}` : '<span class="muted">Sin registro</span>'}</span></summary>
@@ -554,7 +574,8 @@ async function dataView(c) {
   <div class="card-t mt">Plan de alimentación</div><label>Link al PDF del plan (respaldo en Drive; el plan se arma en “Plan alimentación”)<input name="planUrl" value="${esc(c.plan?.pdfUrl || "")}"></label>
   ${c.service === "entrenamiento" ? `<div class="card-t mt">Guía de macros (solo entrenamiento · el cliente ve rangos en vez de un plan)</div><p class="muted small">Gramos por kg de peso. Si dejas en blanco calorías y macros de arriba, su meta diaria es el punto medio de estos rangos.</p>
   <div class="grid3">${[["prot", "Proteína"], ["cho", "Carbohidratos"], ["fat", "Grasas"]].map(([k, l]) => { const v = c.ranges?.[k] || DEFAULT_RANGES[k]; return `<label>${l} (g/kg)<span class="row gap"><input type="number" step="0.1" data-rng="${k}" data-i="0" value="${v[0]}"><span>a</span><input type="number" step="0.1" data-rng="${k}" data-i="1" value="${v[1]}"></span></label>`; }).join("")}</div>` : ""}
-  <details><summary class="card-t">Pauta por porciones (opcional · descuenta porciones al registrar)</summary><div class="grid4">${Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => `<label>${g}<input type="number" step="0.5" data-pauta="${esc(g)}" value="${c.pauta?.[g] ?? ""}"></label>`).join("")}</div></details>
+  <details><summary class="card-t">Pauta por porciones (la ve el cliente en su plan · día normal / día con legumbres)</summary><p class="muted small">Si llenas la del día con legumbres, el cliente la ve en “Mi plan” como “Día con legumbres” (o la usa la opción del plan marcada como día con legumbres).</p>
+  <table class="tbl"><tr><th>Grupo</th><th>Día normal</th><th>Día con legumbres</th></tr>${Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => `<tr><td>${g}</td><td><input type="number" step="0.25" data-pauta="${esc(g)}" value="${c.pauta?.[g] ?? ""}" style="width:90px"></td><td><input type="number" step="0.25" data-pauta-leg="${esc(g)}" value="${c.pautaLeg?.[g] ?? ""}" style="width:90px"></td></tr>`).join("")}</table></details>
   <div class="card-t mt">Fechas de interés (una por línea: AAAA-MM-DD Texto)</div><textarea name="dates" rows="3">${esc((c.dates || []).map((d) => d.date + " " + d.label).join("\n"))}</textarea>
   <div class="row gap mt"><button type="button" class="btn primary" data-a="dataSave">Guardar</button><button type="button" class="btn danger ghost" data-a="archive">Archivar cliente</button></div></form>`;
 }
@@ -581,6 +602,7 @@ act("dataSave", async () => {
   data.plan = { ...(c0.plan || {}), pdfUrl: fd.planUrl };
   data.dates = fd.dates.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => ({ date: l.slice(0, 10), label: l.slice(11) }));
   data.pauta = {}; $$("[data-pauta]").forEach((i) => { if (i.value !== "") data.pauta[i.dataset.pauta] = num(i.value); });
+  data.pautaLeg = {}; $$("[data-pauta-leg]").forEach((i) => { if (i.value !== "") data.pautaLeg[i.dataset.pautaLeg] = num(i.value); });
   if ($("[data-rng]")) { data.ranges = {}; $$("[data-rng]").forEach((i) => { (data.ranges[i.dataset.rng] ||= [null, null])[+i.dataset.i] = num(i.value); }); }
   await db.set("clients/" + CW.cid, data); resetAlerts(); toast("Guardado ✓"); refresh();
 });

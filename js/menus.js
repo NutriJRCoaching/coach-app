@@ -34,7 +34,9 @@ export function homeMeasure(g, medida, medidaG) {
 }
 const fmtG = (g) => (g >= 1000 ? `${r1(g / 1000).toLocaleString("es-CL")} kg` : `${r0(g)} g`);
 const porTxt = (p) => `${r1(p).toLocaleString("es-CL")} porc.`;
-const itemLine = (it) => [it.por && it.gp ? porTxt(it.por) : "", it.g ? r0(it.g) + " g" : "", homeMeasure(it.g, it.medida, it.medidaG)].filter(Boolean).join(" · ");
+const itemLine = (it) => [it.por && it.gp ? porTxt(it.por) : "", it.g ? r0(it.g) + " g" : "", homeMeasure(it.g, it.medida, it.medidaG), isExtra(it) && it.kcal ? r0(it.kcal) + " kcal" : ""].filter(Boolean).join(" · ");
+// Extra = alimento sin grupo de intercambio (chía, Nutella, comida rápida…): lleva sus propios macros (de la cantidad del plan) y suma al total
+export const isExtra = (it) => !it.cat || !GROUPS[it.cat]?.[4];
 
 // El plan se arma con la base de PORCIONES DE INTERCAMBIO de Joaquín (1 porción = lo que aporta los macros del grupo)
 // + los alimentos propios que haya subido en Biblioteca.
@@ -52,22 +54,40 @@ export function menusHtml(c) {
   const menus = c.menus || [];
   if (!menus.length) return "";
   if (PV.k >= menus.length) PV.k = 0;
+  // Día con legumbres: si el coach dejó esa pauta y ninguna opción es de legumbres, se muestra como una pestaña más
+  const legTab = legPauta(c) && !menus.some((m) => m.leg);
+  if (PV.k === -1 && legTab) return `<div class="card"><div class="card-t">Opciones de tu plan</div>${optSeg(menus, legTab)}</div>${legHtml(c)}`;
+  if (PV.k < 0) PV.k = 0;
   const mn = menus[PV.k];
   return `<div class="card"><div class="card-t">Opciones de tu plan</div>
-  ${menus.length > 1 ? `<div class="seg scroll">${menus.map((x, k) => `<button class="${k === PV.k ? "on" : ""}" data-a="pvOpt" data-k="${k}">${esc(x.name || "Opción " + (k + 1))}</button>`).join("")}</div>` : `<b>${esc(mn.name || "Opción 1")}</b>`}
+  ${menus.length > 1 || legTab ? optSeg(menus, legTab) : `<b>${esc(mn.name || "Opción 1")}</b>`}
   ${mn.note ? `<div class="note">${esc(mn.note)}</div>` : ""}
   <p class="muted small">Toca un alimento para ver con qué lo puedes reemplazar.</p></div>
   ${(mn.meals || []).map((m, i) => `<div class="card pmeal"><div class="pmh"><b>${esc(m.name)}</b>${m.time ? `<span class="ptime">${esc(m.time)} hrs</span>` : ""}</div>
-    ${(m.items || []).map((it, j) => `<div class="fi" data-a="pvSwap" data-i="${i}" data-j="${j}"><span>${esc(it.name)}<small>${esc(itemLine(it))}</small>${it.cat ? `<small class="pgrp">${esc(it.cat)}</small>` : ""}</span><span class="swap">⇄</span></div>`).join("") || `<div class="muted small">Sin alimentos</div>`}
+    ${(m.items || []).map((it, j) => `<div class="fi" data-a="pvSwap" data-i="${i}" data-j="${j}"><span>${esc(it.name)}<small>${esc(itemLine(it))}</small>${isExtra(it) ? `<small class="pgrp">Extra</small>` : `<small class="pgrp">${esc(it.cat)}</small>`}</span>${isExtra(it) ? "" : '<span class="swap">⇄</span>'}</div>`).join("") || `<div class="muted small">Sin alimentos</div>`}
     ${m.note ? `<div class="note">${esc(m.note)}</div>` : ""}</div>`).join("")}
   ${has("plan_shop") ? `<a class="btn big block" href="#compras">🛒 Lista de compras</a>` : ""}`;
 }
 act("pvOpt", (el) => { PV.k = +el.dataset.k; refresh(); });
+const optSeg = (menus, legTab) => `<div class="seg scroll">${menus.map((x, k) => `<button class="${k === PV.k ? "on" : ""}" data-a="pvOpt" data-k="${k}">${esc(x.name || "Opción " + (k + 1))}</button>`).join("")}${legTab ? `<button class="${PV.k === -1 ? "on" : ""}" data-a="pvOpt" data-k="-1">Día con legumbres</button>` : ""}</div>`;
+export const legPauta = (c) => (c.pautaLeg && Object.values(c.pautaLeg).some((v) => +v > 0) ? c.pautaLeg : null);
+const fmtP = (v) => { const n = +v || 0, w = Math.floor(n), f = { 0.25: "¼", 0.5: "½", 0.75: "¾" }[Math.round((n - w) * 4) / 4]; return n ? `${w || ""}${f || ""}` || "0" : "0"; };
+// Pauta del día con legumbres: lo que cambia respecto de un día normal
+export function legHtml(c) {
+  const pl = legPauta(c), pn = c.pauta || {}; if (!pl) return "";
+  const gs = GORDER.filter((g) => GROUPS[g][4] && (+pl[g] || +pn[g]));
+  const ch = gs.map((g) => [g, (+pl[g] || 0) - (+pn[g] || 0)]).filter(([, d]) => Math.abs(d) > 0.01);
+  return `<div class="card"><div class="card-t">Día con legumbres</div>
+  <p class="small">Los días que comas porotos, lentejas o garbanzos sigue cualquier opción de tu plan, con este cambio:</p>
+  <div class="pills-wrap">${ch.map(([g, d]) => `<span class="pill ${d > 0 ? "g" : "y"}">${d > 0 ? "+" : "−"}${fmtP(Math.abs(d))} ${esc(g.toLowerCase())}</span>`).join(" ")}</div>
+  <p class="muted small">Por ejemplo, cambia el arroz y parte de la carne del almuerzo por las legumbres.</p>
+  <table class="tbl mt"><tr><th>Grupo</th><th>Día normal</th><th>Con legumbres</th></tr>${gs.map((g) => `<tr><td>${esc(g)}</td><td>${fmtP(pn[g])}</td><td><b>${fmtP(pl[g])}</b></td></tr>`).join("")}</table></div>`;
+}
 
 act("pvSwap", async (el) => {
   const mn = S.client.menus[PV.k], it = mn.meals[+el.dataset.i].items[+el.dataset.j];
   const gInfo = GROUPS[it.cat];
-  if (!it.cat || !gInfo || !gInfo[4] || !it.por) return sheet(it.name, `<p class="muted">Este alimento no pertenece a un grupo de intercambio, así que no tiene reemplazos directos. Si quieres cambiarlo, pregúntale a tu coach.</p>`);
+  if (!it.cat || !gInfo || !gInfo[4] || !it.por) return sheet(it.name, `${isExtra(it) && it.kcal ? `<p class="small">${it.g ? r0(it.g) + " g · " : ""}${r0(it.kcal)} kcal · C ${r1(it.cho)} · L ${r1(it.fat)} · P ${r1(it.prot)}</p>` : ""}<p class="muted">Este alimento no pertenece a un grupo de intercambio, así que no tiene reemplazos directos. Si quieres cambiarlo, pregúntale a tu coach.</p>`);
   const list = [...(await foodIndex()).values()].filter((f) => f.cat === it.cat && f.portion > 0).sort((a, b) => a.name.localeCompare(b.name, "es"));
   const rows = list.map((f) => { const g = it.por * f.portion, hm = homeMeasure(g, f.medida, f.medidaG), same = nk(f.name) === nk(it.name);
     return `<div class="li row between sw-row ${same ? "same" : ""}" data-n="${esc(nk(f.name))}"><span>${esc(f.name)}${same ? ' <span class="badge g">en tu plan</span>' : ""}</span><span class="sw-q"><b>${r0(g)} g</b>${hm ? `<small>${esc(hm)}</small>` : ""}</span></div>`; }).join("");
@@ -177,6 +197,7 @@ export async function menusEditor(c) {
 function totals(mn) {
   const t = { kcal: 0, cho: 0, fat: 0, prot: 0 }, por = {};
   for (const m of mn.meals || []) for (const it of m.items || []) {
+    if (isExtra(it)) { for (const k of ["kcal", "cho", "fat", "prot"]) t[k] += +it[k] || 0; continue; }
     const g = GROUPS[it.cat]; if (!g || !it.por) continue;
     t.kcal += g[0] * it.por; t.cho += g[1] * it.por; t.fat += g[2] * it.por; t.prot += g[3] * it.por; por[it.cat] = (por[it.cat] || 0) + +it.por;
   }
@@ -187,16 +208,18 @@ function editorHtml(c) {
   const mn = ms[MW.k], pauta = MW.pauta || c.pauta || {};
   const head = `<div class="card"><div class="row between"><div class="card-t">Opciones del plan de alimentación</div><span class="row gap">${MW.dirty ? '<span class="badge y">Sin guardar</span>' : ""}<label class="btn" title="Archivo ima-planes.json con planes pasados desde PDF">Importar plan<input type="file" accept=".json,application/json" hidden data-a-change="meImport"></label><button class="btn primary" data-a="meSave">Guardar y publicar</button></span></div>
   <p class="muted small">Cada opción es una pauta alternativa (ej. día de entrenamiento / descanso / fin de semana). El cliente la ve en “Mi plan”, toca un alimento para ver los reemplazos de su grupo y arma su lista de compras.</p>
-  ${MW.pauta ? `<div class="note">Importado: al guardar también se actualiza la <b>pauta por porciones</b> del cliente (${Object.entries(MW.pauta).map(([g, n]) => `${esc(g)} ${r1(n).toLocaleString("es-CL")}`).join(" · ")}). Revisa las opciones y toca “Guardar y publicar”.</div>` : ""}
+  ${MW.pauta ? `<div class="note">Importado: al guardar también se actualiza la <b>pauta por porciones</b> del cliente (${Object.entries(MW.pauta).map(([g, n]) => `${esc(g)} ${r1(n).toLocaleString("es-CL")}`).join(" · ")})${MW.pautaLeg ? " y la del <b>día con legumbres</b>" : ""}. Revisa las opciones y toca “Guardar y publicar”.</div>` : ""}
   <div class="seg scroll">${ms.map((x, k) => `<button class="${k === MW.k ? "on" : ""}" data-a="meOpt" data-k="${k}">${esc(x.name || "Opción " + (k + 1))}</button>`).join("")}<button data-a="meAdd">＋ Nueva opción</button></div></div>`;
   if (!mn) return head;
   const { t, por } = totals(mn);
+  const pautaLeg = MW.pautaLeg || c.pautaLeg || null, pz = mn.leg && pautaLeg ? pautaLeg : pauta;
   const groups = Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => g);
-  const cmp = groups.filter((g) => por[g] || pauta[g]).map((g) => { const a = Math.round((por[g] || 0) * 100) / 100, b = +pauta[g] || 0, ok = !b ? "" : Math.abs(a - b) < 0.02 ? "g" : a > b ? "r" : "y"; return `<span class="pill ${ok}">${esc(g)} ${a}${b ? "/" + b : ""}</span>`; }).join(" ");
+  const cmp = groups.filter((g) => por[g] || pz[g]).map((g) => { const a = Math.round((por[g] || 0) * 100) / 100, b = +pz[g] || 0, ok = !b ? "" : Math.abs(a - b) < 0.02 ? "g" : a > b ? "r" : "y"; return `<span class="pill ${ok}">${esc(g)} ${a}${b ? "/" + b : ""}</span>`; }).join(" ");
   return `${head}<div class="card"><div class="grid3"><label>Nombre de la opción<input value="${esc(mn.name || "")}" data-a-change="meF" data-f="name" placeholder="Ej: Día de entrenamiento"></label><label class="span2">Nota para el cliente (opcional)<input value="${esc(mn.note || "")}" data-a-change="meF" data-f="note"></label></div>
   <div class="small mt"><b>${r0(t.kcal)} kcal</b> · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)} <span class="muted">(por porciones de intercambio${c.kcal ? ` · meta ${c.kcal} kcal` : ""})</span></div>
   <div class="mt pills-wrap">${cmp || '<span class="muted small">Agrega alimentos para ver las porciones por grupo.</span>'}</div>
-  ${Object.keys(pauta).length ? `<p class="muted small">Porciones de la opción / pauta del cliente (verde = igual, amarillo = faltan, rojo = sobran).</p>` : ""}
+  ${Object.keys(pz).length ? `<p class="muted small">Porciones de la opción / pauta ${mn.leg ? "del <b>día con legumbres</b>" : "del cliente"} (verde = igual, amarillo = faltan, rojo = sobran). Los extras suman a las kcal pero no a las porciones.</p>` : ""}
+  <label class="row gap small mt"><input type="checkbox" ${mn.leg ? "checked" : ""} data-a-change="meLeg"> Es el día con legumbres (se compara con la pauta del día con legumbres${pautaLeg ? "" : ": llénala en Datos y objetivos"})</label>
   <div class="row gap mt"><button class="btn small" data-a="meDup">⧉ Duplicar opción</button><button class="btn small danger ghost" data-a="meDel">Eliminar opción</button></div></div>
   ${(mn.meals || []).map((m, i) => `<div class="card"><div class="row gap"><input class="grow" value="${esc(m.name)}" data-a-change="meMeal" data-i="${i}" data-f="name" style="font-weight:700"><input type="time" value="${esc(m.time || "")}" data-a-change="meMeal" data-i="${i}" data-f="time" style="width:120px">
     <button class="icon-btn" data-a="meMealMove" data-i="${i}" data-n="-1" title="Subir">↑</button><button class="icon-btn" data-a="meMealMove" data-i="${i}" data-n="1" title="Bajar">↓</button><button class="icon-btn" data-a="meMealDel" data-i="${i}" title="Quitar">✕</button></div>
@@ -205,8 +228,11 @@ function editorHtml(c) {
       <td><select data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="cat"><option value="">—</option>${Object.keys(GROUPS).map((g) => `<option ${g === it.cat ? "selected" : ""}>${esc(g)}</option>`).join("")}</select></td>
       <td><input type="number" step="0.25" min="0" value="${it.por ?? ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="por" style="width:80px" ${it.gp ? "" : 'disabled title="Sin porción de intercambio: usa gramos"'}></td>
       <td><input type="number" step="1" min="0" value="${it.g ? r0(it.g) : ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="g" style="width:80px"></td>
-      <td class="muted small">${esc(homeMeasure(it.g, it.medida, it.medidaG) || "")}</td><td><button class="icon-btn" data-a="meItDel" data-i="${i}" data-j="${j}">✕</button></td></tr>`).join("")}</table>
-    <div class="row gap"><button class="btn small" data-a="meItAdd" data-i="${i}">＋ Alimento</button><input class="grow small" value="${esc(m.note || "")}" placeholder="Nota de esta comida (opcional)" data-a-change="meMeal" data-i="${i}" data-f="note"></div></div>`).join("")}
+      <td class="muted small">${esc(homeMeasure(it.g, it.medida, it.medidaG) || "")}</td><td><button class="icon-btn" data-a="meItDel" data-i="${i}" data-j="${j}">✕</button></td></tr>
+      ${isExtra(it) ? `<tr class="exrow"><td colspan="6"><span class="badge">Extra</span> <span class="small muted">Aporte de ${it.g ? r0(it.g) + " g" : "esta cantidad"}:</span>
+        ${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([k, l]) => `<label class="exin">${l}<input type="number" step="0.1" min="0" value="${it[k] ?? ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="${k}"></label>`).join("")}
+        ${it.p100 ? '<span class="muted small">(sale de la base por 100 g: cambia solo con los gramos)</span>' : ""}</td></tr>` : ""}`).join("")}</table>
+    <div class="row gap"><button class="btn small" data-a="meItAdd" data-i="${i}">＋ Alimento</button><button class="btn small" data-a="meExAdd" data-i="${i}" title="Alimento sin grupo de intercambio, con sus propios macros">＋ Extra</button><input class="grow small" value="${esc(m.note || "")}" placeholder="Nota de esta comida (opcional)" data-a-change="meMeal" data-i="${i}" data-f="note"></div></div>`).join("")}
   <button class="btn block ghost" data-a="meMealAdd">＋ Agregar tiempo de comida</button>`;
 }
 const redraw = (dirty = true) => { if (dirty) MW.dirty = true; const box = $("#menuEd"); if (box) box.innerHTML = editorHtml(S._coachClient || {}); };
@@ -222,6 +248,8 @@ act("meMealAdd", () => { cur().meals.push({ name: "Comida " + (cur().meals.lengt
 act("meMealDel", async (el) => { const m = cur().meals[+el.dataset.i]; if (m.items?.length && !(await confirmBox(`¿Quitar ${m.name} y sus alimentos?`))) return; cur().meals.splice(+el.dataset.i, 1); redraw(); });
 act("meMealMove", (el) => { const a = cur().meals, i = +el.dataset.i, j = i + +el.dataset.n; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; redraw(); });
 act("meItAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).push({ name: "", cat: "", por: 1, g: 0 }); redraw(); setTimeout(() => { const ins = $$(`#menuEd [data-i="${el.dataset.i}"][data-f="name"][list]`); ins[ins.length - 1]?.focus(); }, 0); });
+act("meExAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).push({ name: "", cat: "", por: null, gp: null, g: 0, kcal: 0, cho: 0, fat: 0, prot: 0 }); redraw(); });
+act("meLeg", (el) => { cur().leg = el.checked; redraw(); });
 act("meItDel", (el) => { cur().meals[+el.dataset.i].items.splice(+el.dataset.j, 1); redraw(); });
 act("meIt", async (el) => {
   const it = cur().meals[+el.dataset.i].items[+el.dataset.j], f = el.dataset.f, v = el.value;
@@ -229,17 +257,21 @@ act("meIt", async (el) => {
     it.name = v.trim(); const x = (await foodIndex()).get(nk(v));
     if (x) { it.name = x.name; it.cat = x.cat || ""; it.gp = x.portion || null; it.medida = x.medida || ""; it.medidaG = x.medidaG || null; }
     else { it.gp = null; it.medida = ""; it.medidaG = null; }
-    if (it.gp) { it.por = it.por || 1; it.g = r1(it.por * it.gp); } else { it.por = null; }
+    if (it.gp) { it.por = it.por || 1; it.g = r1(it.por * it.gp); delete it.p100; } else { it.por = null; }
+    // Sin grupo: si la base trae su aporte por 100 g, el extra calcula sus macros con los gramos
+    if (x && !it.gp && isExtra(it) && x.kcal) { it.p100 = [x.kcal, x.cho, x.fat, x.prot].map((v) => +v || 0); exCalc(it); }
   } else if (f === "cat") it.cat = v;
   else if (f === "por") { it.por = num(v); if (it.gp) it.g = r1(it.por * it.gp); }
-  else if (f === "g") { it.g = num(v); if (it.gp) it.por = Math.round((it.g / it.gp) * 100) / 100; }
+  else if (f === "g") { it.g = num(v); if (it.gp) it.por = Math.round((it.g / it.gp) * 100) / 100; exCalc(it); }
+  else if (["kcal", "cho", "fat", "prot"].includes(f)) { it[f] = num(v) || 0; delete it.p100; }
   redraw();
 });
+const exCalc = (it) => { if (it.p100 && it.g) ["kcal", "cho", "fat", "prot"].forEach((k, i) => (it[k] = r1((it.p100[i] * it.g) / 100))); };
 act("meSave", async () => {
   const menus = MW.menus.map((mn) => ({ ...mn, meals: mn.meals.map((m) => ({ ...m, items: (m.items || []).filter((it) => it.name) })) }));
-  const data = { menus }; if (MW.pauta) data.pauta = MW.pauta;
+  const data = { menus }; if (MW.pauta) data.pauta = MW.pauta; if (MW.pautaLeg) data.pautaLeg = MW.pautaLeg;
   await db.set("clients/" + MW.cid, data); MW.menus = clone(menus); MW.dirty = false;
-  if (S._coachClient) Object.assign(S._coachClient, data); MW.pauta = null; redraw(false); toast("Plan publicado ✓");
+  if (S._coachClient) Object.assign(S._coachClient, data); MW.pauta = null; MW.pautaLeg = null; redraw(false); toast("Plan publicado ✓");
 });
 // Importar un plan pasado desde PDF (archivo ima-planes.json, se prepara aparte: no queda en el repositorio público)
 const nameKey = (s) => nk(s).split(/\s+/).filter(Boolean);
@@ -260,6 +292,7 @@ async function loadPlan(p) {
   if (!(await confirmBox(`Cargar el plan de ${p.name}: ${n} opciones (${p.menus.map((m) => m.name).join(", ")}).${prev ? ` Reemplaza las ${prev} opciones que tiene ahora.` : ""} No se publica hasta que toques “Guardar y publicar”.`))) return;
   MW.menus = clone(p.menus).map((mn) => ({ ...mn, id: uid() })); MW.k = 0;
   MW.pauta = p.pauta && Object.keys(p.pauta).length ? { ...p.pauta } : null;
+  MW.pautaLeg = p.pautaLeg && Object.keys(p.pautaLeg).length ? { ...p.pautaLeg } : null;
   redraw(); toast("Plan cargado: revísalo y publícalo");
 }
 export const menusDirty = () => !!MW?.dirty;
