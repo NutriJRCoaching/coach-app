@@ -232,3 +232,4 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## v1.27.1 (20-nov)
 - Pestaña "Mi plan" de Agregar alimento: cada tiempo de comida en su tarjeta con el mismo color que en Mi plan (`.pmini`, `mealColor`).
+- Decisión de Joaquín (20-nov): **no** pasar el plan a crudo ni poner un aviso de "todo es en crudo" (la gente cocina para varios y pesa cocido). Las carnes del plan quedan como están; solo la lista de compras pasa a crudo arroz, fideos, quínoa, cous cous y legumbres.
