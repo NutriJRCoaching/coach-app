@@ -14,7 +14,7 @@ import { GROUPS } from "./foods.js";
 import { maybeOnboard } from "./onboarding.js";
 import { pushReady, enablePush, pushOn, refreshPush } from "./push.js";
 import { parseMeal, describe, medidaInfo, estimateGrams, speechSupported, listen } from "./voice.js";
-import { menusHtml, shoppingView, homeMeasure as homeMeasureC, legPauta, legHtml } from "./menus.js";
+import { menusHtml, shoppingView, homeMeasure as homeMeasureC, legPauta, legHtml, mealColor } from "./menus.js";
 
 const P = () => "clients/" + S.cid;
 
@@ -340,7 +340,7 @@ function planTab() {
   const mn = menus[k];
   return `<p class="muted small">Tus alimentos del plan. Tócalo y queda con los gramos que te tocan; cámbialos si comiste otra cantidad.</p>
   ${menus.length > 1 ? `<div class="seg scroll">${menus.map((x, j) => `<button class="${j === k ? "on" : ""}" data-a="planOpt" data-k="${j}">${esc(x.name || "Opción " + (j + 1))}</button>`).join("")}</div>` : ""}
-  ${(mn.meals || []).map((m, i) => `<div class="shop-g">${esc(m.name)}</div>${(m.items || []).map((it, j) => `<div class="fi" data-a="planPick" data-i="${i}" data-j="${j}"><span>${esc(it.name)}<small>${it.g ? r0(it.g) + " g" : "a gusto"}${it.medida && it.g ? " · " + esc(planMeasure(it)) : ""}</small></span><span class="add">＋</span></div>`).join("")}`).join("")}`;
+  ${(mn.meals || []).map((m, i) => `<div class="card pmeal pmini" style="--mc:${mealColor(m, i)}"><div class="pmh"><b>${esc(m.name)}</b>${m.free ? `<span class="ptime">Libre durante el día</span>` : ""}</div>${(m.items || []).map((it, j) => `<div class="fi" data-a="planPick" data-i="${i}" data-j="${j}"><span>${esc(it.name)}<small>${it.g ? r0(it.g) + " g" : "a gusto"}${it.medida && it.g ? " · " + esc(planMeasure(it)) : ""}</small></span><span class="add">＋</span></div>`).join("")}</div>`).join("")}`;
 }
 const planMeasure = (it) => { try { return homeMeasureC(it.g, it.medida, it.medidaG) || ""; } catch { return ""; } };
 act("planOpt", (el) => { LS.set("ima-plan-opt", el.dataset.k); renderFoodTab(); });

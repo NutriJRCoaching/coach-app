@@ -525,3 +525,5 @@ body.rec-on .cpanel { min-width: 0; overflow-x: hidden; } .recbar .rb.sw i { mar
 .prep-tot { font-size: 13px; margin: 8px 0; }
 .guide { background: var(--surf2); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 10px; } .guide ol { margin: 6px 0 0 18px; padding: 0; } .guide li { margin: 3px 0; }
 label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--txt); margin: 6px 0; cursor: pointer; } label.chk input { width: auto; margin: 0; flex: none; }
+/* Pestaña "Mi plan" al agregar alimento: cada tiempo de comida en su tarjeta de color */
+.card.pmini { margin: 10px 0; padding: 10px 12px; } .pmini .pmh { margin-bottom: 4px; } .pmini .pmh b { font-size: 12.5px; padding: 4px 10px; }

@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.27.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.27.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -229,3 +229,6 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Lista de compras en crudo** (`toRaw`): lo cocido con par crudo en la base de intercambio y del mismo grupo se pasa a crudo con las mismas porciones (arroz, fideos, quínoa, cous cous, legumbres). Las carnes quedan como están hasta que Joaquín defina si las porciones de su base son en crudo o cocido (por los macros, 50 g = 11 g de proteína calza más con carne cruda).
 - Import: el PDF guarda "(" y "×" como caracteres privados (U+E081, U+E09F); `fixtxt` los convierte. Ya no quedan medidas con "(" suelto.
 - Casillas del editor con estilo `label.chk`.
+
+## v1.27.1 (20-nov)
+- Pestaña "Mi plan" de Agregar alimento: cada tiempo de comida en su tarjeta con el mismo color que en Mi plan (`.pmini`, `mealColor`).
