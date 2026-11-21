@@ -74,7 +74,7 @@ export function foodCheck(f) {
 export function weekPlan(client, routines, sessions, date = ymd()) {
   const w = weekInfo(client, date);
   const today = ymd();
-  const sched = client.schedule || {};
+  const sched = client.startDate && w.last < client.startDate ? {} : client.schedule || {}; // semanas antes de partir: sin entrenamientos
   const done = sessions.filter((s) => s.weekKey === w.key && s.status === "fin");
   const used = new Set();
   const slots = w.days.map((d) => {

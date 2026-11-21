@@ -324,3 +324,6 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.35.2 (20-nov) — Importar rutinas
 - Entrenamiento (coach) → "Importar rutinas" junto a "＋ Nueva rutina": sube `ima-rutinas.json` (`{type:"ima-rutinas", client, routines:[{name, days:[0-6 getDay], note?, exercises:[{name, sets:[{reps, rir}], notes?, video?, wSug?, weekNote?}]}]}`). Reemplaza TODAS las rutinas del cliente (borra las anteriores; los entrenamientos registrados no se tocan), enlaza cada ejercicio con la biblioteca por nombre sin tildes (video, reemplazos, libId) y agrega a la biblioteca los que falten, arma el calendario (schedule con null explícito en los días sin rutina porque Firestore mezcla mapas) y limpia rutReview.
 - El JSON se arma fuera del repo desde la hoja de entrenamiento del cliente (ojo: Sheets guarda "8-10" como 10.8 y "6-8" como fecha 6-ago; pesos con punto como fecha d-m).
+
+## v1.35.3 (20-nov) — Cliente que aún no parte
+- Si hoy < startDate: el cliente no tiene pendientes (campana en 0, "Todo al día"), ve una tarjeta "Tu plan parte mañana / el …" con la invitación a recorrer Mi plan, Entreno y Ajustes, la franja dice "Partes el …" y los días antes de partir no muestran rutina. weekPlan deja sin entrenamientos las semanas que terminan antes de startDate (no hay "atrasados").

@@ -46,7 +46,8 @@ export async function clientView() {
 const head = (title, back, right = "") => `<header class="ch">${back ? `<a href="#${back}" class="icon-btn">${I.back}</a>` : "<span></span>"}<h2>${esc(title)}</h2><span class="right">${right}</span></header>`;
 
 // Qué toca cada día (debajo del número): rutina abreviada o descanso
-function dayTag(dow) {
+function dayTag(dow, d) {
+  if (d && S.client?.startDate && d < S.client.startDate) return `<i class="dtag rest"></i>`; // antes de partir
   const rid = (S.client?.schedule || {})[dow];
   if (!rid) return `<i class="dtag rest">Desc.</i>`;
   const n = S.rtNames?.[rid] || "";
@@ -56,10 +57,10 @@ function dayTag(dow) {
 // Tira de días de la semana del cliente
 function dayStrip() {
   const w = weekInfo(S.client, S.date), today = ymd();
-  return `<div class="strip"><button class="icon-btn" data-a="shiftDay" data-n="-7">${I.back}</button>${w.days.map((d) => { const dt = parseYmd(d); return `<button class="sd ${d === S.date ? "on" : ""} ${d === today ? "today" : ""}" data-a="pickDay" data-d="${d}"><small>${D1[dt.getDay()]}</small>${dt.getDate()}${dayTag(dt.getDay())}</button>`; }).join("")}<button class="icon-btn" data-a="shiftDay" data-n="7">${I.chev}</button></div>
+  return `<div class="strip"><button class="icon-btn" data-a="shiftDay" data-n="-7">${I.back}</button>${w.days.map((d) => { const dt = parseYmd(d); return `<button class="sd ${d === S.date ? "on" : ""} ${d === today ? "today" : ""}" data-a="pickDay" data-d="${d}"><small>${D1[dt.getDay()]}</small>${dt.getDate()}${dayTag(dt.getDay(), d)}</button>`; }).join("")}<button class="icon-btn" data-a="shiftDay" data-n="7">${I.chev}</button></div>
   ${S.date !== today
     ? `<div class="otherday" data-a="pickDay" data-d="${today}"><span>Estás registrando el <b>${fmtDate(S.date, true)}</b>${S.date > today ? " (futuro)" : ""}</span><b>Volver a hoy</b></div>`
-    : `<div class="strip-sub"><span>${fmtDate(S.date, true)} · Semana ${w.n}</span></div>`}`;
+    : `<div class="strip-sub"><span>${fmtDate(S.date, true)} · ${w.n >= 1 ? `Semana ${w.n}` : `Partes el ${fmtDate(S.client.startDate, true)}`}</span></div>`}`;
 }
 act("pickDay", (el) => { S.date = el.dataset.d; refresh(); });
 act("shiftDay", (el) => { S.date = addDays(S.date, +el.dataset.n); refresh(); });
@@ -87,6 +88,7 @@ async function home() {
   const trainTxt = inProgress ? `<small class="muted">Sesión en curso</small><b>${esc(inProgress.routineName)}</b>` : slot && !slot.rest ? `<small class="muted">${slot.status === "hecho" ? "Completado" : date === today ? "Hoy te toca" : "Este día toca"}</small><b>${esc(slot.name)}</b>` : `<small class="muted">Hoy</small><b>Descanso</b>`;
   if (date === today) { setTimeout(maybeOnboard, 400); setTimeout(askYesterdaySteps, 1200); }
   return `<header class="topbar ima"><img src="icons/logo.png?v=ima2" class="hdr-logo" alt="IMA"><div class="brand-t">INTELIGENCIA MUSCULAR APLICADA</div>${bellBtn(pend)}</header>${dayStrip()}
+  ${date === today && c.startDate && today < c.startDate ? `<div class="card startcard"><div class="card-t">${I.info}Tu plan parte ${diffDays(c.startDate, today) === 1 ? "mañana" : "el " + fmtDate(c.startDate, true)}</div><p class="small">Ese día empieza tu semana 1. Mientras, puedes recorrer la app: revisa <a href="#plan">Mi plan</a>, tus rutinas en <a href="#entreno">Entreno</a> y ajusta tus recordatorios en Más → Ajustes.</p></div>` : ""}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   ${date === today && c.payDate && diffDays(c.payDate, today) === 0 ? `<div class="card paycard">${payMsg(c)}</div>` : ""}
@@ -124,6 +126,7 @@ act("bellOpen", () => {
 });
 async function pendings(day, plan, w) {
   const out = [], h = new Date().getHours();
+  if (S.client.startDate && ymd() < S.client.startDate) return out; // aún no parte: nada pendiente
   if (!day.weight) out.push({ t: "Registrar tu peso de hoy", to: "peso", c: "y" });
   const meals = Object.values(day.meals || {}).filter((m) => m.length).length;
   if (h >= 11 && meals === 0) out.push({ t: "Aún no registras comidas hoy", to: "comida", c: "r" });
