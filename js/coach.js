@@ -20,6 +20,7 @@ import { loadCtx, alertsFor, levelOf, SERVICES, SERVICE_GROUPS, emailKey, checki
 // Pendientes de todos los clientes (se recalculan como máximo cada 30 s o al guardar algo)
 let AL = { at: 0, map: {}, dirty: true, busy: null };
 export const resetAlerts = () => { AL.at = 0; AL.dirty = true; };
+window.addEventListener("ima-alerts", () => resetAlerts()); // otros módulos (ej. el editor del plan) piden recalcular los avisos
 async function computeAlerts(clients) {
   const out = {};
   await Promise.all(clients.map(async (c) => { const x = await loadCtx(c); out[c.id] = { x, A: alertsFor(c, x) }; }));

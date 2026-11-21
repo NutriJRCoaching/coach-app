@@ -3,7 +3,8 @@ import { db } from "./db.js";
 import { S } from "./state.js";
 import { ymd, addDays, weekInfo, diffDays, fmtDate, DAYS } from "./util.js";
 import { getRoutines, getSessions, getDays } from "./data.js";
-import { weekPlan, reviewWindow } from "./data.js";
+import { weekPlan, reviewWindow, weightCorr, phaseAt, PHASE_PCT } from "./data.js";
+import { GROUPS } from "./foods.js";
 
 export const SERVICES = { completa: "Coaching 1-1", entrenamiento: "Entrenamiento", nutricion: "Nutrición" };
 export const SERVICE_GROUPS = [["completa", "Coaching 1-1"], ["entrenamiento", "Entrenamiento"], ["nutricion", "Nutrición"], ["", "Sin definir"]];
@@ -23,6 +24,54 @@ export async function loadCtx(c) {
   return { routines, sessions, days, checkins, feedbacks, fbreplies, access, onb };
 }
 
+// ---------- ¿Algo no calza en los planes de alimentación? (planes de la etapa actual y de las que vienen)
+// Revisa: pauta vs metas, cada opción vs su pauta y sus metas, metas vs requerimiento (mantención × % de la etapa)
+// y si el peso cambió desde que se calcularon las metas.
+const MK = [["kcal", "kcal", 0.05], ["cho", "CHO", 0.1], ["fat", "lípidos", 0.1], ["prot", "proteína", 0.1]];
+const pMacA = (p) => { const t = { kcal: 0, cho: 0, fat: 0, prot: 0 }; for (const [g, n] of Object.entries(p || {})) { const G = GROUPS[g]; if (G) { t.kcal += n * G[0]; t.cho += n * G[1]; t.fat += n * G[2]; t.prot += n * G[3]; } } return t; };
+function optTot(mn) {
+  const t = { kcal: 0, cho: 0, fat: 0, prot: 0 }, por = {};
+  for (const m of mn.meals || []) {
+    const bud = m.free && +m.budget?.kcal > 0;
+    if (bud) for (const k in t) t[k] += +m.budget[k] || 0;
+    for (const it of m.items || []) {
+      const G = GROUPS[it.cat];
+      if (G && G[4]) { if (!it.por) continue; t.kcal += G[0] * it.por; t.cho += G[1] * it.por; t.fat += G[2] * it.por; t.prot += G[3] * it.por; por[it.cat] = (por[it.cat] || 0) + +it.por; }
+      else if (!bud) for (const k in t) t[k] += +it[k] || 0;
+    }
+  }
+  return { t, por };
+}
+const offTxt = (a, T) => MK.filter(([k, , tol]) => +T[k] && Math.abs(a[k] / T[k] - 1) > tol).map(([k, l]) => { const d = Math.round(a[k] - T[k]); return `${l} ${d > 0 ? "+" : ""}${d}`; });
+function planChecks(c, x, plans, add) {
+  const today = ymd(), n = c.startDate ? weekInfo(c, today).n : 1, cur = phaseAt(c, today);
+  const live = Object.keys(plans).filter((ph) => ph === cur || (c.stages || []).some((st) => st.phase === ph && +st.to >= n && +st.from - n <= 3));
+  const ws = Object.keys(x.days || {}).sort().map((d) => weightCorr(x.days[d])).filter(Boolean), kgNow = ws.length ? ws.reduce((a, b) => a + b, 0) / ws.length : null;
+  for (const ph of live) {
+    const P = plans[ph], T = P.targets || {}, tag = `Plan de ${ph}`;
+    if (!+T.kcal) continue;
+    // 1) Pauta vs metas
+    if (Object.values(P.pauta || {}).some((v) => +v)) { const o = offTxt(pMacA(P.pauta), T); if (o.length) add("y", `${tag}: la pauta no calza con las metas (${o.join(" · ")})`, "plan"); }
+    else add("y", `${tag}: falta la pauta por porciones`, "plan");
+    // 2) Cada opción vs su pauta (porciones) y vs las metas (macros)
+    for (const mn of P.menus || []) {
+      const { t, por } = optTot(mn), pz = mn.leg && Object.values(P.pautaLeg || {}).some((v) => +v) ? P.pautaLeg : P.pauta || {};
+      const dif = Object.keys({ ...pz, ...por }).filter((g) => GROUPS[g]?.[4] && Math.abs((por[g] || 0) - (+pz[g] || 0)) >= 0.5);
+      const o = offTxt(t, T);
+      if (o.length) add("y", `${tag} · ${mn.name || "opción"}: ${o.join(" · ")} vs las metas`, "plan");
+      else if (dif.length) add("i", `${tag} · ${mn.name || "opción"}: porciones distintas a la pauta en ${dif.slice(0, 3).join(", ").toLowerCase()}${dif.length > 3 ? "…" : ""}`, "plan");
+    }
+    if ((P.menus || []).length && !(P.menus || []).some((m) => m.leg)) add("i", `${tag}: falta el día con legumbres`, "plan");
+    // 3) Metas vs requerimiento de la etapa (mantención × (1 + %))
+    const maint = +P.calc?.maint || +c.kcalMaint || null;
+    if (maint) { const pct = P.calc?.pct !== "" && P.calc?.pct != null ? +P.calc.pct : PHASE_PCT[ph] ?? 0, req = Math.round(maint * (1 + pct / 100));
+      if (Math.abs(T.kcal / req - 1) > 0.08) add("y", `${tag}: sus metas (${T.kcal} kcal) no calzan con el requerimiento de la etapa (${req} kcal = mantención ${maint} ${pct >= 0 ? "+" : ""}${pct} %)`, "plan"); }
+    // 4) El peso cambió desde que se calcularon las metas
+    const kg0 = +P.calc?.kg;
+    if (kg0 && kgNow && Math.abs(kgNow - kg0) >= Math.max(2, kg0 * 0.03)) { const d = Math.round((kgNow - kg0) * 10) / 10;
+      add("y", `${tag}: su peso ${d > 0 ? "subió" : "bajó"} ${Math.abs(d).toString().replace(".", ",")} kg desde que calculaste las metas (${kg0} → ${Math.round(kgNow * 10) / 10} kg): revisa sus requerimientos`, "plan"); }
+  }
+}
 export function alertsFor(c, x) {
   const A = [], add = (lvl, t, tab = "datos") => A.push({ c: lvl, t, tab });
   const today = ymd();
@@ -60,6 +109,7 @@ export function alertsFor(c, x) {
       }
       for (const [ph, P] of Object.entries(plans)) if (!+P.targets?.kcal && (c.stages || []).some((st) => st.phase === ph && +st.to >= n)) add("y", `El plan de ${ph} no tiene metas de calorías y macros`, "plan");
     }
+    if (plans) planChecks(c, x, plans, add);
   }
   if (c.service === "entrenamiento" && !c.ranges) add("i", "Guía de macros por defecto (1,6–2,2 g/kg de proteína)");
   if (!c.steps) add("y", "Falta la meta de pasos");

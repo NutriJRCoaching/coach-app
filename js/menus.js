@@ -262,7 +262,7 @@ function targetsCard(c) {
       <label>% vs mant.<input type="number" value="${k.pct ?? ""}" placeholder="${c.pctOf(MW.phase)}" data-a-change="meCalc" data-k="pct"></label>
       <label>Proteína g/kg<input type="number" step="0.1" value="${k.protKg ?? ""}" placeholder="${c.protKg ?? 2}" data-a-change="meCalc" data-k="protKg"></label>
       <label>Grasa g/kg<input type="number" step="0.1" value="${k.fatKg ?? ""}" placeholder="${c.fatKg ?? 0.8}" data-a-change="meCalc" data-k="fatKg"></label>
-      <span class="small">${c.lastKg ? `${r1(c.lastKg)} kg →` : ""} ${R.miss ? `<span class="muted">Falta ${esc(R.miss)}.</span>` : `<b>${R.kcal} kcal · C ${R.cho} · L ${R.fat} · P ${R.prot}</b>`}</span>
+      <span class="small">${k.kg ? `<span class="muted">metas puestas con ${String(k.kg).replace(".", ",")} kg · </span>` : ""}${c.lastKg ? `${r1(c.lastKg)} kg hoy →` : ""} ${R.miss ? `<span class="muted">Falta ${esc(R.miss)}.</span>` : `<b>${R.kcal} kcal · C ${R.cho} · L ${R.fat} · P ${R.prot}</b>`}</span>
       ${R.miss ? "" : `<button class="btn small" data-a="meTgCalc">Usar el cálculo</button>`}<button class="btn small ghost" data-a="meTgPauta" title="Las metas quedan iguales a lo que aporta la pauta">Usar los macros de la pauta (${r0(pm.kcal)} kcal)</button></div></div>`;
 }
 const phaseColor = (p) => ({ "Break de dieta": "#a855f7", "Déficit leve": "#e0484e", "Déficit moderado": "#c3242b", "Déficit agresivo": "#8e1b1f", "Mini cut": "#b0263a", "Mantención": "#7d7d86", "Recomposición corporal": "#3b82f6", "Dieta reversa": "#d6a21e", "Superávit / Volumen": "#22a35a" }[p] || "#888");
@@ -349,10 +349,10 @@ act("meExAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).
 act("meLeg", (el) => { cur().leg = el.checked; redraw(); });
 act("mePhase", async (el) => { if (MW.dirty && !(await confirmBox("Tienes cambios sin guardar en este plan. ¿Cambiar de etapa igual?"))) return; loadMW(S._coachClient, el.dataset.p); redraw(false); });
 act("meFrom", (el) => { const P = el.dataset.p ? S._coachClient.plans?.[el.dataset.p] : null; Object.assign(MW, { menus: clone(P?.menus || []), pauta: clone(P?.pauta || {}), pautaLeg: clone(P?.pautaLeg || {}), targets: {}, calc: {}, k: 0 }); if (!P) MW.menus = [newMenu("Opción 1")]; MW.exists = true; redraw(); toast(P ? `Copia del plan de ${el.dataset.p}: ajusta las metas y la pauta` : "Plan vacío creado"); });
-act("meTg", (el) => { if (el.value === "") delete MW.targets[el.dataset.k]; else MW.targets[el.dataset.k] = num(el.value); redraw(); });
+act("meTg", (el) => { if (el.value === "") delete MW.targets[el.dataset.k]; else MW.targets[el.dataset.k] = num(el.value); const kg = S._coachClient?.lastKg; if (kg) MW.calc.kg = Math.round(kg * 10) / 10; redraw(); });
 act("meCalc", (el) => { if (el.value === "") delete MW.calc[el.dataset.k]; else MW.calc[el.dataset.k] = num(el.value); redraw(); });
-act("meTgCalc", () => { const R = calcRes(S._coachClient); MW.targets = { kcal: R.kcal, cho: R.cho, fat: R.fat, prot: R.prot }; redraw(); });
-act("meTgPauta", () => { const m = pMac(MW.pauta); MW.targets = { kcal: r0(m.kcal), cho: r0(m.cho), fat: r0(m.fat), prot: r0(m.prot) }; redraw(); });
+act("meTgCalc", () => { const c = S._coachClient, R = calcRes(c); MW.targets = { kcal: R.kcal, cho: R.cho, fat: R.fat, prot: R.prot }; if (c.lastKg) MW.calc.kg = Math.round(c.lastKg * 10) / 10; redraw(); });
+act("meTgPauta", () => { const m = pMac(MW.pauta), kg = S._coachClient?.lastKg; MW.targets = { kcal: r0(m.kcal), cho: r0(m.cho), fat: r0(m.fat), prot: r0(m.prot) }; if (kg) MW.calc.kg = Math.round(kg * 10) / 10; redraw(); });
 act("mePauta", (el) => { const p = el.dataset.p === "l" ? MW.pautaLeg : MW.pauta; if (el.value === "") delete p[el.dataset.g]; else p[el.dataset.g] = num(el.value); MW.openPauta = true; redraw(); });
 act("mePautaOpen", (el) => { MW.openPauta = !el.parentElement.open; });
 act("mePautaCopy", async () => {
@@ -386,13 +386,15 @@ const exCalc = (it) => { if (it.p100 && it.g) ["kcal", "cho", "fat", "prot"].for
 act("meSave", async () => {
   const menus = MW.menus.map((mn) => ({ ...mn, meals: mn.meals.map((m) => ({ ...m, items: (m.items || []).filter((it) => it.name) })) }));
   const clean = (p) => Object.fromEntries(Object.entries(p || {}).filter(([, v]) => v !== "" && v != null && !isNaN(+v)).map(([g, v]) => [g, +v]));
-  const c = S._coachClient || {}, plan = { menus, pauta: clean(MW.pauta), pautaLeg: clean(MW.pautaLeg), targets: clean(MW.targets), calc: MW.calc, at: Date.now() };
+  const c = S._coachClient || {};
+  if (!MW.calc.kg && c.lastKg && +MW.targets.kcal) MW.calc.kg = Math.round(c.lastKg * 10) / 10; // peso con el que quedan las metas (para avisar si cambia)
+  const plan = { menus, pauta: clean(MW.pauta), pautaLeg: clean(MW.pautaLeg), targets: clean(MW.targets), calc: MW.calc, at: Date.now() };
   const plans = { ...(c.plans || {}), [MW.phase]: plan }, data = { plans };
   // El plan de la etapa actual también queda como plan general (respaldo para semanas sin etapa)
   if (c.phaseList?.find((x) => x.phase === MW.phase)?.current) Object.assign(data, { menus: plan.menus, pauta: plan.pauta, pautaLeg: plan.pautaLeg });
   await db.set("clients/" + MW.cid, data); MW.menus = clone(menus); MW.dirty = false; MW.exists = true;
   Object.assign(c, data); const ph = c.phaseList?.find((x) => x.phase === MW.phase); if (ph) ph.ready = true;
-  MW.imported = false; redraw(false); toast(`Plan de ${MW.phase} publicado ✓`);
+  MW.imported = false; redraw(false); toast(`Plan de ${MW.phase} publicado ✓`); window.dispatchEvent(new Event("ima-alerts"));
 });
 // Importar un plan pasado desde PDF (archivo ima-planes.json, se prepara aparte: no queda en el repositorio público)
 const nameKey = (s) => nk(s).split(/\s+/).filter(Boolean);
@@ -415,7 +417,7 @@ async function loadPlan(p) {
   const n = p.menus.length, prev = MW.menus.length;
   if (!(await confirmBox(`Cargar el plan de ${p.name}${p.phase ? ` (${p.phase})` : ""} en la etapa ${MW.phase}: ${n} opciones (${p.menus.map((m) => m.name).join(", ")})${p.targets ? ` y sus metas (${p.targets.kcal} kcal · C ${p.targets.cho} · L ${p.targets.fat} · P ${p.targets.prot})` : ""}.${prev ? ` Reemplaza las ${prev} opciones que tiene ahora.` : ""} No se publica hasta que toques “Guardar y publicar”.`))) return;
   if (p.targets) MW.targets = { ...p.targets };
-  if (p.calc) { const { kg, ...k } = p.calc; MW.calc = k; }
+  if (p.calc) MW.calc = { ...p.calc };
   MW.menus = clone(p.menus).map((mn) => ({ ...mn, id: uid() })); MW.k = 0;
   if (p.pauta && Object.keys(p.pauta).length) MW.pauta = { ...p.pauta };
   if (p.pautaLeg && Object.keys(p.pautaLeg).length) MW.pautaLeg = { ...p.pautaLeg };

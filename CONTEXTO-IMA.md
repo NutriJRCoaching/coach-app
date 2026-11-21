@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.31.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.32.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -263,3 +263,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Avisos:** rojo si la etapa actual no tiene plan; amarillo si una etapa parte en ≤ 2 semanas sin plan o un plan vigente no tiene metas.
 - **ima-planes.json** (fuera del repo) trae por plan su etapa y las metas tal como se calcularon en el PDF; al importar se carga en la pestaña de esa etapa. Los datos de clientes no se escriben en este archivo porque el repositorio es público.
 - **Entrenamiento (una sola pestaña, `trainingView`):** lo que hizo la semana (tarjetas compactas, detalle por serie plegado), revisión semanal, rutina semana a semana (`blockGrid` con técnica, 💬 notas, ⇄ reemplazo y "vs 1ª vez") y, plegados, el detalle de ejercicios y la configuración (calendario y cardio). Se quitaron la pestaña Rutinas (la ruta sigue) y "Para la próxima vez"; en Progreso el resumen por rutina quedó plegado.
+
+## v1.32.0 (20-nov) — Avisos de "algo no calza" en los planes
+- `planChecks` (alerts.js) revisa los planes de la etapa actual y de las que parten en ≤ 3 semanas y avisa en la campana:
+  - pauta vs metas del plan (kcal ±5 %, macros ±10 %) y pauta faltante;
+  - cada opción vs las metas (amarillo, con la diferencia) o, si los macros calzan, porciones distintas a su pauta en ≥ 0,5 (gris); la opción de legumbres se compara con la pauta de legumbres;
+  - falta el día con legumbres (gris);
+  - metas vs requerimiento de la etapa = mantención (del plan o del cliente) × (1 + % de la etapa), si difiere más de 8 %;
+  - el peso (promedio de los últimos 7 días) cambió ≥ 2 kg o ≥ 3 % respecto del peso con que se pusieron las metas (`plan.calc.kg`, se guarda al usar la calculadora, los macros de la pauta, editar metas o publicar; el import trae el peso del PDF).
+- Al publicar un plan se recalculan los avisos (evento `ima-alerts`).
