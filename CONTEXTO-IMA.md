@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.28.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.29.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -240,3 +240,11 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Colores:** cada opción tiene su color (`optColor`: pestaña, borde de sus comidas y de la tabla lateral) y cada grupo de alimentos el suyo (`GCOL`: franja en cada fila de alimento y punto en las tablas).
 - **Tabla lateral fija** (`.me-side`, sticky al hacer scroll; abajo en pantallas angostas): porciones de la opción / pauta por grupo (verde igual, amarillo faltan, rojo sobran) y kcal/CHO/lípidos/proteína contra las metas. Reemplaza las cápsulas de arriba.
 - **Macros por tiempo de comida** bajo el nombre de cada comida en el editor (`mealTot`).
+
+## v1.29.0 (20-nov) — Entrenamiento del coach: bloque semana a semana, progreso por rutina y cardio con descripción
+- **Rutinas → vista del bloque** (`blockGrid`, se abre sola la primera rutina): tabla por rutina con cada ejercicio y, por semana (últimas 5), lo **indicado** (series×reps @RIR, en rojo si cambió respecto de la semana anterior) y lo **hecho** por serie (verde subió, rojo bajó). A la derecha, columnas editables de la **semana siguiente**: series, reps por serie ("8, 6" o una sola), RIR, kg sugerido y comentario del ejercicio (`weekNote`). Arriba, **comentario general de la rutina** (`routine.note`), que el cliente ve al empezarla (se copia a `session.coachNote`) y en "Ver rutina". "Guardar cambios" marca los cambios como antes. El detalle por ejercicio (video, tips, tempo, descanso, reemplazos) quedó en un desplegable debajo.
+- Datos del bloque: `routineBlock(routine, sessions)` en data.js (último entrenamiento terminado de cada semana; unilaterales juntan izquierda y derecha), `planStr`, `setStr`.
+- **Entrenamientos:** bajo cada sesión, "✎ Para la próxima vez" con el comentario general de la rutina y la indicación + kg sugerido por ejercicio; se guarda al salir de la casilla (`patchRoutine`, marca cambios y la revisión semanal).
+- **Progreso por rutina** (reemplaza el progreso por ejercicio): tarjetas por rutina; por ejercicio, serie 1 y 2: 1ª vez · semana anterior · última semana, y diferencia en kg y reps contra la 1ª vez y contra la semana anterior.
+- **Cardio:** fila compacta (veces/semana, tipo, minutos, intensidad) + **descripción** (`cardio.desc`). El cliente la ve completa en "Ver" del cuadro de Cardio del inicio y al registrar (`cardioPlanHtml`).
+- **Plan alimentación (editor):** en la tabla lateral, kcal/CHO/lípidos/proteína en verde/amarillo/rojo según % de la meta.

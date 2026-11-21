@@ -7,7 +7,7 @@ import { I } from "./icons.js";
 import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, dualChart, $, $$ } from "./ui.js";
 import { e1rm } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
-import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto } from "./data.js";
+import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto, routineBlock, planStr, setStr } from "./data.js";
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
@@ -195,8 +195,9 @@ async function sessionsView(c, w) {
   const list = all.filter((s) => s.weekKey === w.key && s.status === "fin").sort((a, b) => a.startedAt - b.startedAt);
   const [exnotes, audios] = await Promise.all([db.list(`clients/${c.id}/exnotes`), db.list(`clients/${c.id}/audios`)]);
   if (!list.length) return `<p class="muted">Sin entrenamientos registrados esta semana.</p>`;
+  const routines = await getRoutines(c.id);
   return list.map((s) => {
-    const prev = prevSession(all, s), sv = s.survey || {};
+    const prev = prevSession(all, s), sv = s.survey || {}, rt = routines.find((r) => r.id === s.routineId);
     return `<div class="card"><div class="row between"><h3>${esc(s.routineName)} <small class="muted">${fmtDate(s.date, true)} · ${s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) + " min" : ""}</small></h3>
     <div class="row gap small">${sv.intensidad ?? sv.dureza ? `<span class="pill">Intensidad ${sv.intensidad ?? sv.dureza}/10</span>` : ""}${sv.fuerza ? `<span class="pill">Fuerza ${sv.fuerza}/5</span>` : ""}${sv.energia ? `<span class="pill">Energía ${sv.energia}/5</span>` : ""}${sv.doms ? `<span class="pill">DOMS ${sv.doms}/5</span>` : ""}${sv.general ? `<span class="pill">General ${sv.general}/5</span>` : ""}${sv.articular === "si" ? `<span class="badge r">Molestia articular: ${esc(sv.articularDet || "")}</span>` : ""}${sv.orden === "no" ? `<span class="badge y">No siguió el orden</span>` : ""}</div></div>
     ${s.comment ? `<div class="note">💬 ${esc(s.comment)}</div>` : ""}
@@ -205,25 +206,47 @@ async function sessionsView(c, w) {
     ${s.exercises.map((e) => e.sets.map((x, j) => { const ref = refSet(prev, e.exId, j); const dw = ref && x.w !== "" && ref.w !== "" ? r1(x.w - ref.w) : null, dr = ref && x.r !== "" && ref.r !== "" ? x.r - ref.r : null;
       return `<tr class="${e.extra ? "extra-row" : ""}">${j === 0 ? `<td rowspan="${e.sets.length}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge extra">Extra</span>' : ""}${e.replaced ? `<br><small class="muted">reemplazó a ${esc(e.replacedFrom)}</small>` : ""}${e.tech ? `<br><span class="badge tech-${e.tech}">Técnica ${e.tech}</span>` : ""}${exnotes.find((n) => n.id === e.exId)?.text ? `<br><small class="muted">⚙ ${esc(exnotes.find((n) => n.id === e.exId).text)}</small>` : ""}</td>` : ""}
       <td>${j + 1}${e.target?.[j] ? `<br><small class="muted">plan ${esc(e.target[j].reps)}${e.target[j].rir !== "" && e.target[j].rir != null ? "@" + e.target[j].rir : ""}</small>` : ""}</td><td><b>${x.w || "–"} × ${x.r || "–"}</b>${x.rir !== "" ? ` RIR ${x.rir}` : ""}${x.tech ? ` <span class="badge tech-${x.tech}">téc. ${x.tech}</span>` : ""}</td><td class="muted">${ref ? `${ref.w}×${ref.r}${ref.rir !== "" ? " RIR " + ref.rir : ""}` : "—"}</td>
-      <td>${(() => { const pg = setProgress(x, ref); return pg ? `<span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</td><td class="small">${esc(x.note || "")}</td></tr>`; }).join("")).join("")}</table></div>`;
+      <td>${(() => { const pg = setProgress(x, ref); return pg ? `<span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</td><td class="small">${esc(x.note || "")}</td></tr>`; }).join("")).join("")}</table>
+    ${rt ? `<details class="nextw" open><summary class="card-t">✎ Para la próxima vez · ${esc(rt.name)}</summary>
+      <p class="muted small">Se guarda al salir de cada casilla y el cliente lo ve en su rutina (los cambios quedan marcados para la semana que viene).</p>
+      <label>Comentario general de la rutina<textarea rows="2" data-a-change="nwNote" data-r="${rt.id}" placeholder="Ej: Buena semana: sube 2,5 kg en las prensas y cuida la bajada en espalda.">${esc(rt.note || "")}</textarea></label>
+      <div class="nw-grid">${rt.exercises.map((e) => `<label>${esc(e.name)}<span class="row gap"><input class="grow" value="${esc(e.weekNote || "")}" data-a-change="nwEx" data-r="${rt.id}" data-e="${e.id}" data-f="weekNote" placeholder="Indicación"><input value="${esc(e.wSug || "")}" data-a-change="nwEx" data-r="${rt.id}" data-e="${e.id}" data-f="wSug" placeholder="kg" style="width:64px"></span></label>`).join("")}</div></details>` : ""}</div>`;
   }).join("");
 }
+
+// Cambios rápidos a una rutina desde Entrenamientos (quedan marcados para la semana que viene, igual que en el editor)
+async function patchRoutine(rid, fn, msg) {
+  const c = await getClient(CW.cid), routines = await getRoutines(CW.cid), r = routines.find((x) => x.id === rid); if (!r) return;
+  fn(r);
+  const rv0 = reviewWindow(c, routines, await getSessions(CW.cid)), w = rv0?.open ? rv0.next : weekInfo(c, ymd());
+  const prevCh = r.changes?.week === w.key ? r.changes.list : [];
+  const { id, ...data } = r; data.updatedAt = Date.now(); if (msg) data.changes = { week: w.key, list: [...prevCh, msg], at: Date.now() };
+  await db.set(`clients/${CW.cid}/routines/${rid}`, data);
+  if (rv0?.open) { await db.set("clients/" + CW.cid, { rutReview: { week: rv0.next.key, same: false, at: Date.now() } }); resetAlerts(); }
+  if (RE?.r?.id === rid) RE = null; toast("Guardado ✓");
+}
+act("nwNote", (el) => { const v = el.value.trim(); patchRoutine(el.dataset.r, (r) => (r.note = v), v ? `Comentario de la rutina: ${v}` : ""); });
+act("nwEx", (el) => { const v = el.value.trim(), f = el.dataset.f; patchRoutine(el.dataset.r, (r) => { const e = r.exercises.find((x) => x.id === el.dataset.e); if (e) e[f] = v; }, v ? `${r_name(el)}: ${f === "wSug" ? "peso sugerido " + v + " kg" : v}` : ""); });
+const r_name = (el) => el.closest("label")?.firstChild?.textContent?.trim() || "Ejercicio";
 
 // ---------- Rutinas (editor)
 let RE = null; // rutina en edición
 async function routinesView(c) {
-  const routines = await getRoutines(c.id), lib = (await db.get("library/exercises"))?.items || [];
+  const routines = await getRoutines(c.id), lib = (await db.get("library/exercises"))?.items || [], sessions = await getSessions(c.id);
   const sched = c.schedule || {};
+  // Se abre sola la primera rutina (antes había que elegirla)
+  if ((!RE || RE.cid !== c.id) && routines.length) { const r0_ = routines[0]; RE = { cid: c.id, r: { ...r0_ }, orig: JSON.stringify(r0_.exercises || []), origNote: r0_.note || "" }; }
   const ed = RE && RE.cid === c.id ? RE.r : null;
-  const rv = reviewWindow(c, routines, await getSessions(c.id));
+  const rv = reviewWindow(c, routines, sessions);
   return `${rv ? `<div class="card review ${rv.done ? "ok" : rv.open ? "due" : ""}"><div class="row between"><div><div class="card-t">Revisión de la semana ${rv.next.n} · parte el ${fmtDate(rv.next.first, true)}</div>
     <p class="small">${rv.done ? `✓ Revisada${c.rutReview?.same ? " · sigue igual" : " · con cambios"}.` : rv.open ? "Ya terminó su semana de entrenamiento: revisa reps, intensidad, pesos sugeridos, indicaciones por ejercicio, orden y selección. Si queda igual, toca “Seguir igual”." : `Se abre el ${fmtDate(rv.lastTrain)} (su último entrenamiento de la semana). Igual puedes dejarla lista antes.`}</p></div>
     ${rv.done ? `<button class="btn small ghost" data-a="rvUndo" data-w="${rv.next.key}">Deshacer</button>` : `<button class="btn primary small" data-a="rvSame" data-w="${rv.next.key}">Seguir igual la semana ${rv.next.n}</button>`}</div></div>` : ""}
   <div class="card"><div class="card-t">Calendario semanal (qué rutina toca cada día)</div><div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>
-  <div class="row gap"><label>Cardio: veces/semana<input type="number" value="${c.cardio?.perWeek || ""}" data-a-change="cardioSet" data-k="perWeek"></label><label>Tipo<input value="${esc(c.cardio?.type || "")}" data-a-change="cardioSet" data-k="type"></label><label>Minutos<input type="number" value="${c.cardio?.minutes || ""}" data-a-change="cardioSet" data-k="minutes"></label><label>Intensidad<input value="${esc(c.cardio?.intensity || "")}" data-a-change="cardioSet" data-k="intensity"></label></div>
+  <div class="cardio-ed"><div class="card-t">Cardio</div><div class="cardio-row"><label class="cw-n">Veces/semana<input type="number" min="0" value="${c.cardio?.perWeek || ""}" data-a-change="cardioSet" data-k="perWeek"></label><label class="grow">Tipo<input value="${esc(c.cardio?.type || "")}" data-a-change="cardioSet" data-k="type" placeholder="Ej: Intervalos en bicicleta estática"></label><label class="cw-n">Minutos<input type="number" value="${c.cardio?.minutes || ""}" data-a-change="cardioSet" data-k="minutes"></label><label class="cw-m">Intensidad<input value="${esc(c.cardio?.intensity || "")}" data-a-change="cardioSet" data-k="intensity" placeholder="7–8/10"></label></div>
+  <label>Descripción (la ve completa al tocar Cardio)<textarea rows="4" data-a-change="cardioSet" data-k="desc" placeholder="Ej: 1 min de entrada en calor suave. Luego 4 rondas de 30 s intenso (8/10) + 60 s suave. Al terminar, 1 min de vuelta a la calma.">${esc(c.cardio?.desc || "")}</textarea></label></div>
   <div class="row gap small">Días sugeridos de cardio: ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="ck"><input type="checkbox" ${(c.cardio?.days || []).includes(d) ? "checked" : ""} data-a-change="cardioDay" data-d="${d}">${DAYS[d].slice(0, 3)}</label>`).join("")}</div></div>
   <div class="row gap"><div class="routine-list">${routines.map((r) => `<button class="btn ${ed?.id === r.id ? "primary" : ""}" data-a="rEdit" data-id="${r.id}">${esc(r.name)}</button>`).join("")}<button class="btn ghost" data-a="rNew">＋ Nueva rutina</button></div></div>
-  ${ed ? routineEditor(ed, lib) : `<p class="muted">Elige una rutina para editarla.</p>`}
+  ${ed ? blockGrid(c, ed, sessions, rv) + `<details class="card-d" ${RE.openDetail ? "open" : ""}><summary class="card-t" data-a="rDetail">Detalle de los ejercicios: video, tips, tempo, descanso y reemplazos</summary>${routineEditor(ed, lib)}</details>` : `<p class="muted">Crea la primera rutina.</p>`}
   <datalist id="exlib">${lib.map((e) => `<option value="${esc(e.name)}">`).join("")}</datalist>`;
 }
 act("rvSame", async (el) => { await db.set("clients/" + CW.cid, { rutReview: { week: el.dataset.w, same: true, at: Date.now() } }); resetAlerts(); toast("Listo: la rutina sigue igual"); refresh(); });
@@ -231,8 +254,34 @@ act("rvUndo", async () => { await db.set("clients/" + CW.cid, { rutReview: null 
 act("schedSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { schedule: { ...(c.schedule || {}), [el.dataset.d]: el.value || null } }); toast("Calendario guardado"); });
 act("cardioSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), [el.dataset.k]: el.type === "number" ? num(el.value) : el.value } }); toast("Guardado"); });
 act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = new Set(c.cardio?.days || []); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), days: [...s] } }); });
-act("rEdit", async (el) => { const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: { id: el.dataset.id, ...r }, orig: JSON.stringify(r.exercises || []) }; refresh(); });
+act("rEdit", async (el) => { const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: { id: el.dataset.id, ...r }, orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
 act("rNew", () => { RE = { cid: CW.cid, r: { id: uid(), name: "Nueva rutina", exercises: [], isNew: true }, orig: "[]" }; refresh(); });
+// Vista del bloque: lo indicado y lo hecho semana a semana, y la próxima semana editable en la misma tabla
+function blockGrid(c, r, sessions, rv) {
+  const B = routineBlock(r, sessions), weeks = B.weeks.slice(-5);
+  const nextN = rv?.next?.n || weekInfo(c, ymd()).n + 1;
+  const prog = (y, p) => { if (!y || !p) return ""; const dw = (+y.w || 0) - (+p.w || 0), dr = (+y.r || 0) - (+p.r || 0); return dw > 0 || (dw === 0 && dr > 0) ? "up" : dw < 0 || (dw === 0 && dr < 0) ? "down" : ""; };
+  const repsTxt = (e) => (e.sets || []).map((x) => x.reps ?? "").join(", "), rirTxt = (e) => [...new Set((e.sets || []).map((x) => x.rir ?? ""))].join(", ");
+  return `<div class="card blk"><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><button class="btn primary" data-a="rSave">Guardar cambios</button></div>
+  <label>Comentario general de la rutina (lo ve al empezarla)<textarea rows="2" data-a-change="rNote" placeholder="Ej: Esta semana sube un poco el peso en los multiarticulares y cuida la bajada en todo.">${esc(r.note || "")}</textarea></label>
+  <div class="scroll-x"><table class="tbl blk-t"><tr><th rowspan="2">Ejercicio</th>${weeks.map((wk) => `<th class="wkh">Semana ${+wk.slice(1)}</th>`).join("")}<th class="nxh" colspan="5">Semana ${nextN} · lo que va a hacer</th></tr>
+  <tr>${weeks.map(() => `<th class="sub">indicado · hecho (kg×reps)</th>`).join("")}<th class="sub nx">Series</th><th class="sub nx">Reps (por serie)</th><th class="sub nx">RIR</th><th class="sub nx">Kg sug.</th><th class="sub nx">Comentario del ejercicio</th></tr>
+  ${r.exercises.map((e, k) => { const cs = B.exs.find((x) => x.e.id === e.id)?.cells || {};
+    return `<tr><td class="exc"><b>${k + 1}. ${esc(e.name || "—")}</b></td>${weeks.map((wk, i) => { const cl = cs[wk], pv = i ? cs[weeks[i - 1]] : null; if (!cl) return `<td class="muted center">—</td>`;
+      const pl = planStr(cl.plan), chg = pv && planStr(pv.plan) !== pl;
+      return `<td class="wkc"><div class="pl ${chg ? "chg" : ""}">${esc(pl || "libre")}</div>${cl.sets.map((y, j) => `<div class="dn ${prog(y, pv?.sets?.[j])}">${esc(setStr(y))}${y.rir !== "" && y.rir != null ? `<small> @${esc(y.rir)}</small>` : ""}</div>`).join("") || '<div class="muted small">sin datos</div>'}</td>`; }).join("")}
+      <td class="nx"><input type="number" min="0" max="10" value="${(e.sets || []).length}" data-a-change="gSets" data-k="${k}" style="width:52px"></td>
+      <td class="nx"><input value="${esc(repsTxt(e))}" data-a-change="gReps" data-k="${k}" placeholder="8, 6" style="width:90px"></td>
+      <td class="nx"><input value="${esc(rirTxt(e))}" data-a-change="gRir" data-k="${k}" placeholder="1" style="width:56px"></td>
+      <td class="nx"><input value="${esc(e.wSug || "")}" data-a-change="exF" data-k="${k}" data-f="wSug" placeholder="–" style="width:64px"></td>
+      <td class="nx"><input value="${esc(e.weekNote || "")}" data-a-change="exF" data-k="${k}" data-f="weekNote" placeholder="Ej: controla la bajada" style="min-width:200px"></td></tr>`; }).join("")}</table></div>
+  <p class="muted small">Cada semana muestra lo indicado (series×reps @RIR; en rojo si cambió respecto de la semana anterior) y lo hecho por serie (verde = subió peso o reps, rojo = bajó). En reps puedes poner una por serie separadas por coma (“8, 6”) o una sola para todas. ${weeks.length ? "" : "Aún no hay entrenamientos de esta rutina."}</p></div>`;
+}
+act("rDetail", (el) => { RE.openDetail = !el.parentElement.open; });
+act("rNote", (el) => { RE.r.note = el.value; });
+act("gSets", (el) => { const e = RE.r.exercises[+el.dataset.k], n = Math.max(0, Math.min(10, num(el.value) || 0)); e.sets ||= []; while (e.sets.length < n) e.sets.push({ ...(e.sets[e.sets.length - 1] || { reps: "8-10", rir: 1 }) }); e.sets.length = n; refresh(); });
+act("gReps", (el) => { const e = RE.r.exercises[+el.dataset.k], v = el.value.split(",").map((x) => x.trim()).filter(Boolean); if (!v.length) return; (e.sets || []).forEach((x, j) => (x.reps = v[Math.min(j, v.length - 1)])); refresh(); });
+act("gRir", (el) => { const e = RE.r.exercises[+el.dataset.k], v = el.value.split(",").map((x) => x.trim()); if (!v.length) return; (e.sets || []).forEach((x, j) => { const t = v[Math.min(j, v.length - 1)]; x.rir = t === "" ? "" : t.toUpperCase() === "F" ? "F" : +t; }); refresh(); });
 function routineEditor(r, lib) {
   const T = ["Excéntrica", "Pausa abajo", "Concéntrica", "Pausa arriba"];
   return `<div class="card"><div class="row gap"><input class="h-in" value="${esc(r.name)}" data-a-change="rName" placeholder="Nombre de la rutina"><button class="btn primary" data-a="rSave">Guardar cambios</button><button class="btn ghost" data-a="rDup">Duplicar</button><button class="btn danger" data-a="rDel">Eliminar</button></div>
@@ -292,11 +341,12 @@ act("rSave", async () => {
     old.filter((o) => !r.exercises.find((e) => e.id === o.id)).forEach((o) => list.push(`Se quitó: ${o.name}`));
   }
   const prevCh = r.changes?.week === w.key ? r.changes.list : [];
-  const data = { name: r.name, exercises: r.exercises, order: r.order ?? 0, updatedAt: Date.now() };
+  if ((RE.origNote || "") !== (r.note || "") && r.note) list.push(`Comentario de la rutina: ${r.note}`);
+  const data = { name: r.name, exercises: r.exercises, note: r.note || "", order: r.order ?? 0, updatedAt: Date.now() };
   if (list.length) data.changes = { week: w.key, list: [...prevCh, ...list], at: Date.now() };
   await db.set(`clients/${CW.cid}/routines/${r.id}`, data);
   if (rv0?.open) { await db.set("clients/" + CW.cid, { rutReview: { week: rv0.next.key, same: false, at: Date.now() } }); resetAlerts(); }
-  RE.orig = JSON.stringify(r.exercises); r.isNew = false;
+  RE.orig = JSON.stringify(r.exercises); RE.origNote = r.note || ""; r.isNew = false;
   toast(list.length ? `Guardado · ${list.length} cambio(s) marcados para el cliente` : "Guardado"); refresh();
 });
 act("rDup", async () => { const id = uid(); await db.set(`clients/${CW.cid}/routines/${id}`, { name: RE.r.name + " (copia)", exercises: RE.r.exercises.map((e) => ({ ...e, id: uid(), changed: false })) }); toast("Duplicada"); refresh(); });
@@ -359,15 +409,25 @@ async function progView(c) {
   const meas = (await db.list(`clients/${c.id}/measures`)).sort((a, b) => a.id.localeCompare(b.id));
   const equip = (await db.list(`clients/${c.id}/photos`)).filter((p) => p.kind === "equipo");
   const sess = (await getSessions(c.id)).filter((x) => x.status === "fin").sort((a, b) => a.startedAt - b.startedAt);
-  // Progreso de cada ejercicio: su primera vez registrada vs la última (peso y repeticiones de la mejor serie)
-  const best = (e) => { const v = (e?.sets || []).filter((y) => +y.w || +y.r); return v.length ? v.reduce((a, y) => (+y.w > +a.w || (+y.w === +a.w && +y.r > +a.r) ? y : a)) : null; };
-  const byEx = {};
-  for (const x of sess) for (const e of x.exercises) { const b = best(e); if (!b) continue; (byEx[e.name] ||= []).push({ d: x.date, wk: x.weekKey, ...b }); }
-  const rows = Object.entries(byEx).filter(([, v]) => v.length).map(([n, v]) => ({ n, f: v[0], l: v[v.length - 1], k: v.length })).sort((a, b) => a.n.localeCompare(b.n, "es"));
-  const dd = (a, b, u) => { const d = r1((+a || 0) - (+b || 0)); return d ? `<b class="${d > 0 ? "g" : "r"}">${d > 0 ? "+" : ""}${d}${u}</b>` : '<span class="muted">=</span>'; };
+  // Progreso por rutina (20-nov): cada ejercicio de cada rutina, serie 1 y serie 2: primera vez · semana anterior · esta semana
+  const routines = await getRoutines(c.id);
+  const dd = (a, b, u) => { if (a == null || b == null || a === "" || b === "") return ""; const d = r1((+a || 0) - (+b || 0)); return d ? `<b class="${d > 0 ? "g" : "r"}">${d > 0 ? "+" : ""}${String(d).replace(".", ",")}${u}</b>` : '<span class="muted">=</span>'; };
+  const cellS = (y) => (y ? `${y.w || "–"}×${y.r || "–"}${y.w2 !== undefined ? `<small class="muted"> | ${y.w2 || "–"}×${y.r2 || "–"}</small>` : ""}` : '<span class="muted">—</span>');
+  const progCards = routines.map((r) => {
+    const B = routineBlock(r, sess); if (!B.weeks.length) return "";
+    const W = B.weeks, wf = W[0], wl = W[W.length - 1], wp = W.length > 2 ? W[W.length - 2] : null;
+    const rows = B.exs.map(({ e, cells }) => {
+      const ks = W.filter((w) => cells[w]?.sets?.length); if (!ks.length) return "";
+      const f = cells[ks[0]], l = cells[ks[ks.length - 1]], p = ks.length > 2 ? cells[ks[ks.length - 2]] : null, n = Math.max(1, Math.min(2, l.sets.length));
+      return Array.from({ length: n }, (_, j) => { const a = f.sets[j], b = l.sets[j], m = p?.sets?.[j];
+        return `<tr>${j === 0 ? `<td rowspan="${n}" class="exc"><b>${esc(e.name)}</b></td>` : ""}<td class="muted">S${j + 1}</td><td>${cellS(a)}</td>${wp ? `<td>${cellS(m)}</td>` : ""}<td><b>${cellS(b)}</b></td>
+          <td>${ks.length > 1 ? `${dd(b?.w, a?.w, " kg")} <span class="muted">·</span> ${dd(b?.r, a?.r, " reps")}` : ""}</td>${wp ? `<td>${m ? `${dd(b?.w, m?.w, " kg")} <span class="muted">·</span> ${dd(b?.r, m?.r, " reps")}` : ""}</td>` : ""}</tr>`; }).join("");
+    }).join("");
+    return rows ? `<div class="card prog-r"><div class="card-t">${esc(r.name)}</div><table class="tbl prog-t"><tr><th>Ejercicio</th><th></th><th>1ª vez <small>(sem. ${+wf.slice(1)})</small></th>${wp ? `<th>Sem. ${+wp.slice(1)}</th>` : ""}<th>Sem. ${+wl.slice(1)}</th><th>vs 1ª vez</th>${wp ? `<th>vs sem. ${+wp.slice(1)}</th>` : ""}</tr>${rows}</table></div>` : "";
+  }).join("");
   return `<div class="card"><div class="card-t">Peso (120 días)</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals, color: "var(--muted)", dots: true, w: 1 }, { vals: trend(vals), color: "var(--acc)" }], { h: 240, unit: " kg" })}</div>
-  <div class="card scroll-x"><div class="card-t">Progreso por ejercicio · primera vez vs la última (mejor serie)</div>${rows.length ? `<table class="tbl"><tr><th>Ejercicio</th><th>Primera vez</th><th>Última vez</th><th>Carga</th><th>Reps</th><th>Sesiones</th></tr>
-  ${rows.map((r) => `<tr><td><b>${esc(r.n)}</b></td><td>${r.f.w || "–"} kg × ${r.f.r || "–"} <small class="muted">${fmtDate(r.f.d)}</small></td><td>${r.l.w || "–"} kg × ${r.l.r || "–"} <small class="muted">${fmtDate(r.l.d)}</small></td><td>${dd(r.l.w, r.f.w, " kg")}</td><td>${dd(r.l.r, r.f.r, "")}</td><td class="muted">${r.k}</td></tr>`).join("")}</table>` : `<p class="muted">Sin entrenamientos registrados.</p>`}</div>
+  <div class="card-t mt">Progreso por rutina · serie 1 y 2 (kg × reps; en unilaterales izquierda | derecha)</div>
+  ${progCards ? `<div class="prog-grid">${progCards}</div>` : `<div class="card"><p class="muted">Sin entrenamientos registrados.</p></div>`}
   <div class="card"><div class="row between"><div class="card-t">Fotos</div><div class="row gap">${["a", "b"].map((k) => `<select data-a-change="cmpSel" data-k="${k}">${weeks.map((x) => `<option ${x === cmp[k] ? "selected" : ""} value="${x}">Semana ${+x.slice(1)}</option>`).join("")}</select>`).join(" vs ")}</div></div>
   ${weeks.length ? `<div class="cmp-grid">${PHOTO_TYPES.map(([t, l]) => { const a = pick(cmp.a, t), b = pick(cmp.b, t); return a || b ? `<div class="cmp"><div>${a ? `<img src="${a.data}">` : "—"}</div><div>${b ? `<img src="${b.data}">` : "—"}</div><small>${l}</small></div>` : ""; }).join("")}</div>` : `<p class="muted">Sin fotos aún.</p>`}</div>
   <div class="card scroll-x"><div class="card-t">Medidas (cm)</div>${meas.length ? `<table class="tbl"><tr><th>Zona</th>${meas.map((m) => `<th>${fmtDate(m.id)}</th>`).join("")}<th>Cambio</th></tr>${MEASURE_ZONES.map(([k, l]) => { const v = meas.map((m) => m[k]).filter((x) => x != null); return `<tr><td>${l}</td>${meas.map((m) => `<td>${m[k] ?? "—"}</td>`).join("")}<td>${v.length > 1 ? r1(v[v.length - 1] - v[0]) : ""}</td></tr>`; }).join("")}</table>` : `<p class="muted">Sin mediciones.</p>`}</div>

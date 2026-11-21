@@ -105,7 +105,7 @@ const blankSet = () => ({ w: "", r: "", rir: "", note: "", done: false });
 export function newSession(client, routine, date = ymd()) {
   return {
     id: uid(), routineId: routine.id, routineName: routine.name, date, weekKey: weekInfo(client, date).key,
-    startedAt: Date.now(), status: "curso",
+    startedAt: Date.now(), status: "curso", coachNote: routine.note || "",
     exercises: routine.exercises.map((e) => {
       const sides = e.uni ?? isUniName(e.name), tg = e.sets || [];
       return {
@@ -376,3 +376,28 @@ export function reviewWindow(c, routines, sessions, today = ymd()) {
   const next = weekInfo(c, addDays(w.last, 1));
   return { open: today >= lastTrain, next, w, lastTrain, done: c.rutReview?.week === next.key };
 }
+
+// ---------- Bloque de una rutina semana a semana (coach: Rutinas y Progreso)
+// Por cada semana con la rutina terminada toma su último entrenamiento: lo indicado (target) y lo hecho por serie.
+// Los unilaterales juntan izquierda y derecha en la misma serie (w/r = izquierda, w2/r2 = derecha).
+export function routineBlock(routine, sessions) {
+  const fin = sessions.filter((x) => x.routineId === routine.id && x.status === "fin").sort((a, b) => a.startedAt - b.startedAt);
+  const byWeek = new Map(); for (const s of fin) byWeek.set(s.weekKey, s); // queda el último de cada semana
+  const weeks = [...byWeek.keys()].sort();
+  const exs = (routine.exercises || []).map((e) => {
+    const cells = {};
+    for (const wk of weeks) {
+      const s = byWeek.get(wk), x = s.exercises.find((y) => y.exId === e.id) || s.exercises.find((y) => y.name === e.name);
+      if (!x) continue;
+      const tg = x.sides ? (x.target || []).filter((_, k) => k % 2 === 0) : x.target || [];
+      const sets = [];
+      if (x.sides) for (let j = 0; j * 2 < x.sets.length; j++) { const a = x.sets[2 * j] || {}, b = x.sets[2 * j + 1] || {}; sets.push({ w: a.w, r: a.r, rir: a.rir, w2: b.w, r2: b.r }); }
+      else for (const a of x.sets || []) sets.push({ w: a.w, r: a.r, rir: a.rir });
+      cells[wk] = { plan: tg, sets: sets.filter((y) => y.w !== "" || y.r !== ""), date: s.date, name: x.name };
+    }
+    return { e, cells };
+  });
+  return { weeks, exs, byWeek };
+}
+export const planStr = (tg) => (tg?.length ? `${tg.length}×${[...new Set(tg.map((t) => t.reps || "–"))].join("/")}${tg.some((t) => t.rir !== "" && t.rir != null) ? ` @${[...new Set(tg.map((t) => t.rir))].join("/")}` : ""}` : "");
+export const setStr = (y) => (y ? `${y.w || "–"}×${y.r || "–"}${y.w2 !== undefined ? ` | ${y.w2 || "–"}×${y.r2 || "–"}` : ""}` : "–");

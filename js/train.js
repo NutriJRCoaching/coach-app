@@ -78,7 +78,7 @@ act("mrRemove", async () => { if (!(await confirmBox("¿Eliminar esta rutina? Tu
 act("viewRoutine", async (el) => {
   const r = (await getRoutines(S.cid)).find((x) => x.id === el.dataset.r); if (!r) return;
   const sessions = await getSessions(S.cid), last = sessions.filter((x) => x.routineId === r.id && x.status === "fin").sort((a, b) => b.startedAt - a.startedAt)[0];
-  sheet(r.name, `${(r.exercises || []).map((e, k) => {
+  sheet(r.name, `${r.note ? `<div class="coachnote rnote"><b>Tu coach:</b> ${esc(r.note)}</div>` : ""}${(r.exercises || []).map((e, k) => {
     const lx = last?.exercises.find((x) => x.exId === e.id), done = (lx?.sets || []).filter((x) => x.w !== "" || x.r !== "");
     return `<div class="rvx" style="--exc:${exColor(k)}"><b>${k + 1}. ${esc(e.name)}</b>${e.changed ? ' <span class="badge r">Modificado</span>' : ""}
     <div class="small">${(e.sets || []).map((t, j) => `<span class="rvset">S${j + 1}: ${planTxt(t)}</span>`).join("") || '<span class="muted">Series libres</span>'}</div>
@@ -118,6 +118,7 @@ export async function sessionView(id) {
   const exNote = (await db.get(`${P()}/exnotes/${ex.exId}`)) || {};
   const hasTips = ex.video || ex.notes || ex.alts?.length || exNote.text || exNote.photos?.length;
   return `<header class="ch sess"><a href="#entreno" class="icon-btn">${I.back}</a><h2>${esc(s.routineName)}</h2><span class="row"><span class="clock" id="clock">${timeSince(s.startedAt)}</span><button class="btn tiny primary" data-a="finishAsk">Terminar</button></span></header>
+  ${s.coachNote && i === 0 ? `<div class="coachnote rnote"><b>Tu coach para hoy:</b> ${esc(s.coachNote)}</div>` : ""}
   <div class="extabs">${s.exercises.map((e, k) => { const done = e.sets.length && e.sets.every((x) => x.done); return `<button class="${k === i ? "on" : ""} ${done ? "done" : ""} ${e.extra ? "extra" : ""} ${e.changed ? "chg" : ""}" style="--exc:${exColor(k)}" data-a="exGo" data-i="${k}">${k + 1}</button>`; }).join("")}</div>
   <div class="card ex ${ex.extra ? "extra" : ""}" style="--exc:${exColor(i)}">
     <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra</span>' : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>

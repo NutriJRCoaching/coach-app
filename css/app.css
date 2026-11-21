@@ -542,3 +542,27 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; col
 .me-t tr.git td:first-child { box-shadow: inset 4px 0 0 var(--gc); padding-left: 10px; }
 .pauta-t input { width: 90px; } .pauta-t tr.ptot td { border-top: 1px solid var(--line); } .pauta-t small.g { color: var(--g); } .pauta-t small.y { color: var(--y); } .pauta-t small.r { color: var(--r); }
 @media (max-width: 1100px) { .me-grid { grid-template-columns: 1fr; } .me-side { position: static; } }
+.side-mac div.okc { background: var(--g-s); } .side-mac div.lowc { background: var(--y-s); } .side-mac div.hic { background: var(--r-s); }
+/* Rutinas (coach, 20-nov): cardio compacto con descripción y bloque semana a semana */
+.cardio-ed { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
+.cardio-row { display: flex; gap: 10px; flex-wrap: wrap; } .cardio-row .grow { flex: 1; min-width: 220px; }
+.cw-n input { width: 80px; } .cw-m input { width: 110px; }
+.blk-t th, .blk-t td { vertical-align: top; } .blk-t th.wkh { text-align: center; } .blk-t th.sub { font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.blk-t th.nxh, .blk-t td.nx, .blk-t th.nx { background: var(--acc-s); } .blk-t th.nxh { text-align: center; color: var(--acc); }
+.blk-t td.exc { min-width: 170px; } .blk-t td.wkc { min-width: 110px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.blk-t .pl { color: var(--muted); font-size: 11px; margin-bottom: 2px; } .blk-t .pl.chg { color: var(--r); font-weight: 700; }
+.blk-t .dn.up { color: var(--g); } .blk-t .dn.down { color: var(--r); }
+.card-d { background: var(--surf); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin: 12px 0; } .card-d > summary { cursor: pointer; }
+.nextw { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; } .nextw summary { cursor: pointer; }
+.nw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 14px; }
+/* Progreso por rutina */
+.prog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 0 14px; }
+.prog-t td, .prog-t th { padding: 5px 6px; font-size: 12.5px; font-variant-numeric: tabular-nums; } .prog-t td.exc { max-width: 170px; } .prog-t th small { font-weight: 500; }
+.prog-t b.g { color: var(--g); } .prog-t b.r { color: var(--r); }
+/* Cliente: indicación de cardio y comentario de la rutina */
+.cardio-plan { background: var(--surf2); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
+.cp-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; } .cp-pills span { background: var(--acc-s); color: var(--txt); border-radius: 99px; padding: 4px 10px; font-size: 12.5px; }
+.cp-type { font-weight: 700; margin: 4px 0; } .cp-desc { white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
+.coachnote.rnote { margin: 8px 14px; }
+.prog-t td:nth-last-child(-n+2) { white-space: nowrap; }
+.cardio-row label { display: block; } .nextw > summary { color: var(--acc); }

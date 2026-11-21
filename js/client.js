@@ -102,7 +102,7 @@ async function home() {
     ${has("home_weight") ? `<a class="card tile" href="#peso"><div class="card-t">${I.scale}Peso</div><div class="big">${day.weight ? r1(day.weight) + " <small>kg</small>" : "—"}</div><div class="muted small">${day.weight ? [day.weightFast === false ? "Sin ayuno" : "Ayunas ✓", day.weightBath === false ? "sin baño" : day.weightBath ? "baño ✓" : ""].filter(Boolean).join(" · ") : "En ayunas"}</div></a>` : ""}
     ${has("home_cardio") ? `<div class="card tile"><div class="card-t">${I.run}Cardio <span class="badge ${Object.keys(cardioDone).length >= (c.cardio?.perWeek || 0) && c.cardio?.perWeek ? "g" : ""}">${Object.keys(cardioDone).length}/${c.cardio?.perWeek || 0}</span></div>
       <div class="cweek">${w.days.map((d) => { const dw = new Date(d + "T12:00").getDay(); return `<span class="${cardioDone[d] ? "ok" : cdays.includes(dw) ? "plan" : ""} ${d === today ? "today" : ""}">${D1[dw]}</span>`; }).join("")}</div>
-      <div class="legend-mini"><span>● hecho</span><span>○ sugerido</span></div><div class="foot"><button class="btn tiny" data-a="cardioAdd">Registrar</button></div></div>` : ""}
+      <div class="legend-mini"><span>● hecho</span><span>○ sugerido</span></div><div class="foot">${c.cardio?.desc || c.cardio?.type ? `<button class="btn tiny ghost" data-a="cardioPlan">Ver</button>` : ""}<button class="btn tiny" data-a="cardioAdd">Registrar</button></div></div>` : ""}
     ${has("home_digest") ? `<div class="card tile"><div class="card-t">${I.gut}Digestión</div><div class="row between"><span class="small muted">Deposiciones</span><div class="stepper-s"><button data-a="depo" data-n="-1">−</button><b>${day.depos ?? 0}</b><button data-a="depo" data-n="1">+</button></div></div>
       <div class="foot"><button class="btn tiny" data-a="gutNote">${day.gut ? "Molestias ●" : "¿Molestias?"}</button></div></div>` : ""}
     ${has("home_train") && has("train_tab") ? `<a class="card tile wide train-tile" href="#${inProgress ? "sesion/" + inProgress.id : "entreno"}"><div class="card-t" style="margin:0">${I.dumbbell}</div><div class="tt">${trainTxt}<span class="muted small">${plan.doneCount} de ${plan.planned.length} entrenamientos esta semana</span></div>${slot && !slot.rest && slot.status !== "hecho" || inProgress ? `<span class="btn primary small">${inProgress ? "Continuar" : "Empezar"}</span>` : I.chev}</a>` : ""}
@@ -162,9 +162,14 @@ export function stepsMsg(st, goal) {
   if (pct < 0.8) return { ic: "👟", title: "Vas bien, sigue así", body: `Llevas ${n(st)} pasos; te faltan <b>${n(left)}</b>. Una caminata de unos <b>${min} minutos</b> y lo logras.`, btn: "Dale" };
   return { ic: "💪", title: "¡Ya casi!", body: `Te faltan solo <b>${n(left)}</b> pasos. Unos ${min} minutos más y meta cumplida.`, btn: "Dale" };
 }
+// Indicación de cardio del coach: tipo, minutos, intensidad y su descripción completa
+const cardioPlanHtml = (c) => (c.perWeek || c.type || c.desc ? `<div class="cardio-plan"><div class="card-t">Tu cardio</div>
+  <div class="cp-pills">${c.perWeek ? `<span><b>${c.perWeek}</b> veces/semana</span>` : ""}${c.minutes ? `<span><b>${c.minutes}</b> min</span>` : ""}${c.intensity ? `<span>Intensidad <b>${esc(c.intensity)}</b></span>` : ""}</div>
+  ${c.type ? `<div class="cp-type">${esc(c.type)}</div>` : ""}${c.desc ? `<div class="cp-desc">${esc(c.desc)}</div>` : ""}</div>` : "");
+act("cardioPlan", () => sheet("Cardio", `${cardioPlanHtml(S.client.cardio || {})}<button class="btn primary big" data-a="cardioAdd">Registrar cardio</button>`));
 act("cardioAdd", () => {
   const c = S.client.cardio || {};
-  sheet("Registrar cardio", `${c.perWeek ? `<div class="note">Tu indicación: ${c.perWeek} veces por semana · ${esc(c.type || "")} · ${c.minutes || ""} min · ${esc(c.intensity || "")}</div>` : ""}<label>Tipo<input id="cT" value="${esc(c.type || "")}" placeholder="Bici, trote, elíptica…"></label><label>Minutos<input id="cM" type="number" inputmode="numeric" value="${c.minutes || ""}"></label>
+  sheet("Registrar cardio", `${cardioPlanHtml(c)}<label>Tipo<input id="cT" value="${esc(c.type || "")}" placeholder="Bici, trote, elíptica…"></label><label>Minutos<input id="cM" type="number" inputmode="numeric" value="${c.minutes || ""}"></label>
   <label>Intensidad<select id="cI">${["Baja", "Moderada", "Alta"].map((x) => `<option ${x === c.intensity ? "selected" : ""}>${x}</option>`).join("")}</select></label><button class="btn primary big" data-a="cardioSave">Guardar</button>`);
 });
 act("cardioSave", async () => {
