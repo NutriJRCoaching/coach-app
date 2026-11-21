@@ -661,7 +661,7 @@ async function dataView(c) {
   ${c.example ? `<p class="small muted">Cliente de ejemplo: no tiene cuenta. Míralo con “Ver como cliente”.</p>` : legacy ? `<p class="small"><span class="badge g">Cuenta activa</span> (creada con el sistema anterior).</p>` : !c.email ? `<p class="small"><span class="badge y">Falta su correo</span> Anótalo abajo y guarda.</p>`
     : `<p class="small">${acc?.ok ? '<span class="badge g">Con acceso</span> Puede crear su cuenta y entrar con su correo.' : '<span class="badge">Sin acceso</span> Si crea su cuenta, verá un mensaje de que aún no le das acceso.'}</p>
     <div class="row gap">${acc?.ok ? `<button class="btn" data-a="accSet" data-v="0">Quitar acceso</button><button class="btn primary" data-a="copyInvite">Copiar invitación para WhatsApp</button>` : `<button class="btn primary" data-a="accSet" data-v="1">Dar acceso</button>`}</div>`}</div>
-  <form class="card" id="dataF"><div class="card-t">Asesoría</div><div class="grid3">
+  <form class="card" id="dataF" data-a-change="dataAuto"><div class="row between"><div class="card-t">Asesoría</div><span class="muted small">Se guarda solo al cambiar cada campo</span></div><div class="grid3">
   <label>Tipo de asesoría<select name="service"><option value="">— Definir —</option>${Object.entries(SERVICES).map(([k, l]) => `<option value="${k}" ${c.service === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
   ${f("startDate", "Inicio del servicio (define el inicio de cada semana)", "date")}${f("endDate", "Fin del servicio (si tiene)", "date")}
   <label>Día de check-in<select name="checkinDay"><option value="">—</option>${[1, 2, 3, 4, 5, 6, 0].map((d) => `<option value="${d}" ${c.checkinDay !== "" && c.checkinDay != null && +c.checkinDay === d ? "selected" : ""}>${DAYS[d]}</option>`).join("")}</select></label>
@@ -696,8 +696,15 @@ document.addEventListener("rendered", async () => {
   el.textContent = w ? waterAuto(w) + " ml" : "sin pesajes"; el.dataset.v = w ? waterAuto(w) : "";
 });
 act("waterSug", () => { const v = $("#wSug").dataset.v; if (v) $('#dataF [name="water"]').value = v; });
-act("dataSave", async () => {
-  const fd = Object.fromEntries(new FormData($("#dataF"))), c0 = await getClient(CW.cid);
+act("dataSave", () => saveData(true));
+// Se guarda solo al cambiar cualquier campo (antes había que bajar hasta "Guardar" y era fácil olvidarlo)
+act("dataAuto", (el, e) => { if (e?.target?.closest("[data-a-change]") !== el) return; clearTimeout(DSV); DSV = setTimeout(() => saveData(false), 300); });
+let DSV = null;
+async function saveData(redraw) {
+  const F = $("#dataF"); if (!F) return;
+  try {
+  const fd = Object.fromEntries(new FormData(F)), c0 = await getClient(CW.cid);
+  if (fd.startDate && fd.startDate !== c0.startDate && c0.startDate) toast(`Inicio cambiado al ${fmtDate(fd.startDate)}: la semana 1 parte ese día y las semanas y etapas se cuentan desde ahí`, 4000);
   const n = ["height", "kcal", "cho", "fat", "prot", "steps", "water", "sleep", "rest", "checkinDay", "payEvery"];
   const data = {};
   for (const [k, v] of Object.entries(fd)) if (!["planUrl", "planNotes", "dates", "email", "todo", "checkinForm"].includes(k)) data[k] = n.includes(k) ? num(v) : v;
@@ -715,8 +722,9 @@ act("dataSave", async () => {
   data.pauta = {}; $$("[data-pauta]").forEach((i) => { if (i.value !== "") data.pauta[i.dataset.pauta] = num(i.value); });
   data.pautaLeg = {}; $$("[data-pauta-leg]").forEach((i) => { if (i.value !== "") data.pautaLeg[i.dataset.pautaLeg] = num(i.value); });
   if ($("[data-rng]")) { data.ranges = {}; $$("[data-rng]").forEach((i) => { (data.ranges[i.dataset.rng] ||= [null, null])[+i.dataset.i] = num(i.value); }); }
-  await db.set("clients/" + CW.cid, data); resetAlerts(); toast("Guardado ✓"); refresh();
-});
+  await db.set("clients/" + CW.cid, data); resetAlerts(); if (!(fd.startDate && fd.startDate !== c0.startDate && c0.startDate)) toast("Guardado ✓"); if (redraw) refresh();
+  } catch (err) { console.error(err); toast("No se pudo guardar: " + (err.message || err)); }
+}
 act("accSet", async (el) => {
   const c = await getClient(CW.cid), e = emailKey(c.email); if (!e) return toast("Primero anota su correo");
   const ok = el.dataset.v === "1";

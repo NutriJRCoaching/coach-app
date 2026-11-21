@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.34.2**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.34.3**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -307,3 +307,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## v1.34.2 (20-nov)
 - Progreso del cliente: "Timeline" con la descripción "Un resumen de tus estadísticas semana a semana". En el Timeline, el calendario nutricional es un calendario del mes (`monthCal`, con flechas para cambiar de mes; `TLM`) con los días pintados por etapa y su leyenda, en vez de la barra de etapas.
+
+## v1.34.3 (20-nov)
+- Datos y objetivos se guarda solo al cambiar cualquier campo (`dataAuto` → `saveData`, con aviso si falla); el botón Guardar sigue. Al cambiar la fecha de inicio avisa que las semanas y etapas se cuentan desde ese día.
+- OJO pendiente: cambiar la fecha de inicio de un cliente con historial renumera las semanas. Sesiones (`weekKey`), check-ins y retros (`S01`, `S02`…) guardan el número de semana viejo, y un check-in nuevo de la "semana 1" pisaría el antiguo de la semana 1. Falta decidir cómo manejar un "nuevo bloque" sin perder lo anterior.
