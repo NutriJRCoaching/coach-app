@@ -843,6 +843,13 @@ async function macroGuideView() {
 
 // ---------- Check-in semanal (igual al de la planilla)
 let CI = {};
+// Resumen del sueño de la semana (de los registros diarios): horas promedio, calidad y cafeína después de las 12
+function sleepSum(days) {
+  const v = Object.values(days), hs = v.map((d) => sleepHours(d.sleep)).filter((x) => x != null), qs = v.map((d) => d.sleep?.quality).filter(Boolean), cf = v.filter((d) => d.cafPM === true || d.cafPM === 1).length, cfn = v.filter((d) => d.cafPM != null).length;
+  if (!hs.length && !qs.length && !cfn) return `<div class="note small">Esta semana no registraste tu sueño en la app.</div>`;
+  const fh = (h) => `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, "0")} min`;
+  return `<div class="ci-sleep"><div><small>Sueño promedio</small><b>${hs.length ? fh(avg(hs)) : "—"}</b><small>${hs.length} noche${hs.length === 1 ? "" : "s"} registradas</small></div><div><small>Calidad</small><b>${qs.length ? r1(avg(qs)).toString().replace(".", ",") + " / 5" : "—"}</b></div><div><small>Cafeína después de las 12</small><b>${cfn ? `${cf} de 7 días` : "—"}</b></div></div>`;
+}
 async function checkinView() {
   const w = weekInfo(S.client, ymd()), saved = (await db.get(`${P()}/checkins/${w.key}`)) || {};
   CI = { ...saved };
@@ -858,11 +865,14 @@ async function checkinView() {
     let inp;
     if (type === "text") inp = `<textarea rows="2" data-a-input="ciTxt" data-k="${k}">${esc(CI[k] || "")}</textarea>`;
     else if (type === "line") inp = `<input data-a-input="ciTxt" data-k="${k}" value="${esc(CI[k] || "")}" placeholder="${esc(ph || "Ejercicio, peso × reps")}">`;
+    else if (type === "list3") inp = [1, 2, 3].map((n) => `<div class="ci-num"><b>${n}</b><input data-a-input="ciTxt" data-k="${k}${n}" value="${esc(CI[k + n] || "")}"></div>`).join("");
     else if (type === "num") inp = `<input type="number" step="0.1" inputmode="decimal" data-a-input="ciTxt" data-k="${k}" value="${esc(CI[k] ?? "")}">`;
     else if (type.multi) inp = `<div class="ci-grid">${type.multi.map((o) => `<label><input type="checkbox" data-a-change="ciMulti" data-k="${k}" value="${esc(o)}" ${(CI[k] || []).includes(o) ? "checked" : ""}>${esc(o)}</label>`).join("")}</div>`;
     else if (type.length > 6) inp = `<select data-a-change="ciSel" data-k="${k}"><option value="">—</option>${type.map((o) => `<option ${CI[k] === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
     else inp = chips(k, type.map((o) => [o, o]), CI[k], "ciChip");
-    const ex = extra ? `<input class="mt" data-a-input="ciTxt" data-k="${k}Det" value="${esc(CI[k + "Det"] || "")}" placeholder="${esc(extra)}">` : "";
+    // Detalle: siempre (texto) o solo con ciertas respuestas ({ when, ph }), p. ej. "¿Por qué?" si marca Malo
+    const cond = extra && typeof extra === "object", show = !cond || (extra.when || []).includes(CI[k]);
+    const ex = extra ? `<input class="mt" id="det-${k}" ${show ? "" : "hidden"} data-a-input="ciTxt" data-k="${k}Det" value="${esc(CI[k + "Det"] || "")}" placeholder="${esc(cond ? extra.ph : extra)}" ${cond ? `data-when="${esc(JSON.stringify(extra.when))}"` : ""}>` : "";
     return `<div class="ci-q"><div>${esc(label)}</div>${inp}${ex}</div>`;
   };
   return `${head(`Check-in · Semana ${w.n}`, "mas")}
@@ -871,14 +881,15 @@ async function checkinView() {
     ${q(["accion", "¿Cómo te fue?", ["Lo logré", "A medias", "No lo logré"]])}${q(["accionDet", "¿Qué te ayudó o qué te lo impidió?", "text"])}</div>` : ""}
   ${CHECKIN.map((sec) => `<div class="ci-sec ${sec.open ? "ci-open" : ""}"><h3>${esc(sec.t)}</h3>
     ${sec.open ? `<p class="muted small">Tómate un par de minutos en estas: son las que más me sirven para ajustar tu plan.</p>` : ""}
-    ${sec.t === "Entrenamiento" && tp.planned.length ? `<div class="ci-q"><div>Entrenamientos de la semana</div><b>${tp.doneCount} de ${tp.planned.length}</b> <span class="muted small">(automático)</span></div>` : ""}
-    ${sec.t === "Nutrición" ? `<div class="ci-q"><div>¿Cuántos días registraste tu alimentación en la app?</div><b>${regDays} de 7</b> <span class="muted small">(automático)</span></div>` : ""}
+    ${sec.t === "Entrenamiento" && tp.planned.length ? `<div class="ci-q"><div>Entrenamientos de la semana</div><b>${tp.doneCount} de ${tp.planned.length}</b></div>` : ""}
+    ${sec.t === "Nutrición" ? `<div class="ci-q"><div>¿Cuántos días registraste tu alimentación en la app?</div><b>${regDays} de 7</b></div>` : ""}
     ${sec.t === "Digestión" && dep != null ? `<div class="note">Según tus registros diarios: ${r1(dep)} deposiciones por día en promedio.</div>` : ""}
+    ${sec.sleep ? sleepSum(days) : ""}
     ${sec.q.map(q).join("")}
     ${sec.t === "Nutrición" && S.client.sex === "F" ? q(["ciclo", "¿Estás en tu ciclo menstrual?", ["Sí", "No"]]) : ""}</div>`).join("")}
   <div class="pad-x"><button class="btn primary big" data-a="ciSave">${saved.at ? "Actualizar" : "Enviar"} check-in</button></div>`;
 }
-act("ciChip", (el) => { CI[el.dataset.name] = el.dataset.v; $$(`[data-a="ciChip"][data-name="${el.dataset.name}"]`).forEach((b) => b.classList.toggle("on", b === el)); });
+act("ciChip", (el) => { const k = el.dataset.name; CI[k] = el.dataset.v; $$(`[data-a="ciChip"][data-name="${k}"]`).forEach((b) => b.classList.toggle("on", b === el)); const d = $("#det-" + k); if (d?.dataset.when) { const on = JSON.parse(d.dataset.when).includes(el.dataset.v); d.hidden = !on; if (!on) { d.value = ""; delete CI[k + "Det"]; } } });
 act("ciSel", (el) => (CI[el.dataset.k] = el.value));
 act("ciTxt", (el) => (CI[el.dataset.k] = el.value));
 act("ciMulti", (el) => { const s = new Set(CI[el.dataset.k] || []); el.checked ? s.add(el.value) : s.delete(el.value); CI[el.dataset.k] = [...s]; });

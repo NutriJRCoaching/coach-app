@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.33.4**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.34.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -291,3 +291,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## v1.33.4 (20-nov)
 - Videos de las series: la función "Videos de sus series (vía WhatsApp)" queda en Servicios para distinguir los planes, pero en la sesión ya no hay botón para grabar/subir: solo un recordatorio al pie de cada ejercicio ("Recuerda mandarle a tu coach el video de tu ejecución por WhatsApp…"). Las acciones `setVideo`/`vidShare` siguen en train.js sin uso.
+
+## v1.34.0 (20-nov) — Check-in reescrito (pedido de Joaquín)
+- Textos: "¿Pasa algo la próxima semana que debamos planificar?", "¿En qué cosa en particular quieres enfocarte…?". Opciones en el género que corresponde (entrenamientos "Muy malos…Muy buenos"; disposición "Muy baja…Muy alta"; energía "Muy baja…Muy alta"; digestión "Muy mala…Muy buena"; salud "Terrible, Mal, Regular, Bien, Muy bien, Excelente").
+- **Detalle condicional** (`why(when, ph)` en data.js; en client.js el campo `#det-clave` se muestra/oculta al tocar la opción): otro deporte → "¿Cuál y cuánto?" solo con Sí; entrenamientos Muy malos/Malos/Regulares → "¿Por qué?"; disposición Muy baja/Baja → "¿Por qué?"; fuerza y rendimiento Muy malos/Malos → "¿A qué lo asocias?"; dolor articular Leve/Moderado/Alto → "¿Dónde y en qué ejercicio?"; sueño Peor → "¿Por qué?".
+- DOMS: Sin dolor, Molestias leves, Adolorido, Muy adolorido, Dolor incapacitante. "Top 3 series o ejercicios de la semana" con 3 casillas (tipo `list3`, claves top1–top3) y "El ejercicio o la serie que más te costó".
+- Nutrición: sin "(automático)" ni cintura; se agregan qué le costó más, qué fue más fácil y qué podría mejorar para seguir el plan. Hambre: Sin hambre, Poca hambre, Lo normal, Hambriento, Muy hambriento. Saciedad: Poca, Satisfecho, Muy satisfecho, Incómodamente satisfecho. Deposiciones: se agrega "Pastosas (entre blandas y líquidas)". "Si hubo, describe tus molestias o síntomas intestinales".
+- Recuperación: resumen automático de la semana (sueño promedio, calidad y cafeína después de las 12 en cuántos de 7 días, `sleepSum`) y "¿Cómo describirías tu sueño comparado con la semana anterior?".
+- Experiencia: progreso (No he visto progreso, Podría ser mejor, Satisfecho, Muy satisfecho, Increíble); "¿Qué tan útil fue mi retroalimentación para esta semana?" (No la vi, No me sirvió, No la apliqué, Útil, Muy útil); "¿Tienes alguna sugerencia sobre qué podría hacer yo para facilitar tu proceso?"; "¿Necesitas algo en particular de mí esta semana? ¿Tienes dudas o consultas…?".
+- Preanálisis de la retro: suma los "por qué" de las respuestas negativas y lo que más le costó / podría mejorar del plan. Respuestas antiguas (cintura, momentoDificil) siguen en "versión anterior".

@@ -492,11 +492,11 @@ async function checkinsView(c) {
   const ans = (id) => fbs.find((f) => f.id === id && (f.at || f.answered));
   const box = (ci) => { const it = [["Seguimiento de su foco", ci.accionFoco ? `${ci.accionFoco} → ${ci.accion || "sin responder"}${ci.accionDet ? ` · ${ci.accionDet}` : ""}` : ""], ["Progreso (qué se le hace más fácil)", ci.facil], ["Barreras", ci.barrera], ["De qué está orgulloso", ci.orgullo], ["La próxima semana", ci.proxSemana], ["Foco que propone", ci.foco]].filter(([, v]) => v);
     return it.length ? `<div class="ci-key">${it.map(([l, v]) => `<div class="qa"><span class="muted">${l}</span><b>${esc(v)}</b></div>`).join("")}<p class="muted small">Antes de responder: busca el progreso, las barreras y lo que viene, y acuerda <b>una sola acción</b> para la semana. En la próxima le preguntamos cómo le fue.</p></div>` : ""; };
-  const shown = new Set(CHECKIN.flatMap((x) => x.q.map(([k]) => k)).concat(["facil", "barrera", "orgullo", "proxSemana", "foco", "accion", "accionDet", "accionFoco"]));
+  const shown = new Set(CHECKIN.flatMap((x) => x.q.map(([k]) => k)).concat(["facil", "barrera", "orgullo", "proxSemana", "foco", "accion", "accionDet", "accionFoco", "top1", "top2", "top3"]));
   const legacy = (ci) => Object.entries(CHECKIN_OLD).filter(([k]) => !shown.has(k) && ci[k] != null && ci[k] !== "").map(([k, l]) => `<div class="qa"><span class="muted">${esc(l)}</span><b>${esc(v(ci[k]))}${ci[k + "Det"] ? ` · ${esc(ci[k + "Det"])}` : ""}</b></div>`).join("");
   return head + list.map((ci, k) => `<details class="card ci-view" ${k === 0 ? "open" : ""}><summary class="row between"><h3>Semana ${+ci.id.slice(1)} <small class="muted">${ci.date ? fmtDate(ci.date) : ""}</small> ${ans(ci.id) ? '<span class="badge g">Respondido ✓</span>' : '<span class="badge r">Sin responder</span>'}</h3><span class="row gap small"><span class="muted">Días con registro de comida: ${ci.diasRegistrados ?? "—"}/7</span>${ans(ci.id) ? "" : `<button class="btn tiny primary" data-a="ciAnswer" data-n="${+ci.id.slice(1)}">Responder</button><button class="btn tiny" data-a="ciMark" data-w="${ci.id}">Marcar respondido</button>`}</span></summary>
   ${box(ci)}${ci.entrenos ? `<p class="small">Entrenamientos: <b>${ci.entrenos}</b></p>` : ""}
-  <div class="grid3">${CHECKIN.filter((sec) => !sec.open).map((sec) => { const qs = sec.q.filter(([key]) => ci[key] != null && ci[key] !== "" && !(Array.isArray(ci[key]) && !ci[key].length)); if (!qs.length) return ""; return `<div><h4>${esc(sec.t)}</h4>${qs.map(([key, label]) => `<div class="qa"><span class="muted">${esc(label)}</span><b>${esc(v(ci[key]))}${ci[key + "Det"] ? ` · ${esc(ci[key + "Det"])}` : ""}</b></div>`).join("")}</div>`; }).join("")}
+  <div class="grid3">${CHECKIN.filter((sec) => !sec.open).map((sec) => { const qs = sec.q.flatMap((x) => (x[2] === "list3" ? [1, 2, 3].map((n) => [x[0] + n, `${x[1].replace(/^Top 3/, "Top")} · ${n}`]) : [x])).filter(([key]) => ci[key] != null && ci[key] !== "" && !(Array.isArray(ci[key]) && !ci[key].length)); if (!qs.length) return ""; return `<div><h4>${esc(sec.t)}</h4>${qs.map(([key, label]) => `<div class="qa"><span class="muted">${esc(label || (key.startsWith("top") ? "Top " + key.slice(3) : ""))}</span><b>${esc(v(ci[key]))}${ci[key + "Det"] ? ` · ${esc(ci[key + "Det"])}` : ""}</b></div>`).join("")}</div>`; }).join("")}
   ${legacy(ci) ? `<div><h4>Otras respuestas (versión anterior)</h4>${legacy(ci)}</div>` : ""}
   ${ci.ciclo ? `<div><h4>Ciclo</h4><div class="qa"><span class="muted">En ciclo menstrual</span><b>${esc(ci.ciclo)}</b></div></div>` : ""}</div></details>`).join("");
 }
@@ -542,8 +542,12 @@ async function preanalysis(c0, w) {
     if (ci.facil) good.push(`Más fácil que hace un mes: ${esc(ci.facil)}`);
     if (ci.barrera) work.push(`Barreras: ${esc(ci.barrera)}`);
     if (/Alto|Muy alto/.test(ci.estGen || "")) work.push(`Estrés general ${esc(ci.estGen).toLowerCase()}${ci.comEst ? `: ${esc(ci.comEst)}` : ""}`);
-    if (/Malo|Muy malo/.test(ci.digest || "") || ci.comDig) work.push(`Digestión ${esc(ci.digest || "")}${ci.comDig ? `: ${esc(ci.comDig)}` : ""}`);
-    if (/Bajo|Muy bajo/.test(ci.enerSes || "")) work.push(`Energía en las sesiones ${esc(ci.enerSes).toLowerCase()}`);
+    if (/^(Malo|Muy malo|Mala|Muy mala)$/.test(ci.digest || "") || ci.comDig) work.push(`Digestión ${esc(ci.digest || "").toLowerCase()}${ci.comDig ? `: ${esc(ci.comDig)}` : ""}`);
+    if (/^(Bajo|Muy bajo|Baja|Muy baja)$/.test(ci.enerSes || "")) work.push(`Energía en las sesiones ${esc(ci.enerSes).toLowerCase()}`);
+    // Respuestas negativas con su "por qué" (las preguntas lo piden solo en esos casos)
+    for (const [k, l] of [["entGeneral", "Entrenamientos"], ["motivEnt", "Disposición a entrenar"], ["fuerza", "Fuerza y rendimiento"], ["articular", "Dolor articular"], ["suenoVs", "Sueño vs la semana anterior"]]) if (ci[k + "Det"]) work.push(`${l} ${esc(ci[k] || "").toLowerCase()}: ${esc(ci[k + "Det"])}`);
+    if (ci.nutDificil) work.push(`Lo que más le costó del plan: ${esc(ci.nutDificil)}`);
+    if (ci.nutMejorar) answer.push(`Qué cree que podría mejorar: ${esc(ci.nutMejorar)}`);
     if (ci.consultas) answer.push(`Pregunta: ${esc(ci.consultas)}`);
     if (ci.proxSemana) answer.push(`La próxima semana: ${esc(ci.proxSemana)}`);
     if (ci.sugerencia) answer.push(`Sugerencia: ${esc(ci.sugerencia)}`);
