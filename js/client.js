@@ -931,9 +931,10 @@ async function settingsView() {
   return `${head("Ajustes", "mas")}<div class="card"><div class="card-t">Tema</div>${chips("t", [["dark", "Oscuro"], ["light", "Claro"]], theme, "theme")}</div>
   <div class="card"><div class="card-t">${I.bell}Recordatorios</div>
     ${perm === "no" ? `<p class="muted small">Este navegador no permite notificaciones.</p>` : perm === "denied" ? `<p class="warn small">Bloqueaste las notificaciones. Actívalas en los ajustes de Chrome para esta app.</p>` : ""}
-    <div class="sched"><b>Tu horario de todos los días</b><div class="remmeals"><span>Despierto a las${tm("sched.wake", r.sched.wake)}</span><span>Me duermo a las${tm("sched.bed", r.sched.bed)}</span></div></div>
+    <div class="remsched"><b>Tu horario de todos los días</b><div class="remmeals"><span>Despierto a las${tm("sched.wake", r.sched.wake)}</span><span>Me duermo a las${tm("sched.bed", r.sched.bed)}</span></div></div>
     ${row("Activar recordatorios", on ? "Activados ✓" : "Te avisa solo si te falta registrar algo", sw("on", on))}
-    ${on ? `
+    ${!on ? `<p class="muted small">Al activarlos, la app te pide permiso para mandarte notificaciones. Estos son los que puedes usar:</p>` : ""}
+    <div class="${on ? "" : "rem-off"}">
     ${row("Agua", "Si vas atrasado con tu meta", `<select data-a-change="remSet" data-k="water.every" class="tm">${[1, 2, 3].map((h) => `<option value="${h}" ${+r.water.every === h ? "selected" : ""}>cada ${h} h</option>`).join("")}</select>${sw("water.on", r.water.on)}`)}
     ${row("Comidas", "Si a esa hora no has registrado esa comida", sw("meals.on", r.meals.on))}
     ${r.meals.on ? `<div class="remmeals">${Object.entries(r.meals.times).map(([m, t]) => `<span>${m}${tm("meals.times." + m, t)}</span>`).join("")}</div>` : ""}
@@ -944,7 +945,7 @@ async function settingsView() {
     ${row("Check-in semanal", "Al final de tu semana", `${tm("checkin.at", r.checkin.at)}${sw("checkin.on", r.checkin.on)}`)}
     <div class="li remrow"><span><b>Avisos con la app cerrada</b><small class="muted">${pushOn() ? "Activados en este celular ✓" : pushReady() ? "Te llegan como notificación aunque no abras la app" : "Tu coach aún está terminando de configurarlos"}</small></span>${pushReady() && !pushOn() ? `<button class="btn tiny primary" data-a="pushOn">Activar</button>` : ""}</div>
     <button class="btn block small mt" data-a="testNotif">🔔 Probar notificación</button>
-    <p class="muted small mt">La campana de arriba a la derecha se mueve cuando tienes algo urgente.</p>` : ""}
+    <p class="muted small mt">La campana de arriba a la derecha se mueve cuando tienes algo urgente.</p></div>
   </div>
   <div class="card"><div class="card-t">Unidades</div><p class="muted small">Kilogramos, litros y centímetros.</p></div>`;
 }

@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.34.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.34.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -300,3 +300,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Recuperación: resumen automático de la semana (sueño promedio, calidad y cafeína después de las 12 en cuántos de 7 días, `sleepSum`) y "¿Cómo describirías tu sueño comparado con la semana anterior?".
 - Experiencia: progreso (No he visto progreso, Podría ser mejor, Satisfecho, Muy satisfecho, Increíble); "¿Qué tan útil fue mi retroalimentación para esta semana?" (No la vi, No me sirvió, No la apliqué, Útil, Muy útil); "¿Tienes alguna sugerencia sobre qué podría hacer yo para facilitar tu proceso?"; "¿Necesitas algo en particular de mí esta semana? ¿Tienes dudas o consultas…?".
 - Preanálisis de la retro: suma los "por qué" de las respuestas negativas y lo que más le costó / podría mejorar del plan. Respuestas antiguas (cintura, momentoDificil) siguen en "versión anterior".
+
+## v1.34.1 (20-nov)
+- Ajustes del cliente: la lista de recordatorios (agua, comidas, pasos, peso, entrenamiento, check-in, avisos con la app cerrada) se ve siempre, atenuada hasta que activa "Activar recordatorios" (antes solo aparecía con los avisos activados y el permiso dado). Los recordatorios se guardan en el celular de cada cliente (LS `rem`), no en su ficha: en "Ver como cliente" se ve la configuración del navegador del coach.
+- Arreglo: "Tu horario de todos los días" usaba la clase `sched` del calendario del panel (7 columnas) y se veía apretado; ahora `remsched`.
