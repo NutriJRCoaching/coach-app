@@ -289,8 +289,8 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 
 /* Unilaterales: izquierda / derecha */
 .ex-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.set .sn small.side { font-size: 9.5px; font-weight: 800; letter-spacing: .03em; color: var(--muted); }
-.set .sn small.side.d { color: var(--acc); }
+.set .sn small.sidel { font-size: 9.5px; font-weight: 800; letter-spacing: .03em; color: var(--muted); }
+.set .sn small.sidel.d { color: var(--acc); }
 
 /* Técnica: igual = verde, mejor = azul, peor = rojo */
 .techb.igual { background: var(--g-s) !important; color: var(--g) !important; border-color: transparent !important; }
@@ -304,7 +304,7 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 /* Unilaterales agrupados por serie */
 .sgrp { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 0; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 13.5px; }
 .sgrp:first-of-type { border-top: 0; padding-top: 2px; } .sgrp span { font-size: 12px; font-weight: 700; } .sgrp .g { color: var(--g); } .sgrp .y { color: var(--y); } .sgrp .b { color: #3b82f6; }
-.set.sided { margin-top: 4px; } .set .sn small.side { font-size: 11px; white-space: nowrap; }
+.set.sided { margin-top: 4px; } .set .sn small.sidel { font-size: 11px; white-space: nowrap; }
 /* Video por serie */
 .lnk.vid { color: var(--muted); } .lnk.vid.on { color: var(--acc); font-weight: 700; }
 .setvid { width: 100%; max-height: 52vh; border-radius: 14px; background: #000; }

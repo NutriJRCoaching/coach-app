@@ -138,7 +138,7 @@ export async function sessionView(id) {
 function setRow(ex, i, j) {
   const st = ex.sets[j], ref = refSet(prev, ex.exId, j), t = ex.target[j] || {};
   const grp = ex.sides && j % 2 === 0 ? `<div class="sgrp"><b>Serie ${j / 2 + 1}</b><span id="diff-${i}-${j / 2}">${pairDiff(ex, j / 2)}</span></div>` : "";
-  return `${grp}<div class="set ${st.done ? "done" : ""} ${ex.sides ? "sided" : ""}" id="set-${i}-${j}"><span class="sn">${ex.sides ? `<small class="side ${j % 2 ? "d" : "i"}">– ${j % 2 ? "Der." : "Izq."}</small>` : `<b>${j + 1}</b>`}</span>
+  return `${grp}<div class="set ${st.done ? "done" : ""} ${ex.sides ? "sided" : ""}" id="set-${i}-${j}"><span class="sn">${ex.sides ? `<small class="sidel ${j % 2 ? "d" : "i"}">– ${j % 2 ? "Der." : "Izq."}</small>` : `<b>${j + 1}</b>`}</span>
   <input type="number" inputmode="decimal" step="0.5" value="${st.w}" placeholder="${ref?.w ?? ""}" data-a-change="setVal" data-j="${j}" data-k="w">
   <label class="repbox ${t.reps ? "" : "free"}">${t.reps ? `<span class="rt" title="Reps de tu plan">${esc(t.reps)}</span>` : ""}<input type="number" inputmode="numeric" value="${st.r}" placeholder="${ref?.r ?? (parseInt(t.reps) || "")}" data-a-change="setVal" data-j="${j}" data-k="r"></label>
   <button class="rirb ${st.rir === "" ? "" : "rir" + st.rir}" data-a="rirPick" data-j="${j}">${st.rir === "" ? "–" : st.rir}</button>
@@ -162,7 +162,7 @@ function setInfo(ex, j) {
     if (dw) h += `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw} kg</span>`;
     if (dr) h += `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr} reps</span>`;
   }
-  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button>${st.vid ? `<button class="lnk vid on" data-a="setVideo" data-j="${j}">🎥 Ver tu video</button>` : ""}`;
+  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button>${!has("train_setvideo") ? "" : `<button class="lnk vid ${st.vid ? "on" : ""}" data-a="setVideo" data-j="${j}">${st.vid ? "🎥 Ver / mandar tu video" : "🎥 Video para tu coach (WhatsApp)"}</button>`}`;
   if (ref?.note) h += `<span class="lastnote">Tu nota de la semana pasada: ${esc(ref.note)}</span>`;
   return h;
 }
@@ -233,9 +233,9 @@ act("setVideo", async (el) => {
   sheet(`Video · ${lbl}`, `${vUrl ? `<video class="setvid" src="${vUrl}" controls playsinline></video>
     <button class="btn primary big" data-a="vidShare" data-j="${j}">Enviar a tu coach (WhatsApp)</button>
     <div class="row gap"><label class="btn grow">Cambiar video<input type="file" accept="video/*" hidden data-a-change="vidPick" data-j="${j}"></label><button class="btn ghost grow red" data-a="vidDel" data-j="${j}">Eliminar</button></div>`
-  : st.vid ? `<p class="muted small">Este video se grabó en otro celular o se borró de este.</p>` : `<p class="muted small">Graba tu serie o elígela de la galería. Queda guardada en tu celular junto a la serie y desde aquí se la mandas a tu coach.</p>
+  : st.vid ? `<p class="muted small">Este video se grabó en otro celular o se borró de este.</p>` : `<p class="muted small">Graba tu serie (o elígela de la galería) y mándasela a tu coach por WhatsApp desde aquí: se abre el menú de compartir del celular con el video y los datos de la serie.</p>
     <label class="btn primary big">🎥 Grabar o elegir video<input type="file" accept="video/*" hidden data-a-change="vidPick" data-j="${j}"></label>`}
-  <label class="mt">Enlace para tu coach (opcional: Drive o YouTube)<input id="vLk" placeholder="https://…" value="${esc(st.vlink || "")}" data-a-change="vidLink" data-j="${j}"></label>`);
+`);
 });
 act("vidPick", async (el) => {
   const f = el.files[0], j = +el.dataset.j; if (!f) return;
