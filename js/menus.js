@@ -233,6 +233,15 @@ const mealTot = (m) => totals({ meals: [m] }).t;
 const macTxt = (t) => `${r0(t.kcal)} kcal · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)}`;
 const fmtN = (v) => (v == null || v === "" ? "" : String(Math.round(+v * 100) / 100));
 // Pauta: se crea aquí mismo (día normal y día con legumbres) y se compara con las metas del cliente
+// ¿La pauta (con el ajuste de la etapa, si tiene) calza con las metas vigentes? kcal ±5 %, macros ±10 %
+function pautaWarn(c) {
+  const eff = { ...MW.pauta }; for (const [g, d] of Object.entries(c.stageInfo?.adj || {})) if (+d) eff[g] = Math.max(0, (+eff[g] || 0) + +d);
+  const m = pMac(eff), L = [["kcal", "kcal", 0.05], ["cho", "CHO", 0.1], ["fat", "lípidos", 0.1], ["prot", "proteína", 0.1]];
+  if (!Object.values(eff).some((v) => +v) || !c.kcal) return "";
+  const off = L.filter(([k, , t]) => c[k] && Math.abs(m[k] / c[k] - 1) > t);
+  if (!off.length) return `<div class="note okn">✓ La pauta calza con las metas${c.stageInfo ? ` de <b>${esc(c.stageInfo.phase)}</b>` : ""}.</div>`;
+  return `<div class="note warnn">⚠ <b>Ajusta la pauta para calzar con las metas${c.stageInfo ? ` de ${esc(c.stageInfo.phase)}` : ""}:</b> ${off.map(([k, l]) => { const d = Math.round(m[k] - c[k]); return `${l} ${r0(m[k])} vs ${r0(c[k])} (${d > 0 ? "+" : ""}${d})`; }).join(" · ")}${c.stageInfo?.adj ? " (ya incluye el ajuste del plan de la etapa)" : ""}.</div>`;
+}
 function pautaCard(c) {
   const pn = MW.pauta, pl = MW.pautaLeg, mn = pMac(pn), ml = pMac(pl), goal = { kcal: c.kcal, cho: c.cho, fat: c.fat, prot: c.prot };
   const adec = (v, g) => (g ? `<small class="${Math.abs(v / g - 1) <= 0.05 ? "g" : Math.abs(v / g - 1) <= 0.1 ? "y" : "r"}">${r0((v / g) * 100)} %</small>` : "");
@@ -252,7 +261,7 @@ function editorHtml(c) {
   ${MW.imported ? `<div class="note">Plan importado: revisa las opciones y la pauta, y toca “Guardar y publicar”.</div>` : ""}
   <div class="seg scroll optseg">${ms.map((x, k) => `<button class="${k === MW.k ? "on" : ""}" style="--oc:${optColor(k)}" data-a="meOpt" data-k="${k}"><i class="gdot" style="background:${optColor(k)}"></i>${esc(x.name || "Opción " + (k + 1))}${x.leg ? " 🫘" : ""}</button>`).join("")}<button data-a="meAdd">＋ Nueva opción</button></div>
   ${ms.length && !hasLeg ? `<div class="note row between"><span>Falta el <b>día con legumbres</b>: arma una opción propia para ese día (no se le pide al cliente que modifique otra).</span><button class="btn small" data-a="meLegAdd">＋ Día con legumbres</button></div>` : ""}</div>
-  ${pautaCard(c)}`;
+  ${pautaWarn(c)}${pautaCard(c)}`;
   if (!mn) return head;
   const oc = optColor(MW.k);
   const { t, por } = totals(mn);

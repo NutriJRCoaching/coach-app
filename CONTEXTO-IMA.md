@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.29.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.30.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -248,3 +248,8 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Progreso por rutina** (reemplaza el progreso por ejercicio): tarjetas por rutina; por ejercicio, serie 1 y 2: 1ª vez · semana anterior · última semana, y diferencia en kg y reps contra la 1ª vez y contra la semana anterior.
 - **Cardio:** fila compacta (veces/semana, tipo, minutos, intensidad) + **descripción** (`cardio.desc`). El cliente la ve completa en "Ver" del cuadro de Cardio del inicio y al registrar (`cardioPlanHtml`).
 - **Plan alimentación (editor):** en la tabla lateral, kcal/CHO/lípidos/proteína en verde/amarillo/rojo según % de la meta.
+
+## v1.30.0 (20-nov) — Requerimientos y etapa en el plan
+- **Etapas → Cálculo de requerimientos** (`reqCard`/`reqCalc`): sexo, fecha de nacimiento (edad), estatura, último peso, fórmula (Mifflin-St Jeor por defecto, Harris-Benedict revisada o Katch-McArdle con % de grasa) y factor de actividad (1,2–1,9 con descripción en pasos/entrenos). Muestra gasto en reposo y total; "Usar X kcal como mantención" guarda `kcalMaint` y recalcula todas las etapas. Campos nuevos del cliente: `bodyFat`, `reqFormula`, `actFactor` (sexo, nacimiento y estatura ya existían en Datos).
+- **Plan alimentación → cabecera de etapa** (`planBanner`, `planCtx` en coach.js): nombre grande de la etapa de esta semana con su color, semanas, ajuste del plan y metas (kcal/CHO/lípidos/proteína de la etapa). Selector para cambiar la etapa (cambia la etapa completa y borra sus números fijados a mano para que se recalculen; si no hay etapa, crea una de 8 semanas desde esta semana). El editor del plan compara contra las metas de la etapa.
+- **Aviso de pauta** (`pautaWarn` en menus.js): verde si la pauta (con el ajuste del plan de la etapa) calza con las metas (kcal ±5 %, macros ±10 %); si no, rojo "Ajusta la pauta para calzar…" con la diferencia de cada uno.

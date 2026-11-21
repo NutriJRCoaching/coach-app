@@ -121,7 +121,7 @@ async function clientPanel(cid, tab, AA) {
   if (!CW || CW.cid !== cid) CW = { cid, n: now.n };
   const wDate = addDays(c.startDate || ymd(), (CW.n - 1) * 7);
   const w = weekInfo(c, wDate);
-  const views = { resumen: tlView, etapas: stagesView, entrenos: sessionsView, rutinas: routinesView, comida: foodView, plan: (c) => { S._coachClient = c; return menusEditor(c); }, progreso: progView, checkins: checkinsView, feedback: feedbackView, datos: dataView };
+  const views = { resumen: tlView, etapas: stagesView, entrenos: sessionsView, rutinas: routinesView, comida: foodView, plan: async (c) => { const cc = planCtx(c); S._coachClient = cc; return planBanner(cc) + (await menusEditor(cc)); }, progreso: progView, checkins: checkinsView, feedback: feedbackView, datos: dataView };
   const weekNav = ["resumen", "entrenos", "comida", "feedback"].includes(tab);
   return `<div class="row between"><h1>${esc(c.name)} <small class="muted">· ${c.service ? esc(SERVICES[c.service]) : "Asesoría sin definir"}${c.startDate ? ` · Semana ${now.n}` : ""} · <span style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</span></small></h1>
   <button class="btn small" data-a="previewClient" data-id="${cid}">Ver como cliente</button></div>
@@ -228,6 +228,28 @@ async function patchRoutine(rid, fn, msg) {
 act("nwNote", (el) => { const v = el.value.trim(); patchRoutine(el.dataset.r, (r) => (r.note = v), v ? `Comentario de la rutina: ${v}` : ""); });
 act("nwEx", (el) => { const v = el.value.trim(), f = el.dataset.f; patchRoutine(el.dataset.r, (r) => { const e = r.exercises.find((x) => x.id === el.dataset.e); if (e) e[f] = v; }, v ? `${r_name(el)}: ${f === "wSug" ? "peso sugerido " + v + " kg" : v}` : ""); });
 const r_name = (el) => el.closest("label")?.firstChild?.textContent?.trim() || "Ejercicio";
+
+// ---------- Plan de alimentación: etapa vigente bien visible y metas de esa etapa
+// El editor compara la pauta con las metas de la etapa de esta semana (si no hay etapa, con las metas generales).
+function planCtx(c) {
+  const a = applyStage(c), s = a.stage || null;
+  return { ...c, kcal: a.kcal, cho: a.cho, fat: a.fat, prot: a.prot, stageInfo: s ? { phase: s.phase, from: s.from, to: s.to, adj: s.adj || null, note: s.note || "" } : null };
+}
+function planBanner(c) {
+  const s = c.stageInfo, col = s ? phaseColor(s.phase) : "var(--muted)";
+  return `<div class="card plan-stage" style="--pc:${col}"><div class="ps-l"><small>Plan de alimentación · etapa de esta semana</small>
+    <div class="ps-name">${s ? esc(s.phase) : "Sin etapa"}</div>
+    <small class="muted">${s ? `Semanas ${s.from}–${s.to}${s.adj ? " · ajuste del plan: " + esc(adjTxt(s.adj)) : ""}` : "Las metas son las generales del cliente (Datos y objetivos)."}</small></div>
+    <div class="ps-goal">${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([k, l]) => `<div><small>${l}</small><b>${c[k] ? r0(c[k]) : "–"}</b></div>`).join("")}</div>
+    <label class="ps-sel">Cambiar la etapa de esta semana<select data-a-change="planPhase"><option value="">${s ? "— Quitar etapa —" : "— Elegir —"}</option>${Object.keys(PHASES).map((p) => `<option ${s?.phase === p ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
+    <small class="muted">${s ? "Cambia la etapa completa (todas sus semanas)." : "Crea una etapa de 8 semanas desde esta semana."} Las calorías y macros se recalculan con la fórmula de Etapas.</small></label></div>`;
+}
+act("planPhase", async (el) => {
+  const c = await getClient(CW.cid), st = validSt(c), now = weekInfo(c, ymd()).n, i = st.findIndex((x) => now >= +x.from && now <= +x.to), v = el.value;
+  if (i >= 0) { if (v) st[i] = { ...st[i], phase: v, pct: "", kcal: "", cho: "", fat: "", prot: "" }; else st.splice(i, 1); }
+  else if (v) st.push({ phase: v, from: now, to: now + 7 });
+  await stStore(c, st); toast(v ? `Etapa: ${v}. Revisa si la pauta calza con las nuevas metas.` : "Etapa quitada");
+});
 
 // ---------- Rutinas (editor)
 let RE = null; // rutina en edición
@@ -808,6 +830,7 @@ async function stagesView(c) {
   return `<div class="card"><div class="row between"><div class="card-t">Calendario de etapas · semana actual ${now}</div><span class="muted small">Elige una etapa y toca los días: se pinta la semana completa de ese día.</span></div>
   <div class="chips">${Object.keys(PHASES).map((p) => `<button class="chip ${STB.brush === p ? "on" : ""}" style="${STB.brush === p ? `background:${phaseColor(p)};border-color:${phaseColor(p)}` : `box-shadow:inset 3px 0 0 ${phaseColor(p)}`}" data-a="stBrush" data-p="${esc(p)}">${p}</button>`).join("")}<button class="chip ${STB.brush === "" ? "on" : ""}" data-a="stBrush" data-p="">Borrar</button></div>
   <div class="st-cals"><div>${monthCal(c, { month: STB.month, nav: "stMonth", act: "stPaint", selWeek: now })}</div><div>${monthCal(c, { month: nextM(STB.month), act: "stPaint", selWeek: now })}</div></div></div>
+  ${reqCard(c, kg)}
   <div class="card"><div class="card-t">Base del cálculo</div><div class="grid4">
     <label>Mantención actual (kcal/día)<input type="number" value="${maint ?? ""}" placeholder="${c.kcal || ""}" data-a-change="stBase" data-k="kcalMaint"></label>
     <label>Peso para el cálculo<input disabled value="${kg ? r1(kg) + " kg (último registrado)" : "sin pesajes"}"></label>
@@ -825,6 +848,34 @@ async function stagesView(c) {
     <td><input value="${esc(x.note || "")}" data-a-change="stF" data-i="${i}" data-k="note" style="width:200px" placeholder="La ve en su Timeline y en su plan"></td></tr>`; }).join("") || `<tr><td colspan="14" class="muted">Pinta semanas en el calendario para crear etapas.</td></tr>`}</table>
   <p class="muted small">En gris va lo que calcula la fórmula; escribe un número solo si quieres fijarlo a mano. La nota la ve el cliente en su Timeline y arriba de su plan de alimentación.</p></div>`;
 }
+// Requerimientos: gasto en reposo (Mifflin-St Jeor, Harris-Benedict revisada o Katch-McArdle con % de grasa) × factor de actividad
+const ACT_F = [[1.2, "Sedentario (poco movimiento, < 5.000 pasos)"], [1.375, "Ligero (5.000–7.500 pasos o entrena 1–3 días)"], [1.55, "Moderado (7.500–10.000 pasos y entrena 3–5 días)"], [1.725, "Alto (> 10.000 pasos y entrena 5–6 días)"], [1.9, "Muy alto (trabajo físico + entrenamiento)"]];
+const ageOf = (b) => { if (!b) return null; const d = new Date(b + "T12:00"), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n < new Date(n.getFullYear(), d.getMonth(), d.getDate())) a--; return a; };
+function reqCalc(c, kg) {
+  const age = ageOf(c.birth), h = +c.height, sex = c.sex, bf = +c.bodyFat, f = c.reqFormula || "mifflin", act = +c.actFactor || 1.55;
+  if (!kg) return { miss: "peso" };
+  let geb = null;
+  if (f === "katch") { if (!bf) return { miss: "% de grasa" }; geb = 370 + 21.6 * kg * (1 - bf / 100); }
+  else { if (!age || !h || !sex) return { miss: [!sex && "sexo", !age && "fecha de nacimiento", !h && "estatura"].filter(Boolean).join(", ") };
+    geb = f === "harris" ? (sex === "M" ? 88.362 + 13.397 * kg + 4.799 * h - 5.677 * age : 447.593 + 9.247 * kg + 3.098 * h - 4.33 * age) : 10 * kg + 6.25 * h - 5 * age + (sex === "M" ? 5 : -161); }
+  return { geb: Math.round(geb), get: Math.round(geb * act), age, act };
+}
+function reqCard(c, kg) {
+  const R = reqCalc(c, kg);
+  return `<div class="card"><div class="card-t">Cálculo de requerimientos</div><div class="grid4">
+    <label>Sexo<select data-a-change="reqF" data-k="sex"><option value="">—</option><option value="M" ${c.sex === "M" ? "selected" : ""}>Masculino</option><option value="F" ${c.sex === "F" ? "selected" : ""}>Femenino</option></select></label>
+    <label>Fecha de nacimiento${R.age ? ` · ${R.age} años` : ""}<input type="date" value="${esc(c.birth || "")}" data-a-change="reqF" data-k="birth"></label>
+    <label>Estatura (cm)<input type="number" value="${esc(c.height || "")}" data-a-change="reqF" data-k="height"></label>
+    <label>Peso<input disabled value="${kg ? r1(kg) + " kg (último registrado)" : "sin pesajes"}"></label>
+    <label>Fórmula<select data-a-change="reqF" data-k="reqFormula">${[["mifflin", "Mifflin-St Jeor"], ["harris", "Harris-Benedict (revisada)"], ["katch", "Katch-McArdle (usa % de grasa)"]].map(([v, l]) => `<option value="${v}" ${(c.reqFormula || "mifflin") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label>% de grasa (opcional)<input type="number" step="0.1" value="${esc(c.bodyFat || "")}" data-a-change="reqF" data-k="bodyFat"></label>
+    <label class="span2">Factor de actividad<select data-a-change="reqF" data-k="actFactor">${ACT_F.map(([v, l]) => `<option value="${v}" ${(+c.actFactor || 1.55) === v ? "selected" : ""}>${v} · ${l}</option>`).join("")}</select></label></div>
+    ${R.miss ? `<p class="muted small">Falta: ${esc(R.miss)}.</p>` : `<div class="req-out"><div><small>Gasto en reposo</small><b>${R.geb} kcal</b></div><div><small>Gasto total (× ${R.act})</small><b>${R.get} kcal</b></div>
+      <button class="btn primary" data-a="reqUse" data-v="${R.get}">Usar ${R.get} kcal como mantención</button>${c.kcalMaint ? `<span class="muted small">Mantención actual: ${c.kcalMaint} kcal</span>` : ""}</div>`}
+    <p class="muted small">Es un punto de partida: ajústalo con lo que pasa con su peso en 2–3 semanas.</p></div>`;
+}
+act("reqF", async (el) => { const k = el.dataset.k, v = ["height", "bodyFat", "actFactor"].includes(k) ? num(el.value) : el.value; await db.set("clients/" + CW.cid, { [k]: v }); refresh(); });
+act("reqUse", async (el) => { await db.set("clients/" + CW.cid, { kcalMaint: +el.dataset.v }); const c = await getClient(CW.cid); await stStore(c, validSt(c)); toast("Mantención actualizada: las etapas se recalcularon"); });
 const PHASE_PCT = { "Break de dieta": 0, "Déficit leve": -10, "Déficit moderado": -20, "Déficit agresivo": -25, "Mini cut": -30, "Mantención": 0, "Recomposición corporal": -5, "Dieta reversa": 5, "Superávit / Volumen": 10 };
 function stageCalc(c, x, kg, pctDef) {
   const m = +x.maint || +c.kcalMaint || +c.kcal || null; if (!m) return {};

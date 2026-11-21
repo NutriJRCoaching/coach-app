@@ -566,3 +566,11 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; col
 .coachnote.rnote { margin: 8px 14px; }
 .prog-t td:nth-last-child(-n+2) { white-space: nowrap; }
 .cardio-row label { display: block; } .nextw > summary { color: var(--acc); }
+/* Plan de alimentación (coach): etapa bien visible y aviso de la pauta */
+.plan-stage { display: grid; grid-template-columns: 1.3fr 1.4fr 1.3fr; gap: 16px; align-items: center; border-left: 6px solid var(--pc); background: linear-gradient(90deg, color-mix(in srgb, var(--pc) 18%, var(--surf)), var(--surf) 60%); }
+.ps-l small { display: block; } .ps-name { font-size: 28px; font-weight: 900; color: var(--pc); letter-spacing: -.01em; line-height: 1.1; margin: 2px 0; }
+.ps-goal { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; } .ps-goal div { background: var(--surf2); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; } .ps-goal b { font-size: 18px; } .ps-goal small { font-size: 11px; color: var(--muted); }
+.ps-sel select { margin-top: 4px; } .ps-sel small { display: block; margin-top: 4px; }
+.note.warnn { background: var(--r-s); border-left: 3px solid var(--r); } .note.okn { background: var(--g-s); border-left: 3px solid var(--g); }
+.req-out { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 6px; } .req-out > div { background: var(--surf2); border-radius: 12px; padding: 8px 14px; display: flex; flex-direction: column; } .req-out b { font-size: 18px; }
+@media (max-width: 1100px) { .plan-stage { grid-template-columns: 1fr; } }
