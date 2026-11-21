@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.33.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.33.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -278,3 +278,6 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Tabla semana a semana:** la semana siguiente ahora tiene una fila por serie con sus reps y su RIR (desplegable: fallo, 0–5), según la cantidad de series. Indicador "Cambios sin guardar" y confirmación al cambiar de rutina sin guardar.
 - **Lo que ve el cliente:** los cambios se describen serie por serie ("serie 1: 8 → 10 reps", "serie 2: RIR 1 → al fallo", "se agrega la serie 3…") más descanso, tempo, comentarios y kg sugerido, en la tarjeta "Esta semana hubo modificaciones en tu rutina" de la semana en que aplican.
 - **Detalle de ejercicios:** solo lo fijo (nombre y orden, video, tips, tempo, descanso, reemplazos). Se quitaron de ahí las series, el peso sugerido y la indicación semanal (viven en la tabla).
+
+## v1.33.1 (20-nov)
+- Se quitó "Subir video de tu serie" de la sesión y la función "Videos de sus series" de Servicios: Joaquín prefiere que le manden los videos por WhatsApp (los ve en el celular). Los videos ya guardados se siguen pudiendo ver ("Ver tu video"). La bienvenida dice que los manden por WhatsApp.

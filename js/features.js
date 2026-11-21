@@ -30,7 +30,6 @@ export const FEATURES = [
   ["Entrenamiento", "train_targets", "Rangos de repeticiones y RIR", "Lo que tiene que hacer en cada serie", E],
   ["Entrenamiento", "train_suggest", "Sugerencias de carga", "Subir, mantener o bajar el peso según cómo le fue", E],
   ["Entrenamiento", "train_tech", "Evaluación de técnica", "Mejor / igual / peor que la semana pasada", E],
-  ["Entrenamiento", "train_setvideo", "Videos de sus series", "Grabar su serie para tu retroalimentación", E],
   ["Entrenamiento", "train_audio", "Audio para el coach", "Audio al terminar la sesión", E],
   ["Progreso", "prog_timeline", "Timeline y etapas", "Calendario nutricional semana a semana", T],
   ["Progreso", "prog_photos", "Fotos de progreso", "Fotos por semana y comparador", T],

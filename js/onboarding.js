@@ -41,7 +41,7 @@ function steps() {
       ${has("train_self") ? "<li>En <b>Entreno → Crear rutina</b> arma tus rutinas y elige qué días las haces.</li>" : "<li>En <b>Entreno</b> ves qué rutina toca cada día. Si cambio algo, te aparece marcado en rojo.</li>"}
       <li>Toca <b>Empezar</b> y anota peso, repeticiones y RIR de cada serie. Al lado ves lo que hiciste la semana pasada.</li>
       ${has("train_tech") ? "<li>Marca tu técnica: <b>la técnica va antes que el peso</b>.</li>" : ""}
-      ${has("train_setvideo") ? "<li>Graba tus series y mándamelas por WhatsApp desde la misma app.</li>" : ""}
+      ${has("train_tech") ? "<li>Si quieres que revise tu técnica, grábate y mándame el video por WhatsApp.</li>" : ""}
       <li>Al terminar, responde la encuesta corta y comparte tu resumen.</li></ul>` });
   if (has("checkin")) out.push({ t: "Tu check-in semanal", h: `<p>Cada <b>${c.checkinDay != null && c.checkinDay !== "" ? DAYS[+c.checkinDay].toLowerCase() : "semana"}</b> me cuentas cómo te fue en <b>Progreso → Check-in</b> y subes tus fotos.</p><p>Yo reviso todo y te respondo: te llega como <b>“Tu coach respondió tu check-in”</b> en el inicio.</p>` });
   out.push({ t: "¡Listo!", h: `<p>Eso es todo. Cualquier duda me escribes por WhatsApp.</p>${cfg.manualUrl ? `<a class="btn block" target="_blank" href="${esc(cfg.manualUrl)}">Ver el manual completo</a>` : ""}<p class="muted small">Puedes volver a ver esta bienvenida en Más → Bienvenida a IMA.</p>` });

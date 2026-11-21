@@ -162,7 +162,7 @@ function setInfo(ex, j) {
     if (dw) h += `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw} kg</span>`;
     if (dr) h += `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr} reps</span>`;
   }
-  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button>${!has("train_setvideo") ? "" : `<button class="lnk vid ${st.vid ? "on" : ""}" data-a="setVideo" data-j="${j}">${st.vid ? "🎥 Ver tu video" : "🎥 Subir video de tu serie"}</button>`}`;
+  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button>${st.vid ? `<button class="lnk vid on" data-a="setVideo" data-j="${j}">🎥 Ver tu video</button>` : ""}`;
   if (ref?.note) h += `<span class="lastnote">Tu nota de la semana pasada: ${esc(ref.note)}</span>`;
   return h;
 }
