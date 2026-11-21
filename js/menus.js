@@ -202,7 +202,7 @@ act("hSave", async () => { const r = (x) => (x == null ? null : Math.round(x)); 
 let MW = null; // copia de trabajo
 const clone = (x) => JSON.parse(JSON.stringify(x));
 export async function menusEditor(c) {
-  if (!MW || MW.cid !== c.id) MW = { cid: c.id, menus: clone(c.menus || []), dirty: false, k: 0 };
+  if (!MW || MW.cid !== c.id) MW = { cid: c.id, menus: clone(c.menus || []), pauta: clone(c.pauta || {}), pautaLeg: clone(c.pautaLeg || {}), dirty: false, k: 0 };
   const idx = await foodIndex();
   return `<datalist id="foodDL">${[...idx.values()].map((f) => `<option value="${esc(f.name)}">`).join("")}</datalist><div id="menuEd">${editorHtml(c)}</div>`;
 }
@@ -222,31 +222,59 @@ const hasBudget = (m) => m.free && +m.budget?.kcal > 0;
 const MCOL = [[/libre|durante el d/, "#94a3b8"], [/^pre ?entreno/, "#22c55e"], [/desayuno/, "#f59e0b"], [/colaci[oó]n (am|1)|media ma/, "#14b8a6"], [/almuerzo/, "#ef4444"], [/colaci[oó]n (pm|2)/, "#a855f7"], [/once|merienda/, "#3b82f6"], [/cena/, "#6366f1"], [/colaci[oó]n 3/, "#ec4899"], [/colaci[oó]n/, "#14b8a6"]];
 const MPAL = ["#f59e0b", "#14b8a6", "#ef4444", "#a855f7", "#3b82f6", "#6366f1", "#ec4899"];
 export const mealColor = (m, i) => (m.free ? "#94a3b8" : (MCOL.find(([re]) => re.test(nk(m.name))) || [])[1] || MPAL[i % MPAL.length]);
+// Colores del editor: uno por opción (pestaña y borde de sus comidas) y uno por grupo de alimentos
+const OPAL = ["#ef4444", "#3b82f6", "#22c55e", "#a855f7", "#f59e0b", "#14b8a6", "#ec4899", "#6366f1"];
+export const optColor = (k) => OPAL[k % OPAL.length];
+export const GCOL = { "Cereales": "#d4a373", "Verduras generales": "#22c55e", "Verduras libre consumo": "#86efac", "Frutas": "#f97316", "Lácteos altos en grasa": "#2563eb", "Lácteos medios en grasa": "#60a5fa", "Lácteos bajos en grasa": "#bfdbfe", "Carnes magras": "#f87171", "Carnes grasas": "#b91c1c", "Huevo": "#facc15", "Legumbres": "#a16207", "Aceites y grasas": "#eab308", "Alimentos ricos en lípidos": "#84cc16", "Azúcar": "#f472b6" };
+const gdot = (g) => `<i class="gdot" style="background:${GCOL[g] || "#777"}"></i>`;
+const PG = () => Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => g);
+const pMac = (p) => { const t = { kcal: 0, cho: 0, fat: 0, prot: 0 }; for (const [g, n] of Object.entries(p || {})) { const G = GROUPS[g]; if (G) { t.kcal += n * G[0]; t.cho += n * G[1]; t.fat += n * G[2]; t.prot += n * G[3]; } } return t; };
+const mealTot = (m) => totals({ meals: [m] }).t;
+const macTxt = (t) => `${r0(t.kcal)} kcal · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)}`;
+const fmtN = (v) => (v == null || v === "" ? "" : String(Math.round(+v * 100) / 100));
+// Pauta: se crea aquí mismo (día normal y día con legumbres) y se compara con las metas del cliente
+function pautaCard(c) {
+  const pn = MW.pauta, pl = MW.pautaLeg, mn = pMac(pn), ml = pMac(pl), goal = { kcal: c.kcal, cho: c.cho, fat: c.fat, prot: c.prot };
+  const adec = (v, g) => (g ? `<small class="${Math.abs(v / g - 1) <= 0.05 ? "g" : Math.abs(v / g - 1) <= 0.1 ? "y" : "r"}">${r0((v / g) * 100)} %</small>` : "");
+  const empty = !Object.values(pn).some((v) => +v);
+  return `<details class="card pauta-card" ${empty || MW.openPauta ? "open" : ""}><summary class="card-t" data-a="mePautaOpen">Pauta de alimentación${empty ? ' <span class="badge y">Por crear</span>' : ` <span class="muted small">· ${r0(mn.kcal)} kcal</span>`}</summary>
+  <p class="muted small">Porciones por grupo al día. Abajo ves sus kcal y macros (por porciones de intercambio) contra las metas del cliente${c.kcal ? "" : " (no tiene metas: ponlas en Datos y objetivos)"}. Se guarda con “Guardar y publicar”.</p>
+  <table class="tbl pauta-t"><tr><th>Grupo</th><th>Día normal</th><th>Día con legumbres</th></tr>
+  ${PG().map((g) => `<tr><td>${gdot(g)}${esc(g)}</td><td><input type="number" step="0.25" min="0" value="${fmtN(pn[g])}" data-a-change="mePauta" data-p="n" data-g="${esc(g)}"></td><td><input type="number" step="0.25" min="0" value="${fmtN(pl[g])}" data-a-change="mePauta" data-p="l" data-g="${esc(g)}"></td></tr>`).join("")}
+  ${[["kcal", "Kcal"], ["cho", "CHO (g)"], ["fat", "Lípidos (g)"], ["prot", "Proteína (g)"]].map(([k, l]) => `<tr class="ptot"><td><b>${l}</b>${goal[k] ? ` <span class="muted small">meta ${goal[k]}</span>` : ""}</td><td><b>${r0(mn[k])}</b> ${adec(mn[k], goal[k])}</td><td><b>${r0(ml[k])}</b> ${adec(ml[k], goal[k])}</td></tr>`).join("")}</table>
+  <button class="btn small" data-a="mePautaCopy">Copiar día normal al día con legumbres (−2 cereales, −1 carnes, +2 legumbres)</button></details>`;
+}
 function editorHtml(c) {
   const ms = MW.menus; if (MW.k >= ms.length) MW.k = Math.max(0, ms.length - 1);
-  const mn = ms[MW.k], pauta = MW.pauta || c.pauta || {};
-  const head = `<div class="card"><div class="row between"><div class="card-t">Opciones del plan de alimentación</div><span class="row gap">${MW.dirty ? '<span class="badge y">Sin guardar</span>' : ""}<label class="btn" title="Archivo ima-planes.json con planes pasados desde PDF">Importar plan<input type="file" accept=".json,application/json" hidden data-a-change="meImport"></label><button class="btn primary" data-a="meSave">Guardar y publicar</button></span></div>
-  <p class="muted small">Cada opción es una pauta alternativa (ej. día de entrenamiento / descanso / fin de semana). El cliente la ve en “Mi plan”, toca un alimento para ver los reemplazos de su grupo y arma su lista de compras.</p>
-  ${MW.pauta ? `<div class="note">Importado: al guardar también se actualiza la <b>pauta por porciones</b> del cliente (${Object.entries(MW.pauta).map(([g, n]) => `${esc(g)} ${r1(n).toLocaleString("es-CL")}`).join(" · ")})${MW.pautaLeg ? " y la del <b>día con legumbres</b>" : ""}. Revisa las opciones y toca “Guardar y publicar”.</div>` : ""}
-  <div class="seg scroll">${ms.map((x, k) => `<button class="${k === MW.k ? "on" : ""}" data-a="meOpt" data-k="${k}">${esc(x.name || "Opción " + (k + 1))}</button>`).join("")}<button data-a="meAdd">＋ Nueva opción</button></div></div>`;
+  const mn = ms[MW.k], pauta = MW.pauta, hasLeg = ms.some((x) => x.leg);
+  const head = `<div class="card"><div class="row between"><div class="card-t">Plan de alimentación</div><span class="row gap">${MW.dirty ? '<span class="badge y">Sin guardar</span>' : ""}<label class="btn" title="Archivo ima-planes.json con planes pasados desde PDF">Importar plan<input type="file" accept=".json,application/json" hidden data-a-change="meImport"></label><button class="btn primary" data-a="meSave">Guardar y publicar</button></span></div>
+  <p class="muted small">Cada opción es un día completo (entreno AM / PM, descanso, legumbres…). El cliente la ve en “Mi plan”, toca un alimento para ver los reemplazos de su grupo y arma su lista de compras.</p>
+  ${MW.imported ? `<div class="note">Plan importado: revisa las opciones y la pauta, y toca “Guardar y publicar”.</div>` : ""}
+  <div class="seg scroll optseg">${ms.map((x, k) => `<button class="${k === MW.k ? "on" : ""}" style="--oc:${optColor(k)}" data-a="meOpt" data-k="${k}"><i class="gdot" style="background:${optColor(k)}"></i>${esc(x.name || "Opción " + (k + 1))}${x.leg ? " 🫘" : ""}</button>`).join("")}<button data-a="meAdd">＋ Nueva opción</button></div>
+  ${ms.length && !hasLeg ? `<div class="note row between"><span>Falta el <b>día con legumbres</b>: arma una opción propia para ese día (no se le pide al cliente que modifique otra).</span><button class="btn small" data-a="meLegAdd">＋ Día con legumbres</button></div>` : ""}</div>
+  ${pautaCard(c)}`;
   if (!mn) return head;
+  const oc = optColor(MW.k);
   const { t, por } = totals(mn);
-  const pautaLeg = MW.pautaLeg || c.pautaLeg || null, pz = mn.leg && pautaLeg ? pautaLeg : pauta;
-  const groups = Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => g);
-  const cmp = groups.filter((g) => por[g] || pz[g]).map((g) => { const a = Math.round((por[g] || 0) * 100) / 100, b = +pz[g] || 0, ok = !b ? "" : Math.abs(a - b) < 0.02 ? "g" : a > b ? "r" : "y"; return `<span class="pill ${ok}">${esc(g)} ${a}${b ? "/" + b : ""}</span>`; }).join(" ");
-  return `${head}<div class="card"><div class="grid3"><label>Nombre de la opción<input value="${esc(mn.name || "")}" data-a-change="meF" data-f="name" placeholder="Ej: Día de entrenamiento"></label><label class="span2">Nota para el cliente (opcional)<input value="${esc(mn.note || "")}" data-a-change="meF" data-f="note"></label></div>
-  <div class="small mt"><b>${r0(t.kcal)} kcal</b> · C ${r0(t.cho)} · L ${r0(t.fat)} · P ${r0(t.prot)} <span class="muted">(por porciones de intercambio${c.kcal ? ` · meta ${c.kcal} kcal` : ""})</span></div>
-  <div class="mt pills-wrap">${cmp || '<span class="muted small">Agrega alimentos para ver las porciones por grupo.</span>'}</div>
-  ${Object.keys(pz).length ? `<p class="muted small">Porciones de la opción / pauta ${mn.leg ? "del <b>día con legumbres</b>" : "del cliente"} (verde = igual, amarillo = faltan, rojo = sobran). Los extras suman a las kcal pero no a las porciones.</p>` : ""}
+  const pz = mn.leg && Object.values(MW.pautaLeg).some((v) => +v) ? MW.pautaLeg : pauta;
+  const groups = PG().filter((g) => por[g] || pz[g]);
+  const goal = { kcal: c.kcal, cho: c.cho, fat: c.fat, prot: c.prot };
+  const side = `<aside class="me-side" style="--oc:${oc}"><div class="card"><div class="card-t"><i class="gdot" style="background:${oc}"></i>${esc(mn.name || "Opción")}</div>
+    <div class="muted small">Porciones de la opción / pauta ${mn.leg ? "del día con legumbres" : "del día normal"}</div>
+    <table class="tbl side-t">${groups.map((g) => { const a = Math.round((por[g] || 0) * 100) / 100, b = +pz[g] || 0, ok = !b && !a ? "" : Math.abs(a - b) < 0.02 ? "okc" : a > b ? "hic" : "lowc"; return `<tr><td>${gdot(g)}${esc(g)}</td><td class="${ok}"><b>${fmtN(a) || 0}</b> / ${fmtN(b) || 0}</td></tr>`; }).join("") || `<tr><td class="muted small">Agrega alimentos o crea la pauta.</td></tr>`}</table>
+    <div class="side-mac">${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([k, l]) => `<div><small>${l}</small><b>${r0(t[k])}</b>${goal[k] ? `<small class="muted">/ ${goal[k]}</small>` : ""}</div>`).join("")}</div>
+    <p class="muted small">Verde = igual a la pauta · amarillo = faltan · rojo = sobran. Los extras suman kcal, no porciones.</p></div></aside>`;
+  return `${head}<div class="me-grid"><div class="me-main" style="--oc:${oc}"><div class="card optcard"><div class="grid3"><label>Nombre de la opción<input value="${esc(mn.name || "")}" data-a-change="meF" data-f="name" placeholder="Ej: Día de entrenamiento"></label><label class="span2">Nota para el cliente (opcional)<input value="${esc(mn.note || "")}" data-a-change="meF" data-f="note"></label></div>
   <label class="chk mt"><input type="checkbox" ${mn.noTime ? "checked" : ""} data-a-change="meNoTime"> Sin horario fijo (el cliente ve “come cada 3 a 4 horas” en vez de las horas)</label>
-  <label class="chk"><input type="checkbox" ${mn.leg ? "checked" : ""} data-a-change="meLeg"> Es el día con legumbres (se compara con la pauta del día con legumbres${pautaLeg ? "" : ": llénala en Datos y objetivos"})</label>
+  <label class="chk"><input type="checkbox" ${mn.leg ? "checked" : ""} data-a-change="meLeg"> Es el día con legumbres (se compara con la pauta del día con legumbres)</label>
   <div class="row gap mt"><button class="btn small" data-a="meDup">⧉ Duplicar opción</button><button class="btn small danger ghost" data-a="meDel">Eliminar opción</button></div></div>
-  ${(mn.meals || []).map((m, i) => `<div class="card"><div class="row gap"><input class="grow" value="${esc(m.name)}" data-a-change="meMeal" data-i="${i}" data-f="name" style="font-weight:700"><input type="time" value="${esc(m.time || "")}" data-a-change="meMeal" data-i="${i}" data-f="time" style="width:120px">
+  ${(mn.meals || []).map((m, i) => `<div class="card mecard"><div class="row gap"><input class="grow" value="${esc(m.name)}" data-a-change="meMeal" data-i="${i}" data-f="name" style="font-weight:700"><input type="time" value="${esc(m.time || "")}" data-a-change="meMeal" data-i="${i}" data-f="time" style="width:120px">
     <button class="icon-btn" data-a="meMealMove" data-i="${i}" data-n="-1" title="Subir">↑</button><button class="icon-btn" data-a="meMealMove" data-i="${i}" data-n="1" title="Bajar">↓</button><button class="icon-btn" data-a="meMealDel" data-i="${i}" title="Quitar">✕</button></div>
+    <div class="meal-mac">${macTxt(mealTot(m))}</div>
     <label class="chk mt"><input type="checkbox" ${m.free ? "checked" : ""} data-a-change="meFree" data-i="${i}"> Libre durante el día (sin horario: lo reparte como pueda, ej. turno de trabajo)</label>
     ${m.free ? `<div class="small mt"><span class="muted">Aporte total de esta comida (opcional; si lo llenas, reemplaza la suma de los extras):</span> ${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([k, l]) => `<label class="exin">${l}<input type="number" step="1" min="0" value="${m.budget?.[k] ?? ""}" data-a-change="meBudget" data-i="${i}" data-f="${k}"></label>`).join("")}</div>` : ""}
     <table class="tbl me-t"><tr><th>Alimento</th><th>Grupo</th><th>Porciones</th><th>Gramos</th><th>Medida casera</th><th></th></tr>
-    ${(m.items || []).map((it, j) => `<tr><td><input list="foodDL" value="${esc(it.name)}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="name" placeholder="Escribe y elige…"></td>
+    ${(m.items || []).map((it, j) => `<tr style="--gc:${GCOL[it.cat] || "transparent"}" class="git"><td><input list="foodDL" value="${esc(it.name)}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="name" placeholder="Escribe y elige…"></td>
       <td><select data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="cat"><option value="">—</option>${Object.keys(GROUPS).map((g) => `<option ${g === it.cat ? "selected" : ""}>${esc(g)}</option>`).join("")}</select></td>
       <td><input type="number" step="0.25" min="0" value="${it.por ?? ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="por" style="width:80px" ${it.gp ? "" : 'disabled title="Sin porción de intercambio: usa gramos"'}></td>
       <td><input type="number" step="1" min="0" value="${it.g ? r0(it.g) : ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="g" style="width:80px"></td>
@@ -255,7 +283,7 @@ function editorHtml(c) {
         ${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([k, l]) => `<label class="exin">${l}<input type="number" step="0.1" min="0" value="${it[k] ?? ""}" data-a-change="meIt" data-i="${i}" data-j="${j}" data-f="${k}"></label>`).join("")}
         ${it.p100 ? '<span class="muted small">(sale de la base por 100 g: cambia solo con los gramos)</span>' : ""}</td></tr>` : ""}`).join("")}</table>
     <div class="row gap"><button class="btn small" data-a="meItAdd" data-i="${i}">＋ Alimento</button><button class="btn small" data-a="meExAdd" data-i="${i}" title="Alimento sin grupo de intercambio, con sus propios macros">＋ Extra</button><input class="grow small" value="${esc(m.note || "")}" placeholder="Nota de esta comida (opcional)" data-a-change="meMeal" data-i="${i}" data-f="note"></div></div>`).join("")}
-  <button class="btn block ghost" data-a="meMealAdd">＋ Agregar tiempo de comida</button>`;
+  <button class="btn block ghost" data-a="meMealAdd">＋ Agregar tiempo de comida</button></div>${side}</div>`;
 }
 const redraw = (dirty = true) => { if (dirty) MW.dirty = true; const box = $("#menuEd"); if (box) box.innerHTML = editorHtml(S._coachClient || {}); };
 const cur = () => MW.menus[MW.k];
@@ -272,6 +300,16 @@ act("meMealMove", (el) => { const a = cur().meals, i = +el.dataset.i, j = i + +e
 act("meItAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).push({ name: "", cat: "", por: 1, g: 0 }); redraw(); setTimeout(() => { const ins = $$(`#menuEd [data-i="${el.dataset.i}"][data-f="name"][list]`); ins[ins.length - 1]?.focus(); }, 0); });
 act("meExAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).push({ name: "", cat: "", por: null, gp: null, g: 0, kcal: 0, cho: 0, fat: 0, prot: 0 }); redraw(); });
 act("meLeg", (el) => { cur().leg = el.checked; redraw(); });
+act("mePauta", (el) => { const p = el.dataset.p === "l" ? MW.pautaLeg : MW.pauta; if (el.value === "") delete p[el.dataset.g]; else p[el.dataset.g] = num(el.value); MW.openPauta = true; redraw(); });
+act("mePautaOpen", (el) => { MW.openPauta = !el.parentElement.open; });
+act("mePautaCopy", async () => {
+  if (Object.values(MW.pautaLeg).some((v) => +v) && !(await confirmBox("¿Reemplazar la pauta del día con legumbres?"))) return;
+  const p = { ...MW.pauta }; p["Cereales"] = Math.max(0, (+p["Cereales"] || 0) - 2); p["Legumbres"] = (+p["Legumbres"] || 0) + 2;
+  if (+p["Carnes grasas"] >= 1) p["Carnes grasas"] -= 1; else p["Carnes magras"] = Math.max(0, (+p["Carnes magras"] || 0) - 1);
+  MW.pautaLeg = p; MW.openPauta = true; redraw();
+});
+// El día con legumbres es una opción propia del plan: parte como copia de la opción elegida y se ajusta a su pauta
+act("meLegAdd", () => { const x = clone(cur() || newMenu("")); x.id = uid(); x.name = "Día con legumbres"; x.leg = true; x.note = x.note || "Para los días que comes porotos, lentejas o garbanzos."; MW.menus.push(x); MW.k = MW.menus.length - 1; redraw(); toast("Ajusta los alimentos a la pauta del día con legumbres"); });
 act("meNoTime", (el) => { cur().noTime = el.checked; redraw(); });
 act("meFree", (el) => { const m = cur().meals[+el.dataset.i]; m.free = el.checked; if (m.free) m.time = ""; redraw(); });
 act("meBudget", (el) => { const m = cur().meals[+el.dataset.i]; (m.budget ||= {})[el.dataset.f] = el.value === "" ? null : num(el.value); redraw(); });
@@ -294,9 +332,10 @@ act("meIt", async (el) => {
 const exCalc = (it) => { if (it.p100 && it.g) ["kcal", "cho", "fat", "prot"].forEach((k, i) => (it[k] = r1((it.p100[i] * it.g) / 100))); };
 act("meSave", async () => {
   const menus = MW.menus.map((mn) => ({ ...mn, meals: mn.meals.map((m) => ({ ...m, items: (m.items || []).filter((it) => it.name) })) }));
-  const data = { menus }; if (MW.pauta) data.pauta = MW.pauta; if (MW.pautaLeg) data.pautaLeg = MW.pautaLeg;
+  const clean = (p) => Object.fromEntries(Object.entries(p || {}).filter(([, v]) => v !== "" && v != null && !isNaN(+v)).map(([g, v]) => [g, +v]));
+  const data = { menus, pauta: clean(MW.pauta), pautaLeg: clean(MW.pautaLeg) };
   await db.set("clients/" + MW.cid, data); MW.menus = clone(menus); MW.dirty = false;
-  if (S._coachClient) Object.assign(S._coachClient, data); MW.pauta = null; MW.pautaLeg = null; redraw(false); toast("Plan publicado ✓");
+  if (S._coachClient) Object.assign(S._coachClient, data); MW.imported = false; redraw(false); toast("Plan publicado ✓");
 });
 // Importar un plan pasado desde PDF (archivo ima-planes.json, se prepara aparte: no queda en el repositorio público)
 const nameKey = (s) => nk(s).split(/\s+/).filter(Boolean);
@@ -316,8 +355,9 @@ async function loadPlan(p) {
   const n = p.menus.length, prev = MW.menus.length;
   if (!(await confirmBox(`Cargar el plan de ${p.name}: ${n} opciones (${p.menus.map((m) => m.name).join(", ")}).${prev ? ` Reemplaza las ${prev} opciones que tiene ahora.` : ""} No se publica hasta que toques “Guardar y publicar”.`))) return;
   MW.menus = clone(p.menus).map((mn) => ({ ...mn, id: uid() })); MW.k = 0;
-  MW.pauta = p.pauta && Object.keys(p.pauta).length ? { ...p.pauta } : null;
-  MW.pautaLeg = p.pautaLeg && Object.keys(p.pautaLeg).length ? { ...p.pautaLeg } : null;
+  if (p.pauta && Object.keys(p.pauta).length) MW.pauta = { ...p.pauta };
+  if (p.pautaLeg && Object.keys(p.pautaLeg).length) MW.pautaLeg = { ...p.pautaLeg };
+  MW.imported = true;
   redraw(); toast("Plan cargado: revísalo y publícalo");
 }
 export const menusDirty = () => !!MW?.dirty;

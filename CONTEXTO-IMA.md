@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.27.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.28.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -233,3 +233,10 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.27.1 (20-nov)
 - Pestaña "Mi plan" de Agregar alimento: cada tiempo de comida en su tarjeta con el mismo color que en Mi plan (`.pmini`, `mealColor`).
 - Decisión de Joaquín (20-nov): **no** pasar el plan a crudo ni poner un aviso de "todo es en crudo" (la gente cocina para varios y pesa cocido). Las carnes del plan quedan como están; solo la lista de compras pasa a crudo arroz, fideos, quínoa, cous cous y legumbres.
+
+## v1.28.0 (20-nov) — Editor del plan (coach) rehecho
+- **Regla de Joaquín:** todo plan nuevo lleva un **día con legumbres planificado como opción propia** (no una modificación de otra opción). Si ninguna opción tiene `leg`, el editor avisa y ofrece "＋ Día con legumbres" (copia la opción elegida, `leg: true`, y se ajusta a la pauta del día con legumbres). La pestaña "Día con legumbres" del cliente (solo la regla) queda para planes antiguos sin esa opción.
+- **Pauta de alimentación** dentro de la pestaña Plan alimentación (tarjeta plegable, abierta si está vacía): porciones por grupo del día normal y del día con legumbres, con kcal y macros por intercambio y % de las metas del cliente (verde ±5 %, amarillo ±10 %, rojo más). Botón para copiar el día normal al de legumbres (−2 cereales, −1 carne grasa o magra, +2 legumbres). `MW.pauta`/`MW.pautaLeg` se guardan siempre con "Guardar y publicar" (también se siguen editando en Datos y objetivos).
+- **Colores:** cada opción tiene su color (`optColor`: pestaña, borde de sus comidas y de la tabla lateral) y cada grupo de alimentos el suyo (`GCOL`: franja en cada fila de alimento y punto en las tablas).
+- **Tabla lateral fija** (`.me-side`, sticky al hacer scroll; abajo en pantallas angostas): porciones de la opción / pauta por grupo (verde igual, amarillo faltan, rojo sobran) y kcal/CHO/lípidos/proteína contra las metas. Reemplaza las cápsulas de arriba.
+- **Macros por tiempo de comida** bajo el nombre de cada comida en el editor (`mealTot`).

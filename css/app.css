@@ -527,3 +527,18 @@ body.rec-on .cpanel { min-width: 0; overflow-x: hidden; } .recbar .rb.sw i { mar
 label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--txt); margin: 6px 0; cursor: pointer; } label.chk input { width: auto; margin: 0; flex: none; }
 /* Pestaña "Mi plan" al agregar alimento: cada tiempo de comida en su tarjeta de color */
 .card.pmini { margin: 10px 0; padding: 10px 12px; } .pmini .pmh { margin-bottom: 4px; } .pmini .pmh b { font-size: 12.5px; padding: 4px 10px; }
+/* Editor del plan (coach, 20-nov): color por opción, color por grupo, tabla fija de porciones vs pauta */
+.gdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; flex: none; }
+.optseg button { display: inline-flex; align-items: center; }
+.optseg button.on { box-shadow: inset 0 -3px 0 var(--oc); }
+.me-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
+.me-main .card.optcard, .me-main .card.mecard { border-left: 4px solid var(--oc); }
+.me-side { position: sticky; top: 12px; } .me-side .card { border-top: 4px solid var(--oc); margin-top: 0; }
+.me-side .card-t { display: flex; align-items: center; }
+.side-t td { padding: 5px 4px; font-size: 12.5px; } .side-t td:last-child { text-align: right; white-space: nowrap; }
+.side-mac { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 4px; text-align: center; }
+.side-mac div { background: var(--surf2); border-radius: 10px; padding: 6px 2px; display: flex; flex-direction: column; } .side-mac b { font-size: 14px; } .side-mac small { font-size: 10.5px; color: var(--muted); }
+.meal-mac { font-size: 12px; color: var(--muted); margin: 6px 0 0 2px; font-variant-numeric: tabular-nums; }
+.me-t tr.git td:first-child { box-shadow: inset 4px 0 0 var(--gc); padding-left: 10px; }
+.pauta-t input { width: 90px; } .pauta-t tr.ptot td { border-top: 1px solid var(--line); } .pauta-t small.g { color: var(--g); } .pauta-t small.y { color: var(--y); } .pauta-t small.r { color: var(--r); }
+@media (max-width: 1100px) { .me-grid { grid-template-columns: 1fr; } .me-side { position: static; } }
