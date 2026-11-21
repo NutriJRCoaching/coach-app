@@ -89,7 +89,7 @@ export function alertsFor(c, x) {
     if (!x.routines.length) add("r", "Falta su plan de entrenamiento (rutinas)", "entrenos");
     else if (!Object.values(c.schedule || {}).some(Boolean)) add("y", "Falta el calendario semanal: qué rutina toca cada día", "entrenos");
     const rv = reviewWindow(c, x.routines, x.sessions);
-    if (rv?.open && !rv.done) add(today === rv.w.last ? "r" : "y", `Revisa su rutina para la semana ${rv.next.n} (parte el ${fmtDate(rv.next.first)})`, "entrenos");
+    if (rv?.open && !rv.done) { const pend = (rv.list || []).filter((x) => !x.done).map((x) => x.r.name); add(today === rv.w.last ? "r" : "y", `Revisa ${pend.length ? pend.join(", ") : "su rutina"} para la semana ${rv.next.n} (parte el ${fmtDate(rv.next.first)})`, "entrenos"); }
   }
   if (eats(c)) {
     const plans = c.plans && Object.keys(c.plans).length ? c.plans : null;

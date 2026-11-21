@@ -587,3 +587,9 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; col
 .blk-t .nt { cursor: help; font-size: 12px; } .blk-t .badge[class*="tech-"] { padding: 0 5px; font-size: 10px; }
 .ses-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 0 14px; } .ses-grid .card { margin-top: 8px; }
 .sesc h3 { font-size: 15px; } .sesc details summary { cursor: pointer; margin-top: 6px; }
+/* Entrenamiento: pendientes por rutina y series una por una */
+.rv-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.rv-item { display: flex; align-items: baseline; gap: 6px; padding: 7px 12px; border-radius: 99px; border: 1.5px solid var(--y); background: var(--y-s); color: var(--txt); cursor: pointer; font-size: 13px; }
+.rv-item small { color: var(--muted); } .rv-item.ok { border-color: var(--g); background: var(--g-s); } .rv-item.dz { border-color: var(--acc); background: var(--acc-s); }
+.psets { display: flex; flex-direction: column; gap: 4px; } .ps { display: flex; align-items: center; gap: 4px; white-space: nowrap; } .ps small { color: var(--muted); width: 18px; }
+.ps input { width: 64px; } .ps select { width: 92px; padding: 4px 6px; }

@@ -383,7 +383,10 @@ export function reviewWindow(c, routines, sessions, today = ymd()) {
   const w = weekInfo(c, today), plan = weekPlan(c, routines, sessions, today);
   const lastTrain = plan.planned.length ? plan.planned[plan.planned.length - 1].date : addDays(w.last, -1);
   const next = weekInfo(c, addDays(w.last, 1));
-  return { open: today >= lastTrain, next, w, lastTrain, done: c.rutReview?.week === next.key };
+  // Cada rutina se revisa por separado (r.review = {week, same}); la semana queda revisada si lo están todas (o se marcó todo igual)
+  const scheduled = routines.filter((r) => Object.values(c.schedule || {}).includes(r.id));
+  const list = (scheduled.length ? scheduled : routines).map((r) => ({ r, done: r.review?.week === next.key || r.changes?.week === next.key, same: r.review?.week === next.key && r.review.same }));
+  return { open: today >= lastTrain, next, w, lastTrain, list, done: c.rutReview?.week === next.key || list.every((x) => x.done) };
 }
 
 // ---------- Bloque de una rutina semana a semana (coach: Rutinas y Progreso)

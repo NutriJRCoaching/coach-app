@@ -20,7 +20,9 @@ import { loadCtx, alertsFor, levelOf, SERVICES, SERVICE_GROUPS, emailKey, checki
 // Pendientes de todos los clientes (se recalculan como máximo cada 30 s o al guardar algo)
 let AL = { at: 0, map: {}, dirty: true, busy: null };
 export const resetAlerts = () => { AL.at = 0; AL.dirty = true; };
-window.addEventListener("ima-alerts", () => resetAlerts()); // otros módulos (ej. el editor del plan) piden recalcular los avisos
+window.addEventListener("ima-alerts", () => resetAlerts());
+// Rutina en edición: muestra "Cambios sin guardar" apenas se toca algo de la tabla o del detalle
+document.addEventListener("change", (e) => { if (e.target.closest?.("[data-rdirty]")) { const b = document.getElementById("rDirty"); if (b) b.hidden = false; } }); // otros módulos (ej. el editor del plan) piden recalcular los avisos
 async function computeAlerts(clients) {
   const out = {};
   await Promise.all(clients.map(async (c) => { const x = await loadCtx(c); out[c.id] = { x, A: alertsFor(c, x) }; }));
@@ -262,11 +264,13 @@ async function routinesView(c) {
   if ((!RE || RE.cid !== c.id) && routines.length) { const r0_ = routines[0]; RE = { cid: c.id, r: { ...r0_ }, orig: JSON.stringify(r0_.exercises || []), origNote: r0_.note || "" }; }
   const ed = RE && RE.cid === c.id ? RE.r : null;
   const rv = reviewWindow(c, routines, sessions);
-  return `${rv ? `<div class="card review ${rv.done ? "ok" : rv.open ? "due" : ""}"><div class="row between"><div><div class="card-t">Revisión de la semana ${rv.next.n} · parte el ${fmtDate(rv.next.first, true)}</div>
-    <p class="small">${rv.done ? `✓ Revisada${c.rutReview?.same ? " · sigue igual" : " · con cambios"}.` : rv.open ? "Ya terminó su semana de entrenamiento: revisa reps, intensidad, pesos sugeridos, indicaciones por ejercicio, orden y selección. Si queda igual, toca “Seguir igual”." : `Se abre el ${fmtDate(rv.lastTrain)} (su último entrenamiento de la semana). Igual puedes dejarla lista antes.`}</p></div>
-    ${rv.done ? `<button class="btn small ghost" data-a="rvUndo" data-w="${rv.next.key}">Deshacer</button>` : `<button class="btn primary small" data-a="rvSame" data-w="${rv.next.key}">Seguir igual la semana ${rv.next.n}</button>`}</div></div>` : ""}
+  const edDirty = ed && (JSON.stringify(ed.exercises || []) !== RE.orig || (ed.note || "") !== (RE.origNote || ""));
+  return `${rv ? `<div class="card review ${rv.done ? "ok" : rv.open ? "due" : ""}"><div class="row between"><div><div class="card-t">Pendientes para la semana ${rv.next.n} · parte el ${fmtDate(rv.next.first, true)}</div>
+    <p class="small">${rv.done ? "✓ Todo revisado. El cliente ve los ajustes en su semana." : rv.open ? "Ya terminó su semana: en cada rutina ajusta series, reps, RIR, kg sugerido y comentarios y toca “Guardar cambios”, o márcala “Sin cambios”." : `Se abre el ${fmtDate(rv.lastTrain)} (su último entrenamiento de la semana). Igual puedes dejarla lista antes.`}</p>
+    <div class="rv-list">${rv.list.map((x) => { const dz = edDirty && ed.id === x.r.id; return `<button class="rv-item ${x.done ? "ok" : dz ? "dz" : ""}" data-a="rEdit" data-id="${x.r.id}">${x.done ? "✓" : dz ? "●" : "○"} <b>${esc(x.r.name)}</b><small>${dz ? "cambios sin guardar" : x.done ? (x.same ? "sin cambios" : "con ajustes") : "por revisar"}</small></button>`; }).join("")}</div></div>
+    ${rv.done ? `<button class="btn small ghost" data-a="rvUndo" data-w="${rv.next.key}">Deshacer</button>` : `<button class="btn small" data-a="rvSame" data-w="${rv.next.key}">Todas sin cambios</button>`}</div></div>` : ""}
   <div class="row gap"><div class="routine-list">${routines.map((r) => `<button class="btn ${ed?.id === r.id ? "primary" : ""}" data-a="rEdit" data-id="${r.id}">${esc(r.name)}</button>`).join("")}<button class="btn ghost" data-a="rNew">＋ Nueva rutina</button></div></div>
-  ${ed ? blockGrid(c, ed, sessions, rv) + `<details class="card-d" ${RE.openDetail ? "open" : ""}><summary class="card-t" data-a="rDetail">Detalle de los ejercicios de ${esc(ed.name)}: video, tips, tempo, descanso y reemplazos</summary>${routineEditor(ed, lib)}</details>` : `<p class="muted">Crea la primera rutina.</p>`}
+  ${ed ? blockGrid(c, ed, sessions, rv) + `<details class="card-d" ${RE.openDetail ? "open" : ""}><summary class="card-t" data-a="rDetail">Ejercicios de ${esc(ed.name)}: agregar, quitar u ordenar · video, tips, tempo, descanso y reemplazos</summary>${routineEditor(ed, lib)}</details>` : `<p class="muted">Crea la primera rutina.</p>`}
   <details class="card-d" ${RE?.openCfg ? "open" : ""}><summary class="card-t" data-a="rCfg">Configuración: calendario semanal (qué rutina toca cada día) y cardio</summary>  <div><div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>
   <div class="cardio-ed"><div class="card-t">Cardio</div><div class="cardio-row"><label class="cw-n">Veces/semana<input type="number" min="0" value="${c.cardio?.perWeek || ""}" data-a-change="cardioSet" data-k="perWeek"></label><label class="grow">Tipo<input value="${esc(c.cardio?.type || "")}" data-a-change="cardioSet" data-k="type" placeholder="Ej: Intervalos en bicicleta estática"></label><label class="cw-n">Minutos<input type="number" value="${c.cardio?.minutes || ""}" data-a-change="cardioSet" data-k="minutes"></label><label class="cw-m">Intensidad<input value="${esc(c.cardio?.intensity || "")}" data-a-change="cardioSet" data-k="intensity" placeholder="7–8/10"></label></div>
   <label>Descripción (la ve completa al tocar Cardio)<textarea rows="4" data-a-change="cardioSet" data-k="desc" placeholder="Ej: 1 min de entrada en calor suave. Luego 4 rondas de 30 s intenso (8/10) + 60 s suave. Al terminar, 1 min de vuelta a la calma.">${esc(c.cardio?.desc || "")}</textarea></label></div>
@@ -276,11 +280,14 @@ async function routinesView(c) {
   <datalist id="exlib">${lib.map((e) => `<option value="${esc(e.name)}">`).join("")}</datalist>`;
 }
 act("rvSame", async (el) => { await db.set("clients/" + CW.cid, { rutReview: { week: el.dataset.w, same: true, at: Date.now() } }); resetAlerts(); toast("Listo: la rutina sigue igual"); refresh(); });
-act("rvUndo", async () => { await db.set("clients/" + CW.cid, { rutReview: null }); resetAlerts(); refresh(); });
+act("rvUndo", async (el) => { await db.set("clients/" + CW.cid, { rutReview: null }); for (const r of await getRoutines(CW.cid)) if (r.review?.week === el.dataset.w) await db.set(`clients/${CW.cid}/routines/${r.id}`, { review: null }); resetAlerts(); refresh(); });
+// Una rutina sin cambios para la semana que viene; si ya están todas revisadas, la semana queda revisada
+async function reviewDone(w) { const c = await getClient(CW.cid), rv = reviewWindow(c, await getRoutines(CW.cid), await getSessions(CW.cid)); if (rv?.list?.every((x) => x.done)) await db.set("clients/" + CW.cid, { rutReview: { week: w, same: rv.list.every((x) => x.same), at: Date.now() } }); resetAlerts(); }
+act("rSameOne", async (el) => { await db.set(`clients/${CW.cid}/routines/${el.dataset.id}`, { review: { week: el.dataset.w, same: true, at: Date.now() } }); await reviewDone(el.dataset.w); toast("Sin cambios para la próxima semana ✓"); refresh(); });
 act("schedSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { schedule: { ...(c.schedule || {}), [el.dataset.d]: el.value || null } }); toast("Calendario guardado"); });
 act("cardioSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), [el.dataset.k]: el.type === "number" ? num(el.value) : el.value } }); toast("Guardado"); });
 act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = new Set(c.cardio?.days || []); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), days: [...s] } }); });
-act("rEdit", async (el) => { const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: { id: el.dataset.id, ...r }, orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
+act("rEdit", async (el) => { if (RE?.r && RE.r.id !== el.dataset.id && (JSON.stringify(RE.r.exercises || []) !== RE.orig || (RE.r.note || "") !== (RE.origNote || "")) && !(await confirmBox(`Tienes cambios sin guardar en ${RE.r.name}. ¿Salir sin guardarlos?`))) return; const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: { id: el.dataset.id, ...r }, orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
 act("rNew", () => { RE = { cid: CW.cid, r: { id: uid(), name: "Nueva rutina", exercises: [], isNew: true }, orig: "[]" }; refresh(); });
 // Vista del bloque: lo indicado y lo hecho semana a semana, y la próxima semana editable en la misma tabla
 function blockGrid(c, r, sessions, rv) {
@@ -288,10 +295,12 @@ function blockGrid(c, r, sessions, rv) {
   const nextN = rv?.next?.n || weekInfo(c, ymd()).n + 1;
   const prog = (y, p) => { if (!y || !p) return ""; const dw = (+y.w || 0) - (+p.w || 0), dr = (+y.r || 0) - (+p.r || 0); return dw > 0 || (dw === 0 && dr > 0) ? "up" : dw < 0 || (dw === 0 && dr < 0) ? "down" : ""; };
   const repsTxt = (e) => (e.sets || []).map((x) => x.reps ?? "").join(", "), rirTxt = (e) => [...new Set((e.sets || []).map((x) => x.rir ?? ""))].join(", ");
-  return `<div class="card blk"><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><button class="btn primary" data-a="rSave">Guardar cambios</button></div>
+  const dirty = JSON.stringify(r.exercises || []) !== RE.orig || (r.note || "") !== (RE.origNote || "") || r.isNew;
+  const st = rv?.list?.find((x) => x.r.id === r.id);
+  return `<div class="card blk" data-rdirty><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><span class="row gap"><span id="rDirty" class="badge y" ${dirty ? "" : "hidden"}>Cambios sin guardar</span>${st && !st.done ? `<button class="btn" data-a="rSameOne" data-id="${r.id}" data-w="${rv.next.key}" title="La semana ${nextN} esta rutina queda igual">Sin cambios para la semana ${nextN}</button>` : st?.done ? `<span class="badge g">${st.same ? "Semana " + nextN + ": sin cambios" : "Semana " + nextN + ": con ajustes"} ✓</span>` : ""}<button class="btn primary" data-a="rSave">Guardar cambios</button></span></div>
   <label>Comentario general de la rutina (lo ve al empezarla)<textarea rows="2" data-a-change="rNote" placeholder="Ej: Esta semana sube un poco el peso en los multiarticulares y cuida la bajada en todo.">${esc(r.note || "")}</textarea></label>
-  <div class="scroll-x"><table class="tbl blk-t"><tr><th rowspan="2">Ejercicio</th>${weeks.map((wk) => `<th class="wkh">Semana ${+wk.slice(1)}</th>`).join("")}<th rowspan="2" class="vs1h">vs 1ª vez</th><th class="nxh" colspan="5">Semana ${nextN} · lo que va a hacer</th></tr>
-  <tr>${weeks.map(() => `<th class="sub">indicado · hecho (kg×reps)</th>`).join("")}<th class="sub nx">Series</th><th class="sub nx">Reps (por serie)</th><th class="sub nx">RIR</th><th class="sub nx">Kg sug.</th><th class="sub nx">Comentario del ejercicio</th></tr>
+  <div class="scroll-x"><table class="tbl blk-t"><tr><th rowspan="2">Ejercicio</th>${weeks.map((wk) => `<th class="wkh">Semana ${+wk.slice(1)}</th>`).join("")}<th rowspan="2" class="vs1h">vs 1ª vez</th><th class="nxh" colspan="4">Semana ${nextN} · lo que va a hacer</th></tr>
+  <tr>${weeks.map(() => `<th class="sub">indicado · hecho (kg×reps)</th>`).join("")}<th class="sub nx">Series</th><th class="sub nx">Cada serie: reps · RIR</th><th class="sub nx">Kg sug.</th><th class="sub nx">Comentario del ejercicio</th></tr>
   ${r.exercises.map((e, k) => { const cs = B.exs.find((x) => x.e.id === e.id)?.cells || {};
     return `<tr><td class="exc"><b>${k + 1}. ${esc(e.name || "—")}</b></td>${weeks.map((wk, i) => { const cl = cs[wk], pv = i ? cs[weeks[i - 1]] : null; if (!cl) return `<td class="muted center">—</td>`;
       const pl = planStr(cl.plan), chg = pv && planStr(pv.plan) !== pl;
@@ -299,8 +308,7 @@ function blockGrid(c, r, sessions, rv) {
       ${(() => { const ks = B.weeks.filter((wk) => cs[wk]?.sets?.length); if (ks.length < 2) return `<td class="vs1 muted center">—</td>`; const f = cs[ks[0]].sets, l = cs[ks[ks.length - 1]].sets;
         return `<td class="vs1">${l.slice(0, 2).map((y, j) => { const a = f[j]; if (!a) return ""; const dw = r1((+y.w || 0) - (+a.w || 0)), dr = (+y.r || 0) - (+a.r || 0); return `<div><small class="muted">S${j + 1}</small> <b class="${dw > 0 ? "g" : dw < 0 ? "r" : ""}">${dw > 0 ? "+" : ""}${String(dw).replace(".", ",")} kg</b> <span class="${dr > 0 ? "g" : dr < 0 ? "r" : "muted"}">${dr > 0 ? "+" : ""}${dr} reps</span></div>`; }).join("")}</td>`; })()}
       <td class="nx"><input type="number" min="0" max="10" value="${(e.sets || []).length}" data-a-change="gSets" data-k="${k}" style="width:52px"></td>
-      <td class="nx"><input value="${esc(repsTxt(e))}" data-a-change="gReps" data-k="${k}" placeholder="8, 6" style="width:90px"></td>
-      <td class="nx"><input value="${esc(rirTxt(e))}" data-a-change="gRir" data-k="${k}" placeholder="1" style="width:56px"></td>
+      <td class="nx"><div class="psets">${(e.sets || []).map((x, j) => `<span class="ps"><small>S${j + 1}</small><input value="${esc(x.reps ?? "")}" data-a-change="setF" data-k="${k}" data-j="${j}" data-f="reps" placeholder="8-10" title="Repeticiones de la serie ${j + 1}"><select data-a-change="setF" data-k="${k}" data-j="${j}" data-f="rir" title="RIR de la serie ${j + 1}">${["", "F", 0, 1, 2, 3, 4, 5].map((v) => `<option value="${v}" ${String(x.rir ?? "") === String(v) ? "selected" : ""}>${v === "" ? "RIR –" : v === "F" ? "Fallo" : "RIR " + v}</option>`).join("")}</select></span>`).join("") || '<span class="muted small">Pon cuántas series</span>'}</div></td>
       <td class="nx"><input value="${esc(e.wSug || "")}" data-a-change="exF" data-k="${k}" data-f="wSug" placeholder="–" style="width:64px"></td>
       <td class="nx"><input value="${esc(e.weekNote || "")}" data-a-change="exF" data-k="${k}" data-f="weekNote" placeholder="Ej: controla la bajada" style="min-width:200px"></td></tr>`; }).join("")}</table></div>
   <p class="muted small">Cada semana muestra lo indicado (series×reps @RIR; en rojo si cambió respecto de la semana anterior) y lo hecho por serie (verde = subió peso o reps, rojo = bajó). En reps puedes poner una por serie separadas por coma (“8, 6”) o una sola para todas. ${weeks.length ? "" : "Aún no hay entrenamientos de esta rutina."}</p></div>`;
@@ -313,15 +321,11 @@ act("gReps", (el) => { const e = RE.r.exercises[+el.dataset.k], v = el.value.spl
 act("gRir", (el) => { const e = RE.r.exercises[+el.dataset.k], v = el.value.split(",").map((x) => x.trim()); if (!v.length) return; (e.sets || []).forEach((x, j) => { const t = v[Math.min(j, v.length - 1)]; x.rir = t === "" ? "" : t.toUpperCase() === "F" ? "F" : +t; }); refresh(); });
 function routineEditor(r, lib) {
   const T = ["Excéntrica", "Pausa abajo", "Concéntrica", "Pausa arriba"];
-  return `<div class="card"><div class="row gap"><input class="h-in" value="${esc(r.name)}" data-a-change="rName" placeholder="Nombre de la rutina"><button class="btn primary" data-a="rSave">Guardar cambios</button><button class="btn ghost" data-a="rDup">Duplicar</button><button class="btn danger" data-a="rDel">Eliminar</button></div>
+  return `<div class="card" data-rdirty><p class="muted small">Lo fijo de cada ejercicio (no cambia semana a semana): nombre y orden, video, tips de ejecución, tempo, descanso y reemplazos. Las series, reps, RIR, kg sugerido y comentarios de cada semana van en la tabla de arriba.</p><div class="row gap"><input class="h-in" value="${esc(r.name)}" data-a-change="rName" placeholder="Nombre de la rutina"><button class="btn primary" data-a="rSave">Guardar cambios</button><button class="btn ghost" data-a="rDup">Duplicar</button><button class="btn danger" data-a="rDel">Eliminar</button></div>
   ${r.exercises.map((e, k) => { const tp = String(e.tempo || "").split("-"); return `<div class="exed"><div class="row gap"><b class="exn">${k + 1}</b><input class="grow exname" list="exlib" value="${esc(e.name)}" data-a-change="exF" data-k="${k}" data-f="name" placeholder="Ejercicio (escribe y elige de la biblioteca)">
     <button class="icon-btn" data-a="exMove" data-k="${k}" data-n="-1" title="Subir">↑</button><button class="icon-btn" data-a="exMove" data-k="${k}" data-n="1" title="Bajar">↓</button><button class="icon-btn" data-a="exDel" data-k="${k}" title="Quitar">✕</button></div>
-    <div class="exgrid"><table class="tbl sets-t"><tr><th>Serie</th><th>Repeticiones</th><th>RIR</th><th></th></tr>
-      ${(e.sets || []).map((x, j) => `<tr><td>${j + 1}</td><td><input value="${esc(x.reps ?? "")}" data-a-change="setF" data-k="${k}" data-j="${j}" data-f="reps" placeholder="8-10" style="width:80px"></td><td><input value="${esc(x.rir ?? "")}" data-a-change="setF" data-k="${k}" data-j="${j}" data-f="rir" placeholder="1" style="width:56px"></td><td><button class="icon-btn" data-a="setDel" data-k="${k}" data-j="${j}">✕</button></td></tr>`).join("")}
-      <tr><td colspan="4"><button class="btn tiny" data-a="setAdd" data-k="${k}">＋ Serie</button></td></tr></table>
-    <div><label>Descanso sugerido (s)<input type="number" value="${e.rest || ""}" data-a-change="exF" data-k="${k}" data-f="rest" placeholder="180"></label>
+    <div class="exgrid"><div><label>Descanso sugerido (s)<input type="number" value="${e.rest || ""}" data-a-change="exF" data-k="${k}" data-f="rest" placeholder="180"></label>
       <div class="small muted">Tempo (segundos)</div><div class="tempo">${T.map((l, i) => `<label>${l}<input type="number" min="0" value="${esc(tp[i] ?? "")}" data-a-change="tempoF" data-k="${k}" data-i="${i}" placeholder="–"></label>`).join("")}</div></div></div>
-    <div class="row gap wk-ind"><label class="grow">Indicación para esta semana (la ve arriba del ejercicio)<input value="${esc(e.weekNote || "")}" data-a-change="exF" data-k="${k}" data-f="weekNote" placeholder="Ej: hombro: baja el peso y controla la bajada"></label><label>Peso sugerido (kg)<input value="${esc(e.wSug || "")}" data-a-change="exF" data-k="${k}" data-f="wSug" placeholder="–" style="width:110px"></label></div>
     <label>Link del video (YouTube, Drive, Instagram…)<input value="${esc(e.video || "")}" data-a-change="exF" data-k="${k}" data-f="video"></label>
     <label>Tips de ejecución (uno por línea; el cliente los ve como punteo)<textarea rows="3" data-a-change="exF" data-k="${k}" data-f="notes">${esc(String(e.notes || "").split(/\s*(?:\n|•)\s*/).filter(Boolean).join("\n"))}</textarea></label>
     <details ${e.alts?.length ? "open" : ""}><summary class="small"><b>Reemplazos de emergencia (${(e.alts || []).length})</b> · si la máquina está ocupada</summary>
@@ -353,6 +357,18 @@ act("exF", async (el) => {
 act("exAdd", () => { RE.r.exercises.push({ id: uid(), name: "", sets: [{ reps: "8-10", rir: 1 }, { reps: "8-10", rir: 1 }], alts: [] }); refresh(); });
 act("exDel", (el) => { RE.r.exercises.splice(+el.dataset.k, 1); refresh(); });
 act("exMove", (el) => { const a = RE.r.exercises, k = +el.dataset.k, n = k + +el.dataset.n; if (n < 0 || n >= a.length) return; [a[k], a[n]] = [a[n], a[k]]; refresh(); });
+// Textos de los cambios que ve el cliente: "serie 1: 8 → 10 reps", "serie 2: RIR 1 → al fallo", "se agrega la serie 3 (8 reps, RIR 1)"
+const rirT = (v) => (v === "F" ? "al fallo" : v === "" || v == null ? "sin RIR" : "RIR " + v);
+function setChanges(a, b) {
+  const out = [];
+  for (let j = 0; j < Math.max(a.length, b.length); j++) {
+    const o = a[j], e = b[j];
+    if (!o) out.push(`se agrega la serie ${j + 1} (${e.reps || "–"} reps, ${rirT(e.rir)})`);
+    else if (!e) out.push(`se quita la serie ${j + 1}`);
+    else { const t = []; if (String(o.reps ?? "") !== String(e.reps ?? "")) t.push(`${o.reps || "–"} → ${e.reps || "–"} reps`); if (String(o.rir ?? "") !== String(e.rir ?? "")) t.push(`${rirT(o.rir)} → ${rirT(e.rir)}`); if (t.length) out.push(`serie ${j + 1}: ${t.join(", ")}`); }
+  }
+  return out;
+}
 act("rSave", async () => {
   const c = await getClient(CW.cid), rv0 = reviewWindow(c, await getRoutines(CW.cid), await getSessions(CW.cid)), w = rv0?.open ? rv0.next : weekInfo(c, ymd());
   const old = JSON.parse(RE.orig), r = RE.r, list = [];
@@ -362,7 +378,9 @@ act("rSave", async () => {
       const o = old.find((x) => x.id === e.id); e.changed = false;
       if (!o) { list.push(`Nuevo ejercicio: ${e.name}`); e.changed = true; return; }
       if (o.name !== e.name) { list.push(`${o.name} → ${e.name}`); e.changed = true; }
-      if (fmtS(o.sets) !== fmtS(e.sets)) { list.push(`${e.name}: series ${fmtS(o.sets)} → ${fmtS(e.sets)}`); e.changed = true; }
+      if (fmtS(o.sets) !== fmtS(e.sets)) { setChanges(o.sets || [], e.sets || []).forEach((t) => list.push(`${e.name}: ${t}`)); e.changed = true; }
+      if ((o.rest || "") !== (e.rest || "") && e.rest) list.push(`${e.name}: descanso ${o.rest ? mmss(o.rest) : "–"} → ${mmss(e.rest)}`);
+      if ((o.tempo || "") !== (e.tempo || "") && e.tempo) list.push(`${e.name}: tempo ${e.tempo} (bajada-pausa-subida-pausa)`);
       if (old.indexOf(o) !== k) { list.push(`${e.name}: cambió de orden`); e.changed = true; }
       if ((o.weekNote || "") !== (e.weekNote || "") && e.weekNote) list.push(`${e.name}: ${e.weekNote}`);
       if ((o.wSug || "") !== (e.wSug || "") && e.wSug) list.push(`${e.name}: peso sugerido ${e.wSug} kg`);
@@ -374,7 +392,7 @@ act("rSave", async () => {
   const data = { name: r.name, exercises: r.exercises, note: r.note || "", order: r.order ?? 0, updatedAt: Date.now() };
   if (list.length) data.changes = { week: w.key, list: [...prevCh, ...list], at: Date.now() };
   await db.set(`clients/${CW.cid}/routines/${r.id}`, data);
-  if (rv0?.open) { await db.set("clients/" + CW.cid, { rutReview: { week: rv0.next.key, same: false, at: Date.now() } }); resetAlerts(); }
+  if (rv0?.open) { await db.set(`clients/${CW.cid}/routines/${r.id}`, { review: { week: rv0.next.key, same: !list.length, at: Date.now() } }); await reviewDone(rv0.next.key); }
   RE.orig = JSON.stringify(r.exercises); RE.origNote = r.note || ""; r.isNew = false;
   toast(list.length ? `Guardado · ${list.length} cambio(s) marcados para el cliente` : "Guardado"); refresh();
 });

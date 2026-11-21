@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.32.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.33.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -272,3 +272,9 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
   - metas vs requerimiento de la etapa = mantención (del plan o del cliente) × (1 + % de la etapa), si difiere más de 8 %;
   - el peso (promedio de los últimos 7 días) cambió ≥ 2 kg o ≥ 3 % respecto del peso con que se pusieron las metas (`plan.calc.kg`, se guarda al usar la calculadora, los macros de la pauta, editar metas o publicar; el import trae el peso del PDF).
 - Al publicar un plan se recalculan los avisos (evento `ima-alerts`).
+
+## v1.33.0 (20-nov) — Revisión semanal por rutina
+- **Pendientes para la semana N** (arriba de las rutinas): una cápsula por rutina del calendario (`reviewWindow(...).list`): "por revisar" (amarillo), "cambios sin guardar" (rojo), "con ajustes" / "sin cambios" (verde). Cada rutina se cierra con "Guardar cambios" (guarda `routine.review = {week, same}`) o "Sin cambios para la semana N" (`rSameOne`); cuando están todas, la semana queda revisada (`client.rutReview`). "Todas sin cambios" y "Deshacer" siguen. El aviso de la campana nombra las rutinas pendientes.
+- **Tabla semana a semana:** la semana siguiente ahora tiene una fila por serie con sus reps y su RIR (desplegable: fallo, 0–5), según la cantidad de series. Indicador "Cambios sin guardar" y confirmación al cambiar de rutina sin guardar.
+- **Lo que ve el cliente:** los cambios se describen serie por serie ("serie 1: 8 → 10 reps", "serie 2: RIR 1 → al fallo", "se agrega la serie 3…") más descanso, tempo, comentarios y kg sugerido, en la tarjeta "Esta semana hubo modificaciones en tu rutina" de la semana en que aplican.
+- **Detalle de ejercicios:** solo lo fijo (nombre y orden, video, tips, tempo, descanso, reemplazos). Se quitaron de ahí las series, el peso sugerido y la indicación semanal (viven en la tabla).
