@@ -128,6 +128,7 @@ export async function sessionView(id) {
     <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span>${has("train_tech") ? "<span>Técnica</span>" : ""}</div>
     ${ex.sets.map((st, j) => setRow(ex, i, j)).join("")}</div>
     <div class="row gap"><button class="btn tiny" data-a="addSet">${I.plus} Serie</button>${ex.sets.length > (ex.target.length || 0) ? `<button class="btn tiny ghost" data-a="delSet">Quitar serie</button>` : ""}<span class="grow"></span>${has("train_tech") ? '<span class="muted small">Técnica vs. semana pasada</span>' : ""}</div>
+    ${has("train_setvideo") ? `<div class="vidrem">🎥 Recuerda mandarle a tu coach el video de tu ejecución por WhatsApp, para asegurarte de que estás cumpliendo con la técnica e intensidad programada.</div>` : ""}
     <div id="sug-${i}">${sugHtml(ex)}</div>
   </div>
   <div class="row gap pad-x"><button class="btn ghost small grow" data-a="addExtra">${I.plus} Ejercicio extra</button><button class="btn ghost small grow" data-a="sessComment">${I.note} Comentario${s.comment ? " ●" : ""}</button></div>
@@ -162,7 +163,7 @@ function setInfo(ex, j) {
     if (dw) h += `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw} kg</span>`;
     if (dr) h += `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr} reps</span>`;
   }
-  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button>${!has("train_setvideo") ? "" : `<button class="lnk vid ${st.vid ? "on" : ""}" data-a="setVideo" data-j="${j}">${st.vid ? "🎥 Ver / mandar tu video" : "🎥 Video para tu coach (WhatsApp)"}</button>`}`;
+  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button>`;
   if (ref?.note) h += `<span class="lastnote">Tu nota de la semana pasada: ${esc(ref.note)}</span>`;
   return h;
 }

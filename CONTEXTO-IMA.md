@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.33.3**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.33.4**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -288,3 +288,6 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## v1.33.3 (20-nov) — Actualizaciones que no llegaban
 - GitHub Pages manda los archivos con caché de 10 min, y el service worker (red primero) los pedía pasando por ese caché: la app podía seguir con la versión anterior un rato. Ahora: `install` baja cada archivo con `cache: "reload"`, el `fetch` de archivos propios usa `cache: "no-cache"` (revalida con el servidor) y el registro usa `updateViaCache: "none"`.
+
+## v1.33.4 (20-nov)
+- Videos de las series: la función "Videos de sus series (vía WhatsApp)" queda en Servicios para distinguir los planes, pero en la sesión ya no hay botón para grabar/subir: solo un recordatorio al pie de cada ejercicio ("Recuerda mandarle a tu coach el video de tu ejecución por WhatsApp…"). Las acciones `setVideo`/`vidShare` siguen en train.js sin uso.

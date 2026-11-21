@@ -593,3 +593,5 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; col
 .rv-item small { color: var(--muted); } .rv-item.ok { border-color: var(--g); background: var(--g-s); } .rv-item.dz { border-color: var(--acc); background: var(--acc-s); }
 .psets { display: flex; flex-direction: column; gap: 4px; } .ps { display: flex; align-items: center; gap: 4px; white-space: nowrap; } .ps small { color: var(--muted); width: 18px; }
 .ps input { width: 64px; } .ps select { width: 92px; padding: 4px 6px; }
+
+.vidrem { margin-top: 10px; padding: 8px 10px; border-radius: 10px; background: var(--surf2); color: var(--muted); font-size: 12px; line-height: 1.4; }
