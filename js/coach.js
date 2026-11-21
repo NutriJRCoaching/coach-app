@@ -269,7 +269,7 @@ async function routinesView(c) {
     <p class="small">${rv.done ? "✓ Todo revisado. El cliente ve los ajustes en su semana." : rv.open ? "Ya terminó su semana: en cada rutina ajusta series, reps, RIR, kg sugerido y comentarios y toca “Guardar cambios”, o márcala “Sin cambios”." : `Se abre el ${fmtDate(rv.lastTrain)} (su último entrenamiento de la semana). Igual puedes dejarla lista antes.`}</p>
     <div class="rv-list">${rv.list.map((x) => { const dz = edDirty && ed.id === x.r.id; return `<button class="rv-item ${x.done ? "ok" : dz ? "dz" : ""}" data-a="rEdit" data-id="${x.r.id}">${x.done ? "✓" : dz ? "●" : "○"} <b>${esc(x.r.name)}</b><small>${dz ? "cambios sin guardar" : x.done ? (x.same ? "sin cambios" : "con ajustes") : "por revisar"}</small></button>`; }).join("")}</div></div>
     ${rv.done ? `<button class="btn small ghost" data-a="rvUndo" data-w="${rv.next.key}">Deshacer</button>` : `<button class="btn small" data-a="rvSame" data-w="${rv.next.key}">Todas sin cambios</button>`}</div></div>` : ""}
-  <div class="row gap"><div class="routine-list">${routines.map((r) => `<button class="btn ${ed?.id === r.id ? "primary" : ""}" data-a="rEdit" data-id="${r.id}">${esc(r.name)}</button>`).join("")}<button class="btn ghost" data-a="rNew">＋ Nueva rutina</button></div></div>
+  <div class="row gap"><div class="routine-list">${routines.map((r) => `<button class="btn ${ed?.id === r.id ? "primary" : ""}" data-a="rEdit" data-id="${r.id}">${esc(r.name)}</button>`).join("")}<button class="btn ghost" data-a="rNew">＋ Nueva rutina</button><label class="btn ghost" title="Archivo ima-rutinas.json con rutinas pasadas desde su planilla">Importar rutinas<input type="file" accept=".json,application/json" hidden data-a-change="rImport"></label></div></div>
   ${ed ? blockGrid(c, ed, sessions, rv) + `<details class="card-d" ${RE.openDetail ? "open" : ""}><summary class="card-t" data-a="rDetail">Ejercicios de ${esc(ed.name)}: agregar, quitar u ordenar · video, tips, tempo, descanso y reemplazos</summary>${routineEditor(ed, lib)}</details>` : `<p class="muted">Crea la primera rutina.</p>`}
   <details class="card-d" ${RE?.openCfg ? "open" : ""}><summary class="card-t" data-a="rCfg">Configuración: calendario semanal (qué rutina toca cada día) y cardio</summary>  <div><div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>
   <div class="cardio-ed"><div class="card-t">Cardio</div><div class="cardio-row"><label class="cw-n">Veces/semana<input type="number" min="0" value="${c.cardio?.perWeek || ""}" data-a-change="cardioSet" data-k="perWeek"></label><label class="grow">Tipo<input value="${esc(c.cardio?.type || "")}" data-a-change="cardioSet" data-k="type" placeholder="Ej: Intervalos en bicicleta estática"></label><label class="cw-n">Minutos<input type="number" value="${c.cardio?.minutes || ""}" data-a-change="cardioSet" data-k="minutes"></label><label class="cw-m">Intensidad<input value="${esc(c.cardio?.intensity || "")}" data-a-change="cardioSet" data-k="intensity" placeholder="7–8/10"></label></div>
@@ -288,6 +288,31 @@ act("schedSet", async (el) => { const c = await getClient(CW.cid); await db.set(
 act("cardioSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), [el.dataset.k]: el.type === "number" ? num(el.value) : el.value } }); toast("Guardado"); });
 act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = new Set(c.cardio?.days || []); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), days: [...s] } }); });
 act("rEdit", async (el) => { if (RE?.r && RE.r.id !== el.dataset.id && (JSON.stringify(RE.r.exercises || []) !== RE.orig || (RE.r.note || "") !== (RE.origNote || "")) && !(await confirmBox(`Tienes cambios sin guardar en ${RE.r.name}. ¿Salir sin guardarlos?`))) return; const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: { id: el.dataset.id, ...r }, orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
+// Importar rutinas (ima-rutinas.json armado desde la planilla del cliente): reemplaza sus rutinas actuales
+const nkx = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+act("rImport", async (el) => {
+  let data; try { data = JSON.parse(await el.files[0].text()); } catch { return toast("El archivo no es válido"); } el.value = "";
+  if (data.type !== "ima-rutinas" || !Array.isArray(data.routines)) return toast("Este archivo no es de rutinas de IMA");
+  const c = await getClient(CW.cid), old = await getRoutines(CW.cid);
+  if (data.client && nkx(data.client).split(" ")[0] !== nkx(c.name).split(" ")[0] && !(await confirmBox(`Este archivo es de ${data.client} y estás en la ficha de ${c.name}. ¿Importarlo igual?`))) return;
+  if (!(await confirmBox(`Se reemplazan las ${old.length} rutinas actuales de ${c.name} (${old.map((r) => r.name).join(", ") || "ninguna"}) por: ${data.routines.map((r) => r.name).join(", ")}. Los entrenamientos ya registrados no se tocan.`))) return;
+  const lib = (await db.get("library/exercises"))?.items || []; let libNew = 0;
+  for (const r of old) await db.del(`clients/${CW.cid}/routines/${r.id}`);
+  const sched = {}, ids = [];
+  for (const r of data.routines) {
+    const id = uid(); ids.push(id);
+    const exercises = (r.exercises || []).map((e) => {
+      let l = lib.find((x) => nkx(x.name) === nkx(e.name));
+      if (!l) { l = { id: uid(), name: e.name.trim(), group: "", video: "", alts: [], tips: e.notes || "" }; lib.push(l); libNew++; } else if (!l.tips && e.notes) l.tips = e.notes;
+      return { id: uid(), name: l.name, libId: l.id, sets: (e.sets || []).map((x) => ({ reps: String(x.reps ?? ""), rir: x.rir ?? "" })), notes: e.notes || l.tips || "", video: e.video || l.video || "", alts: (l.alts || []).map((a) => ({ name: a.name, video: a.video || "", tips: a.tips || "" })), wSug: e.wSug ?? "", ...(e.weekNote ? { weekNote: e.weekNote } : {}) };
+    });
+    await db.set(`clients/${CW.cid}/routines/${id}`, { name: r.name, note: r.note || "", exercises, importedAt: Date.now() }, false);
+    for (const d of r.days || []) sched[d] = id;
+  }
+  if (libNew || lib.length) await db.set("library/exercises", { items: lib }, false);
+  await db.set("clients/" + CW.cid, { schedule: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, sched[d] || null])), rutReview: null }); // null explícito: Firestore mezcla mapas
+  RE = null; resetAlerts(); toast(`Listo: ${data.routines.length} rutinas importadas${Object.keys(sched).length ? " con sus días" : ""}`, 4000); refresh();
+});
 act("rNew", () => { RE = { cid: CW.cid, r: { id: uid(), name: "Nueva rutina", exercises: [], isNew: true }, orig: "[]" }; refresh(); });
 // Vista del bloque: lo indicado y lo hecho semana a semana, y la próxima semana editable en la misma tabla
 function blockGrid(c, r, sessions, rv) {
