@@ -4,7 +4,7 @@ import { S } from "./state.js";
 import { ymd, addDays, weekInfo, diffDays, fmtDate, DAYS } from "./util.js";
 import { getRoutines, getSessions, getDays } from "./data.js";
 import { weekPlan, reviewWindow, weightCorr, phaseAt, PHASE_PCT } from "./data.js";
-import { GROUPS } from "./foods.js";
+import { GROUPS, pautaExtras, pautaMac } from "./foods.js";
 
 export const SERVICES = { completa: "Coaching 1-1", entrenamiento: "Entrenamiento", nutricion: "Nutrición" };
 export const SERVICE_GROUPS = [["completa", "Coaching 1-1"], ["entrenamiento", "Entrenamiento"], ["nutricion", "Nutrición"], ["", "Sin definir"]];
@@ -51,7 +51,7 @@ function planChecks(c, x, plans, add) {
     const P = plans[ph], T = P.targets || {}, tag = `Plan de ${ph}`;
     if (!+T.kcal) continue;
     // 1) Pauta vs metas
-    if (Object.values(P.pauta || {}).some((v) => +v)) { const o = offTxt(pMacA(P.pauta), T); if (o.length) add("y", `${tag}: la pauta no calza con las metas (${o.join(" · ")})`, "plan"); }
+    if (Object.values(P.pauta || {}).some((v) => +v)) { const o = offTxt(pautaMac(P.pauta, pautaExtras(P.menus)), T); if (o.length) add("y", `${tag}: la pauta no calza con las metas (${o.join(" · ")})`, "plan"); }
     else add("y", `${tag}: falta la pauta por porciones`, "plan");
     // 2) Cada opción vs su pauta (porciones) y vs las metas (macros)
     for (const mn of P.menus || []) {

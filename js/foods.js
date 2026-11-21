@@ -31,3 +31,13 @@ export function seedToFood(r, i) {
   return { id: "b" + i, name, cat, medida, portion: g,
     kcal: m[0] * f, cho: m[1] * f, fat: m[2] * f, prot: m[3] * f, src: "base" };
 }
+
+// Extras fijos del plan (ej. Nutella 15 g): los que están en TODAS las opciones normales, fuera de una comida libre.
+// La pauta son porciones de intercambio; estos extras se suman aparte para comparar con las metas.
+export function pautaExtras(menus, leg = false) {
+  const ops = (menus || []).filter((m) => !!m.leg === leg && !m.noTime); const src = ops.length ? ops : (menus || []).filter((m) => !m.noTime);
+  if (!src.length) return [];
+  const per = src.map((mn) => { const o = {}; for (const m of mn.meals || []) if (!(m.free && +m.budget?.kcal > 0)) for (const it of m.items || []) if ((!it.cat || !GROUPS[it.cat]?.[4]) && +it.kcal) { const k = (it.name || "").trim().toLowerCase(), x = (o[k] ||= { name: it.name, g: 0, kcal: 0, cho: 0, fat: 0, prot: 0 }); for (const f of ["g", "kcal", "cho", "fat", "prot"]) x[f] += +it[f] || 0; } return o; });
+  return Object.keys(per[0]).filter((k) => per.every((o) => o[k])).map((k) => { const x = { name: per[0][k].name }; for (const f of ["g", "kcal", "cho", "fat", "prot"]) x[f] = per.reduce((a, o) => a + o[k][f], 0) / per.length; return x; });
+}
+export const pautaMac = (pauta, extras = []) => { const t = { kcal: 0, cho: 0, fat: 0, prot: 0 }; for (const [g, n] of Object.entries(pauta || {})) { const G = GROUPS[g]; if (G) { t.kcal += n * G[0]; t.cho += n * G[1]; t.fat += n * G[2]; t.prot += n * G[3]; } } for (const e of extras) for (const k in t) t[k] += e[k]; return t; };

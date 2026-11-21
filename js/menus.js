@@ -7,7 +7,7 @@ import { S, refresh } from "./state.js";
 import { act, toast, sheet, closeSheet, confirmBox, $, $$ } from "./ui.js";
 import { esc, r0, r1, num, uid, LS } from "./util.js";
 import { getFoodBase } from "./data.js";
-import { GROUPS } from "./foods.js";
+import { GROUPS, pautaExtras, pautaMac } from "./foods.js";
 
 const nk = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const GORDER = Object.keys(GROUPS);
@@ -239,7 +239,7 @@ const fmtN = (v) => (v == null || v === "" ? "" : String(Math.round(+v * 100) / 
 // ¿La pauta (con el ajuste de la etapa, si tiene) calza con las metas vigentes? kcal ±5 %, macros ±10 %
 // ¿La pauta calza con las metas de esta etapa? kcal ±5 %, macros ±10 %
 function pautaWarn() {
-  const T = MW.targets, m = pMac(MW.pauta), L = [["kcal", "kcal", 0.05], ["cho", "CHO", 0.1], ["fat", "lípidos", 0.1], ["prot", "proteína", 0.1]];
+  const T = MW.targets, m = pautaMac(MW.pauta, pautaExtras(MW.menus)), L = [["kcal", "kcal", 0.05], ["cho", "CHO", 0.1], ["fat", "lípidos", 0.1], ["prot", "proteína", 0.1]];
   if (!Object.values(MW.pauta).some((v) => +v) || !+T.kcal) return "";
   const off = L.filter(([k, , t]) => +T[k] && Math.abs(m[k] / T[k] - 1) > t);
   if (!off.length) return `<div class="note okn">✓ La pauta calza con las metas de <b>${esc(MW.phase)}</b>.</div>`;
@@ -254,7 +254,7 @@ function calcRes(c) {
   const prot = Math.round(pk * kg), fat = Math.round(fk * kg); return { kcal, prot, fat, cho: Math.max(0, Math.round((kcal - prot * 4 - fat * 9) / 4)), pct, pk, fk, m };
 }
 function targetsCard(c) {
-  const R = calcRes(c), T = MW.targets, k = MW.calc, pm = pMac(MW.pauta), col = phaseColor(MW.phase);
+  const R = calcRes(c), T = MW.targets, k = MW.calc, pm = pautaMac(MW.pauta, pautaExtras(MW.menus)), col = phaseColor(MW.phase);
   return `<div class="card tg-card" style="--pc:${col}"><div class="row between"><div><div class="card-t">Metas de ${esc(MW.phase)}</div><span class="muted small">Lo que la app le muestra al cliente las semanas de esta etapa.</span></div>
     <div class="tg-now">${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([x, l]) => `<label>${l}<input type="number" value="${T[x] ?? ""}" data-a-change="meTg" data-k="${x}" placeholder="–"></label>`).join("")}</div></div>
     <div class="tg-calc"><span class="muted small">Calculadora:</span>
@@ -274,13 +274,17 @@ function phaseStrip(c) {
     <b>${esc(x.phase)}</b><small>${sem(x)}${when(x) ? " · " + when(x) : ""}</small>${x.ready ? '<span class="badge g">Plan listo</span>' : `<span class="badge ${x.current || (x.startsIn != null && x.startsIn <= 2) ? "r" : "y"}">Falta el plan</span>`}</button>`).join("")}</div>`;
 }
 function pautaCard(c) {
-  const pn = MW.pauta, pl = MW.pautaLeg, mn = pMac(pn), ml = pMac(pl), goal = MW.targets;
+  const pn = MW.pauta, pl = MW.pautaLeg, en = pautaExtras(MW.menus), el = MW.menus.some((m) => m.leg) ? pautaExtras(MW.menus, true) : en;
+  const mn = pautaMac(pn, en), ml = pautaMac(pl, el), goal = MW.targets;
+  const exNames = [...new Set([...en, ...el].map((e) => e.name))], exOf = (L, n) => L.find((e) => e.name === n);
+  const exTd = (e) => (e ? `${e.g ? r0(e.g) + " g · " : ""}${r0(e.kcal)} kcal <span class="muted small">C ${r1(e.cho)} · L ${r1(e.fat)} · P ${r1(e.prot)}</span>` : "–");
   const adec = (v, g) => (g ? `<small class="${Math.abs(v / g - 1) <= 0.05 ? "g" : Math.abs(v / g - 1) <= 0.1 ? "y" : "r"}">${r0((v / g) * 100)} %</small>` : "");
   const empty = !Object.values(pn).some((v) => +v);
-  return `<details class="card pauta-card" ${empty || MW.openPauta ? "open" : ""}><summary class="card-t" data-a="mePautaOpen">Pauta de alimentación${empty ? ' <span class="badge y">Por crear</span>' : ` <span class="muted small">· ${r0(mn.kcal)} kcal</span>`}</summary>
-  <p class="muted small">Porciones por grupo al día. Abajo ves sus kcal y macros (por porciones de intercambio) contra las metas de esta etapa. Se guarda con “Guardar y publicar”.</p>
+  return `<details class="card pauta-card" ${empty || MW.openPauta ? "open" : ""}><summary class="card-t" data-a="mePautaOpen">Pauta de alimentación${empty ? ' <span class="badge y">Por crear</span>' : ` <span class="muted small">· ${r0(mn.kcal)} kcal${en.length ? " con extras" : ""}</span>`}</summary>
+  <p class="muted small">Porciones por grupo al día. Abajo ves sus kcal y macros (porciones de intercambio + los extras que van en todas las opciones, como un postre fijo) contra las metas de esta etapa. Se guarda con “Guardar y publicar”.</p>
   <table class="tbl pauta-t"><tr><th>Grupo</th><th>Día normal</th><th>Día con legumbres</th></tr>
   ${PG().map((g) => `<tr><td>${gdot(g)}${esc(g)}</td><td><input type="number" step="0.25" min="0" value="${fmtN(pn[g])}" data-a-change="mePauta" data-p="n" data-g="${esc(g)}"></td><td><input type="number" step="0.25" min="0" value="${fmtN(pl[g])}" data-a-change="mePauta" data-p="l" data-g="${esc(g)}"></td></tr>`).join("")}
+  ${exNames.map((n) => `<tr class="exrow"><td><span class="badge">Extra</span> ${esc(n)}<br><span class="muted small">viene de las opciones (está en todas)</span></td><td>${exTd(exOf(en, n))}</td><td>${exTd(exOf(el, n))}</td></tr>`).join("")}
   ${[["kcal", "Kcal"], ["cho", "CHO (g)"], ["fat", "Lípidos (g)"], ["prot", "Proteína (g)"]].map(([k, l]) => `<tr class="ptot"><td><b>${l}</b>${goal[k] ? ` <span class="muted small">meta ${goal[k]}</span>` : ""}</td><td><b>${r0(mn[k])}</b> ${adec(mn[k], goal[k])}</td><td><b>${r0(ml[k])}</b> ${adec(ml[k], goal[k])}</td></tr>`).join("")}</table>
   <button class="btn small" data-a="mePautaCopy">Copiar día normal al día con legumbres (−2 cereales, −1 carnes, +2 legumbres)</button></details>`;
 }
@@ -352,7 +356,7 @@ act("meFrom", (el) => { const P = el.dataset.p ? S._coachClient.plans?.[el.datas
 act("meTg", (el) => { if (el.value === "") delete MW.targets[el.dataset.k]; else MW.targets[el.dataset.k] = num(el.value); const kg = S._coachClient?.lastKg; if (kg) MW.calc.kg = Math.round(kg * 10) / 10; redraw(); });
 act("meCalc", (el) => { if (el.value === "") delete MW.calc[el.dataset.k]; else MW.calc[el.dataset.k] = num(el.value); redraw(); });
 act("meTgCalc", () => { const c = S._coachClient, R = calcRes(c); MW.targets = { kcal: R.kcal, cho: R.cho, fat: R.fat, prot: R.prot }; if (c.lastKg) MW.calc.kg = Math.round(c.lastKg * 10) / 10; redraw(); });
-act("meTgPauta", () => { const m = pMac(MW.pauta), kg = S._coachClient?.lastKg; MW.targets = { kcal: r0(m.kcal), cho: r0(m.cho), fat: r0(m.fat), prot: r0(m.prot) }; if (kg) MW.calc.kg = Math.round(kg * 10) / 10; redraw(); });
+act("meTgPauta", () => { const m = pautaMac(MW.pauta, pautaExtras(MW.menus)), kg = S._coachClient?.lastKg; MW.targets = { kcal: r0(m.kcal), cho: r0(m.cho), fat: r0(m.fat), prot: r0(m.prot) }; if (kg) MW.calc.kg = Math.round(kg * 10) / 10; redraw(); });
 act("mePauta", (el) => { const p = el.dataset.p === "l" ? MW.pautaLeg : MW.pauta; if (el.value === "") delete p[el.dataset.g]; else p[el.dataset.g] = num(el.value); MW.openPauta = true; redraw(); });
 act("mePautaOpen", (el) => { MW.openPauta = !el.parentElement.open; });
 act("mePautaCopy", async () => {
