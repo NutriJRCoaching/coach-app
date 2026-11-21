@@ -248,7 +248,7 @@ function registerSW() {
     document.body.appendChild(d);
   };
   try { setTimeout(() => sessionStorage.removeItem("justUpdated"), 10000); } catch {}
-  navigator.serviceWorker.register("sw.js").then((r) => {
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((r) => {
     reg = r;
     if (r.waiting && navigator.serviceWorker.controller) ask();
     r.addEventListener("updatefound", () => {

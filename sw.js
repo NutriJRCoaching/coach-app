@@ -1,11 +1,12 @@
 // Service worker: guarda la app en el celular para que abra sin conexión.
 // Cada vez que publiques cambios, sube el número de versión.
-const VERSION = "v73";
+const VERSION = "v74";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "css/app.css", "icons/icon-192.png?v=ima2", "icons/icon-512.png?v=ima2", "icons/logo.png?v=ima2", "icons/badge-96.png?v=ima2", "js/seed-jr.js", "js/seed-plan.js",
   "js/app.js", "js/config.js", "js/db.js", "js/util.js", "js/ui.js", "js/state.js", "js/data.js", "js/foods.js", "js/realfoods.js", "js/icons.js",
   "js/client.js", "js/train.js", "js/coach.js", "js/demo.js", "js/voice.js", "js/push.js", "js/offchile.js", "js/menus.js", "js/alerts.js", "js/features.js", "js/onboarding.js", "js/intercambio.js", "js/recorder.js", "js/player.js"];
 
-self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL))); });
+// cache: "reload" = baja cada archivo del servidor (no del caché del navegador, que GitHub guarda hasta 10 min)
+self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" }))))); });
 // La versión nueva espera hasta que el usuario toque "Actualizar"
 self.addEventListener("message", (e) => { if (e.data === "skip") self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
@@ -18,7 +19,7 @@ self.addEventListener("fetch", (e) => {
   const own = u.origin === location.origin, sdk = ["www.gstatic.com", "fonts.googleapis.com", "fonts.gstatic.com"].includes(u.hostname);
   if (!own && !sdk) return; // Firestore, Open Food Facts, etc. van directo a la red
   // Red primero (para recibir actualizaciones), y si no hay señal, lo guardado
-  e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); return r; })
+  e.respondWith(fetch(own ? new Request(e.request, { cache: "no-cache" }) : e.request).then((r) => { const copy = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); return r; })
     .catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match("index.html"))));
 });
 // Avisos que llegan con la app cerrada (Firebase Cloud Messaging)

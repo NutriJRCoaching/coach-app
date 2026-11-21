@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.33.2**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.33.3**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -285,3 +285,6 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.33.2 (20-nov)
 - Vuelve "Videos de sus series (vía WhatsApp)": botón "🎥 Video para tu coach (WhatsApp)" en cada serie; graba o elige el video y lo comparte por el menú del celular con los datos de la serie. Se quitó el campo de enlace a Drive/YouTube.
 - Arreglo: en ejercicios con Izq/Der la etiqueta usaba la clase `side`, que choca con la barra lateral del panel (`.side` con alto de pantalla completa) y descuadraba la serie. Ahora es `sidel`. Pasaba también en el celular.
+
+## v1.33.3 (20-nov) — Actualizaciones que no llegaban
+- GitHub Pages manda los archivos con caché de 10 min, y el service worker (red primero) los pedía pasando por ese caché: la app podía seguir con la versión anterior un rato. Ahora: `install` baja cada archivo con `cache: "reload"`, el `fetch` de archivos propios usa `cache: "no-cache"` (revalida con el servidor) y el registro usa `updateViaCache: "none"`.
