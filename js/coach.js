@@ -11,7 +11,7 @@ import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCo
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
-import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, CHECKIN, CHECKIN_OLD } from "./data.js";
+import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, PHASE_PCT, phaseAt, hasPlans, CHECKIN, CHECKIN_OLD } from "./data.js";
 import { weeksTable } from "./client.js";
 import { GROUPS } from "./foods.js";
 import { menusEditor } from "./menus.js";
@@ -36,7 +36,7 @@ async function allAlerts(clients) {
 }
 const chip = (a, cid) => `<a class="badge ${a.c === "i" ? "" : a.c}" href="#coach/c/${cid}/${a.tab}">${esc(a.t)}</a>`;
 
-const TABS = [["datos", "Datos y objetivos"], ["resumen", "Timeline semanal"], ["etapas", "Etapas"], ["entrenos", "Entrenamientos"], ["rutinas", "Rutinas"], ["comida", "Alimentación"], ["plan", "Plan alimentación"], ["progreso", "Progreso"], ["checkins", "Check-ins"], ["feedback", "Retroalimentación"]];
+const TABS = [["datos", "Datos y objetivos"], ["resumen", "Timeline semanal"], ["etapas", "Etapas"], ["entrenos", "Entrenamiento"], ["comida", "Alimentación"], ["plan", "Plan alimentación"], ["progreso", "Progreso"], ["checkins", "Check-ins"], ["feedback", "Retroalimentación"]];
 let CW = null; // semana que está viendo el coach
 let PF = null; // último cliente precargado
 
@@ -121,7 +121,7 @@ async function clientPanel(cid, tab, AA) {
   if (!CW || CW.cid !== cid) CW = { cid, n: now.n };
   const wDate = addDays(c.startDate || ymd(), (CW.n - 1) * 7);
   const w = weekInfo(c, wDate);
-  const views = { resumen: tlView, etapas: stagesView, entrenos: sessionsView, rutinas: routinesView, comida: foodView, plan: async (c) => { const cc = planCtx(c); S._coachClient = cc; return planBanner(cc) + (await menusEditor(cc)); }, progreso: progView, checkins: checkinsView, feedback: feedbackView, datos: dataView };
+  const views = { resumen: tlView, etapas: stagesView, entrenos: trainingView, rutinas: trainingView, comida: foodView, plan: async (c) => { const cc = await planCtx(c); S._coachClient = cc; return menusEditor(cc); }, progreso: progView, checkins: checkinsView, feedback: feedbackView, datos: dataView };
   const weekNav = ["resumen", "entrenos", "comida", "feedback"].includes(tab);
   return `<div class="row between"><h1>${esc(c.name)} <small class="muted">· ${c.service ? esc(SERVICES[c.service]) : "Asesoría sin definir"}${c.startDate ? ` · Semana ${now.n}` : ""} · <span style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</span></small></h1>
   <button class="btn small" data-a="previewClient" data-id="${cid}">Ver como cliente</button></div>
@@ -189,6 +189,11 @@ act("tlMetric", (el) => { TLM.m = el.dataset.k; refresh(); });
 act("tlMonth", (el) => { TLM.month = el.dataset.m; refresh(); });
 act("tlWeek", (el) => { CW.n = +el.dataset.w; refresh(); });
 
+// ---------- Entrenamiento (20-nov): una sola pestaña para la revisión semanal
+// 1) lo que hizo esta semana (compacto) · 2) la rutina semana a semana con la próxima editable · 3) configuración plegada
+async function trainingView(c, w) {
+  return `<div class="card-t mt">Semana ${w.n} · lo que hizo</div><div class="ses-grid">${await sessionsView(c, w)}</div>${await routinesView(c)}`;
+}
 // ---------- Entrenamientos de la semana
 async function sessionsView(c, w) {
   const all = await getSessions(c.id);
@@ -198,19 +203,15 @@ async function sessionsView(c, w) {
   const routines = await getRoutines(c.id);
   return list.map((s) => {
     const prev = prevSession(all, s), sv = s.survey || {}, rt = routines.find((r) => r.id === s.routineId);
-    return `<div class="card"><div class="row between"><h3>${esc(s.routineName)} <small class="muted">${fmtDate(s.date, true)} · ${s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) + " min" : ""}</small></h3>
+    return `<div class="card sesc"><div class="row between"><h3>${esc(s.routineName)} <small class="muted">${fmtDate(s.date, true)} · ${s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) + " min" : ""}</small></h3>
     <div class="row gap small">${sv.intensidad ?? sv.dureza ? `<span class="pill">Intensidad ${sv.intensidad ?? sv.dureza}/10</span>` : ""}${sv.fuerza ? `<span class="pill">Fuerza ${sv.fuerza}/5</span>` : ""}${sv.energia ? `<span class="pill">Energía ${sv.energia}/5</span>` : ""}${sv.doms ? `<span class="pill">DOMS ${sv.doms}/5</span>` : ""}${sv.general ? `<span class="pill">General ${sv.general}/5</span>` : ""}${sv.articular === "si" ? `<span class="badge r">Molestia articular: ${esc(sv.articularDet || "")}</span>` : ""}${sv.orden === "no" ? `<span class="badge y">No siguió el orden</span>` : ""}</div></div>
     ${s.comment ? `<div class="note">💬 ${esc(s.comment)}</div>` : ""}
     ${audios.find((a) => a.id === s.id)?.data ? `<div class="note">🎙️ Audio del cliente (${audios.find((a) => a.id === s.id).secs || "?"} s)<br><audio controls src="${audios.find((a) => a.id === s.id).data}"></audio></div>` : ""}
-    <table class="tbl"><tr><th>Ejercicio</th><th>Serie</th><th>Esta semana</th><th>Semana anterior</th><th>Δ</th><th>Nota</th></tr>
+    <details><summary class="small muted">Ver detalle por serie</summary><table class="tbl"><tr><th>Ejercicio</th><th>Serie</th><th>Esta semana</th><th>Semana anterior</th><th>Δ</th><th>Nota</th></tr>
     ${s.exercises.map((e) => e.sets.map((x, j) => { const ref = refSet(prev, e.exId, j); const dw = ref && x.w !== "" && ref.w !== "" ? r1(x.w - ref.w) : null, dr = ref && x.r !== "" && ref.r !== "" ? x.r - ref.r : null;
       return `<tr class="${e.extra ? "extra-row" : ""}">${j === 0 ? `<td rowspan="${e.sets.length}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge extra">Extra</span>' : ""}${e.replaced ? `<br><small class="muted">reemplazó a ${esc(e.replacedFrom)}</small>` : ""}${e.tech ? `<br><span class="badge tech-${e.tech}">Técnica ${e.tech}</span>` : ""}${exnotes.find((n) => n.id === e.exId)?.text ? `<br><small class="muted">⚙ ${esc(exnotes.find((n) => n.id === e.exId).text)}</small>` : ""}</td>` : ""}
       <td>${j + 1}${e.target?.[j] ? `<br><small class="muted">plan ${esc(e.target[j].reps)}${e.target[j].rir !== "" && e.target[j].rir != null ? "@" + e.target[j].rir : ""}</small>` : ""}</td><td><b>${x.w || "–"} × ${x.r || "–"}</b>${x.rir !== "" ? ` RIR ${x.rir}` : ""}${x.tech ? ` <span class="badge tech-${x.tech}">téc. ${x.tech}</span>` : ""}</td><td class="muted">${ref ? `${ref.w}×${ref.r}${ref.rir !== "" ? " RIR " + ref.rir : ""}` : "—"}</td>
-      <td>${(() => { const pg = setProgress(x, ref); return pg ? `<span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</td><td class="small">${esc(x.note || "")}</td></tr>`; }).join("")).join("")}</table>
-    ${rt ? `<details class="nextw" open><summary class="card-t">✎ Para la próxima vez · ${esc(rt.name)}</summary>
-      <p class="muted small">Se guarda al salir de cada casilla y el cliente lo ve en su rutina (los cambios quedan marcados para la semana que viene).</p>
-      <label>Comentario general de la rutina<textarea rows="2" data-a-change="nwNote" data-r="${rt.id}" placeholder="Ej: Buena semana: sube 2,5 kg en las prensas y cuida la bajada en espalda.">${esc(rt.note || "")}</textarea></label>
-      <div class="nw-grid">${rt.exercises.map((e) => `<label>${esc(e.name)}<span class="row gap"><input class="grow" value="${esc(e.weekNote || "")}" data-a-change="nwEx" data-r="${rt.id}" data-e="${e.id}" data-f="weekNote" placeholder="Indicación"><input value="${esc(e.wSug || "")}" data-a-change="nwEx" data-r="${rt.id}" data-e="${e.id}" data-f="wSug" placeholder="kg" style="width:64px"></span></label>`).join("")}</div></details>` : ""}</div>`;
+      <td>${(() => { const pg = setProgress(x, ref); return pg ? `<span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</td><td class="small">${esc(x.note || "")}</td></tr>`; }).join("")).join("")}</table></details></div>`;
   }).join("");
 }
 
@@ -229,27 +230,27 @@ act("nwNote", (el) => { const v = el.value.trim(); patchRoutine(el.dataset.r, (r
 act("nwEx", (el) => { const v = el.value.trim(), f = el.dataset.f; patchRoutine(el.dataset.r, (r) => { const e = r.exercises.find((x) => x.id === el.dataset.e); if (e) e[f] = v; }, v ? `${r_name(el)}: ${f === "wSug" ? "peso sugerido " + v + " kg" : v}` : ""); });
 const r_name = (el) => el.closest("label")?.firstChild?.textContent?.trim() || "Ejercicio";
 
-// ---------- Plan de alimentación: etapa vigente bien visible y metas de esa etapa
-// El editor compara la pauta con las metas de la etapa de esta semana (si no hay etapa, con las metas generales).
-function planCtx(c) {
-  const a = applyStage(c), s = a.stage || null;
-  return { ...c, kcal: a.kcal, cho: a.cho, fat: a.fat, prot: a.prot, stageInfo: s ? { phase: s.phase, from: s.from, to: s.to, adj: s.adj || null, note: s.note || "" } : null };
+// ---------- Plan de alimentación por etapa: aquí se diseña un plan para cada etapa del Timeline; la app del cliente
+// muestra solo el de la etapa de esa semana. Se pasan al editor las etapas (con sus semanas) y los valores para la calculadora.
+async function planCtx(c) {
+  const now = c.startDate ? weekInfo(c, ymd()).n : 1, st = validSt(c), cur = phaseAt(c) || "Mantención";
+  // Plan antiguo (uno solo): pasa a ser el plan de la etapa actual, con las metas generales (o las de su pauta)
+  if (!hasPlans(c) && ((c.menus || []).length || Object.keys(c.pauta || {}).length)) {
+    const t = {}; for (const k of ["kcal", "cho", "fat", "prot"]) if (+c[k]) t[k] = +c[k];
+    c.plans = { [cur]: { menus: c.menus || [], pauta: c.pauta || {}, pautaLeg: c.pautaLeg || {}, targets: t, migrated: true, at: Date.now() } };
+    await db.set("clients/" + c.id, { plans: c.plans });
+  }
+  const used = new Map();
+  for (const x of st) { const u = used.get(x.phase) || { phase: x.phase, ranges: [] }; u.ranges.push([+x.from, +x.to]); used.set(x.phase, u); }
+  for (const ph of Object.keys(c.plans || {})) if (!used.has(ph)) used.set(ph, { phase: ph, ranges: [] });
+  if (!used.size) used.set(cur, { phase: cur, ranges: [] });
+  const list = [...used.values()].map((u) => { const r = u.ranges.sort((a, b) => a[0] - b[0]), on = r.some(([a, b]) => now >= a && now <= b), nx = r.find(([a]) => a > now);
+    return { ...u, color: phaseColor(u.phase), current: on || (!st.length && u.phase === cur), startsIn: nx ? nx[0] - now : null, past: r.length && r.every(([, b]) => b < now), ready: !!c.plans?.[u.phase] }; })
+    .sort((a, b) => (b.current - a.current) || ((a.startsIn ?? 99) - (b.startsIn ?? 99)) || a.past - b.past);
+  const def = (await db.get("library/phases")) || {};
+  return { ...c, phaseList: list, curPhase: list.find((x) => x.current)?.phase || list[0].phase, lastKg: (await lastWeight(c.id)) || c.weightStart || null, pctOf: (p) => def.pct?.[p] ?? PHASE_PCT[p] ?? 0, weekOf: (n) => addDays(c.startDate || ymd(), (n - 1) * 7) };
 }
-function planBanner(c) {
-  const s = c.stageInfo, col = s ? phaseColor(s.phase) : "var(--muted)";
-  return `<div class="card plan-stage" style="--pc:${col}"><div class="ps-l"><small>Plan de alimentación · etapa de esta semana</small>
-    <div class="ps-name">${s ? esc(s.phase) : "Sin etapa"}</div>
-    <small class="muted">${s ? `Semanas ${s.from}–${s.to}${s.adj ? " · ajuste del plan: " + esc(adjTxt(s.adj)) : ""}` : "Las metas son las generales del cliente (Datos y objetivos)."}</small></div>
-    <div class="ps-goal">${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([k, l]) => `<div><small>${l}</small><b>${c[k] ? r0(c[k]) : "–"}</b></div>`).join("")}</div>
-    <label class="ps-sel">Cambiar la etapa de esta semana<select data-a-change="planPhase"><option value="">${s ? "— Quitar etapa —" : "— Elegir —"}</option>${Object.keys(PHASES).map((p) => `<option ${s?.phase === p ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
-    <small class="muted">${s ? "Cambia la etapa completa (todas sus semanas)." : "Crea una etapa de 8 semanas desde esta semana."} Las calorías y macros se recalculan con la fórmula de Etapas.</small></label></div>`;
-}
-act("planPhase", async (el) => {
-  const c = await getClient(CW.cid), st = validSt(c), now = weekInfo(c, ymd()).n, i = st.findIndex((x) => now >= +x.from && now <= +x.to), v = el.value;
-  if (i >= 0) { if (v) st[i] = { ...st[i], phase: v, pct: "", kcal: "", cho: "", fat: "", prot: "" }; else st.splice(i, 1); }
-  else if (v) st.push({ phase: v, from: now, to: now + 7 });
-  await stStore(c, st); toast(v ? `Etapa: ${v}. Revisa si la pauta calza con las nuevas metas.` : "Etapa quitada");
-});
+
 
 // ---------- Rutinas (editor)
 let RE = null; // rutina en edición
@@ -263,12 +264,14 @@ async function routinesView(c) {
   return `${rv ? `<div class="card review ${rv.done ? "ok" : rv.open ? "due" : ""}"><div class="row between"><div><div class="card-t">Revisión de la semana ${rv.next.n} · parte el ${fmtDate(rv.next.first, true)}</div>
     <p class="small">${rv.done ? `✓ Revisada${c.rutReview?.same ? " · sigue igual" : " · con cambios"}.` : rv.open ? "Ya terminó su semana de entrenamiento: revisa reps, intensidad, pesos sugeridos, indicaciones por ejercicio, orden y selección. Si queda igual, toca “Seguir igual”." : `Se abre el ${fmtDate(rv.lastTrain)} (su último entrenamiento de la semana). Igual puedes dejarla lista antes.`}</p></div>
     ${rv.done ? `<button class="btn small ghost" data-a="rvUndo" data-w="${rv.next.key}">Deshacer</button>` : `<button class="btn primary small" data-a="rvSame" data-w="${rv.next.key}">Seguir igual la semana ${rv.next.n}</button>`}</div></div>` : ""}
-  <div class="card"><div class="card-t">Calendario semanal (qué rutina toca cada día)</div><div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>
+  <div class="row gap"><div class="routine-list">${routines.map((r) => `<button class="btn ${ed?.id === r.id ? "primary" : ""}" data-a="rEdit" data-id="${r.id}">${esc(r.name)}</button>`).join("")}<button class="btn ghost" data-a="rNew">＋ Nueva rutina</button></div></div>
+  ${ed ? blockGrid(c, ed, sessions, rv) + `<details class="card-d" ${RE.openDetail ? "open" : ""}><summary class="card-t" data-a="rDetail">Detalle de los ejercicios de ${esc(ed.name)}: video, tips, tempo, descanso y reemplazos</summary>${routineEditor(ed, lib)}</details>` : `<p class="muted">Crea la primera rutina.</p>`}
+  <details class="card-d" ${RE?.openCfg ? "open" : ""}><summary class="card-t" data-a="rCfg">Configuración: calendario semanal (qué rutina toca cada día) y cardio</summary>  <div><div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>
   <div class="cardio-ed"><div class="card-t">Cardio</div><div class="cardio-row"><label class="cw-n">Veces/semana<input type="number" min="0" value="${c.cardio?.perWeek || ""}" data-a-change="cardioSet" data-k="perWeek"></label><label class="grow">Tipo<input value="${esc(c.cardio?.type || "")}" data-a-change="cardioSet" data-k="type" placeholder="Ej: Intervalos en bicicleta estática"></label><label class="cw-n">Minutos<input type="number" value="${c.cardio?.minutes || ""}" data-a-change="cardioSet" data-k="minutes"></label><label class="cw-m">Intensidad<input value="${esc(c.cardio?.intensity || "")}" data-a-change="cardioSet" data-k="intensity" placeholder="7–8/10"></label></div>
   <label>Descripción (la ve completa al tocar Cardio)<textarea rows="4" data-a-change="cardioSet" data-k="desc" placeholder="Ej: 1 min de entrada en calor suave. Luego 4 rondas de 30 s intenso (8/10) + 60 s suave. Al terminar, 1 min de vuelta a la calma.">${esc(c.cardio?.desc || "")}</textarea></label></div>
   <div class="row gap small">Días sugeridos de cardio: ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="ck"><input type="checkbox" ${(c.cardio?.days || []).includes(d) ? "checked" : ""} data-a-change="cardioDay" data-d="${d}">${DAYS[d].slice(0, 3)}</label>`).join("")}</div></div>
-  <div class="row gap"><div class="routine-list">${routines.map((r) => `<button class="btn ${ed?.id === r.id ? "primary" : ""}" data-a="rEdit" data-id="${r.id}">${esc(r.name)}</button>`).join("")}<button class="btn ghost" data-a="rNew">＋ Nueva rutina</button></div></div>
-  ${ed ? blockGrid(c, ed, sessions, rv) + `<details class="card-d" ${RE.openDetail ? "open" : ""}><summary class="card-t" data-a="rDetail">Detalle de los ejercicios: video, tips, tempo, descanso y reemplazos</summary>${routineEditor(ed, lib)}</details>` : `<p class="muted">Crea la primera rutina.</p>`}
+</details>
+
   <datalist id="exlib">${lib.map((e) => `<option value="${esc(e.name)}">`).join("")}</datalist>`;
 }
 act("rvSame", async (el) => { await db.set("clients/" + CW.cid, { rutReview: { week: el.dataset.w, same: true, at: Date.now() } }); resetAlerts(); toast("Listo: la rutina sigue igual"); refresh(); });
@@ -286,12 +289,14 @@ function blockGrid(c, r, sessions, rv) {
   const repsTxt = (e) => (e.sets || []).map((x) => x.reps ?? "").join(", "), rirTxt = (e) => [...new Set((e.sets || []).map((x) => x.rir ?? ""))].join(", ");
   return `<div class="card blk"><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><button class="btn primary" data-a="rSave">Guardar cambios</button></div>
   <label>Comentario general de la rutina (lo ve al empezarla)<textarea rows="2" data-a-change="rNote" placeholder="Ej: Esta semana sube un poco el peso en los multiarticulares y cuida la bajada en todo.">${esc(r.note || "")}</textarea></label>
-  <div class="scroll-x"><table class="tbl blk-t"><tr><th rowspan="2">Ejercicio</th>${weeks.map((wk) => `<th class="wkh">Semana ${+wk.slice(1)}</th>`).join("")}<th class="nxh" colspan="5">Semana ${nextN} · lo que va a hacer</th></tr>
+  <div class="scroll-x"><table class="tbl blk-t"><tr><th rowspan="2">Ejercicio</th>${weeks.map((wk) => `<th class="wkh">Semana ${+wk.slice(1)}</th>`).join("")}<th rowspan="2" class="vs1h">vs 1ª vez</th><th class="nxh" colspan="5">Semana ${nextN} · lo que va a hacer</th></tr>
   <tr>${weeks.map(() => `<th class="sub">indicado · hecho (kg×reps)</th>`).join("")}<th class="sub nx">Series</th><th class="sub nx">Reps (por serie)</th><th class="sub nx">RIR</th><th class="sub nx">Kg sug.</th><th class="sub nx">Comentario del ejercicio</th></tr>
   ${r.exercises.map((e, k) => { const cs = B.exs.find((x) => x.e.id === e.id)?.cells || {};
     return `<tr><td class="exc"><b>${k + 1}. ${esc(e.name || "—")}</b></td>${weeks.map((wk, i) => { const cl = cs[wk], pv = i ? cs[weeks[i - 1]] : null; if (!cl) return `<td class="muted center">—</td>`;
       const pl = planStr(cl.plan), chg = pv && planStr(pv.plan) !== pl;
-      return `<td class="wkc"><div class="pl ${chg ? "chg" : ""}">${esc(pl || "libre")}</div>${cl.sets.map((y, j) => `<div class="dn ${prog(y, pv?.sets?.[j])}">${esc(setStr(y))}${y.rir !== "" && y.rir != null ? `<small> @${esc(y.rir)}</small>` : ""}</div>`).join("") || '<div class="muted small">sin datos</div>'}</td>`; }).join("")}
+      return `<td class="wkc"><div class="pl ${chg ? "chg" : ""}">${esc(pl || "libre")}${cl.tech ? ` <span class="badge tech-${cl.tech}" title="Técnica ${cl.tech}">${{ mejor: "↑", igual: "=", peor: "↓" }[cl.tech] || ""}</span>` : ""}${cl.notes.length ? ` <span class="nt" title="${esc(cl.notes.join(" · "))}">💬</span>` : ""}${cl.replaced ? ` <span class="nt" title="Usó un reemplazo">⇄</span>` : ""}</div>${cl.sets.map((y, j) => `<div class="dn ${prog(y, pv?.sets?.[j])}">${esc(setStr(y))}${y.rir !== "" && y.rir != null ? `<small> @${esc(y.rir)}</small>` : ""}</div>`).join("") || '<div class="muted small">sin datos</div>'}</td>`; }).join("")}
+      ${(() => { const ks = B.weeks.filter((wk) => cs[wk]?.sets?.length); if (ks.length < 2) return `<td class="vs1 muted center">—</td>`; const f = cs[ks[0]].sets, l = cs[ks[ks.length - 1]].sets;
+        return `<td class="vs1">${l.slice(0, 2).map((y, j) => { const a = f[j]; if (!a) return ""; const dw = r1((+y.w || 0) - (+a.w || 0)), dr = (+y.r || 0) - (+a.r || 0); return `<div><small class="muted">S${j + 1}</small> <b class="${dw > 0 ? "g" : dw < 0 ? "r" : ""}">${dw > 0 ? "+" : ""}${String(dw).replace(".", ",")} kg</b> <span class="${dr > 0 ? "g" : dr < 0 ? "r" : "muted"}">${dr > 0 ? "+" : ""}${dr} reps</span></div>`; }).join("")}</td>`; })()}
       <td class="nx"><input type="number" min="0" max="10" value="${(e.sets || []).length}" data-a-change="gSets" data-k="${k}" style="width:52px"></td>
       <td class="nx"><input value="${esc(repsTxt(e))}" data-a-change="gReps" data-k="${k}" placeholder="8, 6" style="width:90px"></td>
       <td class="nx"><input value="${esc(rirTxt(e))}" data-a-change="gRir" data-k="${k}" placeholder="1" style="width:56px"></td>
@@ -300,6 +305,7 @@ function blockGrid(c, r, sessions, rv) {
   <p class="muted small">Cada semana muestra lo indicado (series×reps @RIR; en rojo si cambió respecto de la semana anterior) y lo hecho por serie (verde = subió peso o reps, rojo = bajó). En reps puedes poner una por serie separadas por coma (“8, 6”) o una sola para todas. ${weeks.length ? "" : "Aún no hay entrenamientos de esta rutina."}</p></div>`;
 }
 act("rDetail", (el) => { RE.openDetail = !el.parentElement.open; });
+act("rCfg", (el) => { if (RE) RE.openCfg = !el.parentElement.open; });
 act("rNote", (el) => { RE.r.note = el.value; });
 act("gSets", (el) => { const e = RE.r.exercises[+el.dataset.k], n = Math.max(0, Math.min(10, num(el.value) || 0)); e.sets ||= []; while (e.sets.length < n) e.sets.push({ ...(e.sets[e.sets.length - 1] || { reps: "8-10", rir: 1 }) }); e.sets.length = n; refresh(); });
 act("gReps", (el) => { const e = RE.r.exercises[+el.dataset.k], v = el.value.split(",").map((x) => x.trim()).filter(Boolean); if (!v.length) return; (e.sets || []).forEach((x, j) => (x.reps = v[Math.min(j, v.length - 1)])); refresh(); });
@@ -448,8 +454,8 @@ async function progView(c) {
     return rows ? `<div class="card prog-r"><div class="card-t">${esc(r.name)}</div><table class="tbl prog-t"><tr><th>Ejercicio</th><th></th><th>1ª vez <small>(sem. ${+wf.slice(1)})</small></th>${wp ? `<th>Sem. ${+wp.slice(1)}</th>` : ""}<th>Sem. ${+wl.slice(1)}</th><th>vs 1ª vez</th>${wp ? `<th>vs sem. ${+wp.slice(1)}</th>` : ""}</tr>${rows}</table></div>` : "";
   }).join("");
   return `<div class="card"><div class="card-t">Peso (120 días)</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals, color: "var(--muted)", dots: true, w: 1 }, { vals: trend(vals), color: "var(--acc)" }], { h: 240, unit: " kg" })}</div>
-  <div class="card-t mt">Progreso por rutina · serie 1 y 2 (kg × reps; en unilaterales izquierda | derecha)</div>
-  ${progCards ? `<div class="prog-grid">${progCards}</div>` : `<div class="card"><p class="muted">Sin entrenamientos registrados.</p></div>`}
+  <div class="card"><div class="card-t">Progreso de entrenamiento</div><p class="small muted">Está en <b>Entrenamiento</b>: cada rutina muestra semana a semana lo indicado y lo hecho, y la columna “vs 1ª vez”.</p>
+  <details><summary class="small">Ver el resumen por rutina aquí (1ª vez · semana anterior · última)</summary>${progCards ? `<div class="prog-grid">${progCards}</div>` : `<p class="muted">Sin entrenamientos registrados.</p>`}</details></div>
   <div class="card"><div class="row between"><div class="card-t">Fotos</div><div class="row gap">${["a", "b"].map((k) => `<select data-a-change="cmpSel" data-k="${k}">${weeks.map((x) => `<option ${x === cmp[k] ? "selected" : ""} value="${x}">Semana ${+x.slice(1)}</option>`).join("")}</select>`).join(" vs ")}</div></div>
   ${weeks.length ? `<div class="cmp-grid">${PHOTO_TYPES.map(([t, l]) => { const a = pick(cmp.a, t), b = pick(cmp.b, t); return a || b ? `<div class="cmp"><div>${a ? `<img src="${a.data}">` : "—"}</div><div>${b ? `<img src="${b.data}">` : "—"}</div><small>${l}</small></div>` : ""; }).join("")}</div>` : `<p class="muted">Sin fotos aún.</p>`}</div>
   <div class="card scroll-x"><div class="card-t">Medidas (cm)</div>${meas.length ? `<table class="tbl"><tr><th>Zona</th>${meas.map((m) => `<th>${fmtDate(m.id)}</th>`).join("")}<th>Cambio</th></tr>${MEASURE_ZONES.map(([k, l]) => { const v = meas.map((m) => m[k]).filter((x) => x != null); return `<tr><td>${l}</td>${meas.map((m) => `<td>${m[k] ?? "—"}</td>`).join("")}<td>${v.length > 1 ? r1(v[v.length - 1] - v[0]) : ""}</td></tr>`; }).join("")}</table>` : `<p class="muted">Sin mediciones.</p>`}</div>
@@ -836,17 +842,16 @@ async function stagesView(c) {
     <label>Peso para el cálculo<input disabled value="${kg ? r1(kg) + " kg (último registrado)" : "sin pesajes"}"></label>
     <label>Proteína por defecto (g/kg)<input type="number" step="0.1" value="${c.protKg ?? 2}" data-a-change="stBase" data-k="protKg"></label>
     <label>Grasa por defecto (g/kg)<input type="number" step="0.1" value="${c.fatKg ?? 0.8}" data-a-change="stBase" data-k="fatKg"></label></div>
-    <p class="muted small">Kcal de cada etapa = mantención × (1 + %). Proteína y grasa por kilo de peso; los carbohidratos completan las calorías. Si la mantención cambia (más pasos, más actividad), anota la nueva solo en esa etapa. Agua: automática, ${40} ml por kg del último peso${kg ? ` = <b>${waterAuto(kg)} ml</b>` : ""}.</p>
+    <p class="muted small">Son los valores de partida de la calculadora de cada plan (Plan alimentación → Metas de la etapa): kcal = mantención × (1 + % de la etapa), proteína y grasa por kilo, los carbohidratos completan. En cada plan puedes cambiarlos. Agua: automática, ${40} ml por kg del último peso${kg ? ` = <b>${waterAuto(kg)} ml</b>` : ""}.</p>
     <details><summary class="small">% por defecto de cada etapa (aplica a todos tus clientes)</summary><div class="grid4">${Object.keys(PHASES).map((p) => `<label>${p}<input type="number" step="1" value="${pctDef(p)}" data-a-change="stPctDef" data-p="${esc(p)}"></label>`).join("")}</div></details></div>
-  <div class="card scroll-x"><table class="tbl stt"><tr><th>Etapa</th><th>Semanas</th><th>% vs mant.</th><th>Mant. de la etapa</th><th>P g/kg</th><th>G g/kg</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Pasos</th><th>Cardio</th><th>Ajuste del plan</th><th>Nota para el cliente</th></tr>
-  ${st.map((x, i) => { const t = stageCalc(c, x, kg, pctDef); return `<tr><td><span class="dotc" style="background:${phaseColor(x.phase)}"></span><b>${esc(x.phase)}</b></td>
+  <div class="card scroll-x"><table class="tbl stt"><tr><th>Etapa</th><th>Semanas</th><th>Plan de alimentación y metas</th><th>Pasos</th><th>Cardio</th><th>Nota para el cliente</th></tr>
+  ${st.map((x, i) => { const P = c.plans?.[x.phase], T = P?.targets || {}, soon = x.from - now;
+    return `<tr><td><span class="dotc" style="background:${phaseColor(x.phase)}"></span><b>${esc(x.phase)}</b></td>
     <td class="small">S${x.from}–S${x.to}<br><span class="muted">${fmtDate(addDays(c.startDate || ymd(), (x.from - 1) * 7))} – ${fmtDate(addDays(c.startDate || ymd(), x.to * 7 - 1))}</span></td>
-    <td>${inp("pct", i, x.pct, 58, pctDef(x.phase))}</td><td>${inp("maint", i, x.maint, 76, maint || c.kcal || "")}</td><td>${inp("protKg", i, x.protKg, 54, c.protKg ?? 2, "0.1")}</td><td>${inp("fatKg", i, x.fatKg, 54, c.fatKg ?? 0.8, "0.1")}</td>
-    ${["kcal", "cho", "fat", "prot"].map((k) => `<td>${inp(k, i, x[k], 66, t[k] ?? "")}</td>`).join("")}
+    <td>${P ? `<span class="badge g">Plan listo</span> <span class="small">${T.kcal ? `${T.kcal} kcal · C ${T.cho ?? "–"} · L ${T.fat ?? "–"} · P ${T.prot ?? "–"}` : '<span class="muted">sin metas</span>'}</span>` : `<span class="badge ${x.to >= now && soon <= 2 ? "r" : "y"}">Falta el plan</span>`} <a class="btn tiny" href="#coach/c/${c.id}/plan">${P ? "Ver" : "Armarlo"}</a></td>
     <td>${inp("steps", i, x.steps, 76, c.steps || "")}</td><td><input value="${esc(x.cardio || "")}" data-a-change="stF" data-i="${i}" data-k="cardio" placeholder="ej: 3×25 min" style="width:96px"></td>
-    <td><button class="btn tiny" data-a="stAdj" data-i="${i}">${adjTxt(x.adj) ? esc(adjTxt(x.adj)) : "Sin cambios"}</button></td>
-    <td><input value="${esc(x.note || "")}" data-a-change="stF" data-i="${i}" data-k="note" style="width:200px" placeholder="La ve en su Timeline y en su plan"></td></tr>`; }).join("") || `<tr><td colspan="14" class="muted">Pinta semanas en el calendario para crear etapas.</td></tr>`}</table>
-  <p class="muted small">En gris va lo que calcula la fórmula; escribe un número solo si quieres fijarlo a mano. La nota la ve el cliente en su Timeline y arriba de su plan de alimentación.</p></div>`;
+    <td><input value="${esc(x.note || "")}" data-a-change="stF" data-i="${i}" data-k="note" style="width:220px" placeholder="La ve en su Timeline y en su plan"></td></tr>`; }).join("") || `<tr><td colspan="6" class="muted">Pinta semanas en el calendario para crear etapas.</td></tr>`}</table>
+  <p class="muted small">Cada etapa usa su propio plan de alimentación (con sus metas de calorías y macros), que se arma en <b>Plan alimentación</b>. Las semanas que ya pasaron quedan como se planificaron.</p></div>`;
 }
 // Requerimientos: gasto en reposo (Mifflin-St Jeor, Harris-Benedict revisada o Katch-McArdle con % de grasa) × factor de actividad
 const ACT_F = [[1.2, "Sedentario (poco movimiento, < 5.000 pasos)"], [1.375, "Ligero (5.000–7.500 pasos o entrena 1–3 días)"], [1.55, "Moderado (7.500–10.000 pasos y entrena 3–5 días)"], [1.725, "Alto (> 10.000 pasos y entrena 5–6 días)"], [1.9, "Muy alto (trabajo físico + entrenamiento)"]];
@@ -876,7 +881,6 @@ function reqCard(c, kg) {
 }
 act("reqF", async (el) => { const k = el.dataset.k, v = ["height", "bodyFat", "actFactor"].includes(k) ? num(el.value) : el.value; await db.set("clients/" + CW.cid, { [k]: v }); refresh(); });
 act("reqUse", async (el) => { await db.set("clients/" + CW.cid, { kcalMaint: +el.dataset.v }); const c = await getClient(CW.cid); await stStore(c, validSt(c)); toast("Mantención actualizada: las etapas se recalcularon"); });
-const PHASE_PCT = { "Break de dieta": 0, "Déficit leve": -10, "Déficit moderado": -20, "Déficit agresivo": -25, "Mini cut": -30, "Mantención": 0, "Recomposición corporal": -5, "Dieta reversa": 5, "Superávit / Volumen": 10 };
 function stageCalc(c, x, kg, pctDef) {
   const m = +x.maint || +c.kcalMaint || +c.kcal || null; if (!m) return {};
   const pct = x.pct !== "" && x.pct != null ? +x.pct : pctDef(x.phase), kcal = Math.round(m * (1 + pct / 100));

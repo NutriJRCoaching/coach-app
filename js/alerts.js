@@ -35,18 +35,31 @@ export function alertsFor(c, x) {
   if (!c.startDate) add("y", "Falta la fecha de inicio (define sus semanas)");
   const miss = [["sex", "sexo"], ["birth", "fecha de nacimiento"], ["height", "estatura"]].filter(([k]) => !c[k]).map(([, l]) => l);
   if (miss.length) add("y", "Faltan datos: " + miss.join(", "));
-  if (c.service === "nutricion" && active && !x.routines.length) add("i", "Aún no arma sus rutinas en la app", "rutinas");
+  if (c.service === "nutricion" && active && !x.routines.length) add("i", "Aún no arma sus rutinas en la app", "entrenos");
   if (trains(c)) {
-    if (!x.routines.length) add("r", "Falta su plan de entrenamiento (rutinas)", "rutinas");
-    else if (!Object.values(c.schedule || {}).some(Boolean)) add("y", "Falta el calendario semanal: qué rutina toca cada día", "rutinas");
+    if (!x.routines.length) add("r", "Falta su plan de entrenamiento (rutinas)", "entrenos");
+    else if (!Object.values(c.schedule || {}).some(Boolean)) add("y", "Falta el calendario semanal: qué rutina toca cada día", "entrenos");
     const rv = reviewWindow(c, x.routines, x.sessions);
-    if (rv?.open && !rv.done) add(today === rv.w.last ? "r" : "y", `Revisa su rutina para la semana ${rv.next.n} (parte el ${fmtDate(rv.next.first)})`, "rutinas");
+    if (rv?.open && !rv.done) add(today === rv.w.last ? "r" : "y", `Revisa su rutina para la semana ${rv.next.n} (parte el ${fmtDate(rv.next.first)})`, "entrenos");
   }
   if (eats(c)) {
-    if (!c.kcal || !c.prot) add("r", "Faltan los objetivos de calorías y macros");
-    if (!(c.menus || []).length && !c.plan?.pdfUrl && !c.planPdf) add("r", "Falta su plan de alimentación", "plan");
-    else if (!(c.menus || []).length) add("y", "Su plan está solo en PDF: pásalo a la app", "plan");
-    if (!c.pauta || !Object.keys(c.pauta).length) add("y", "Falta la pauta por porciones");
+    const plans = c.plans && Object.keys(c.plans).length ? c.plans : null;
+    if (!plans) {
+      if (!c.kcal || !c.prot) add("r", "Faltan los objetivos de calorías y macros");
+      if (!(c.menus || []).length && !c.plan?.pdfUrl && !c.planPdf) add("r", "Falta su plan de alimentación", "plan");
+      else if (!(c.menus || []).length) add("y", "Su plan está solo en PDF: pásalo a la app", "plan");
+      if (!c.pauta || !Object.keys(c.pauta).length) add("y", "Falta la pauta por porciones", "plan");
+    } else if (c.startDate) {
+      // Cada etapa del Timeline necesita su plan: aviso cuando la etapa ya corre o parte en ≤ 2 semanas
+      const n = weekInfo(c, today).n, seen = new Set();
+      for (const st of [...(c.stages || [])].sort((a, b) => a.from - b.from)) {
+        if (+st.to < n || plans[st.phase] || seen.has(st.phase)) continue; seen.add(st.phase);
+        const d = +st.from - n;
+        if (d <= 0) add("r", `Falta el plan de alimentación de ${st.phase} (etapa actual)`, "plan");
+        else if (d <= 2) add("y", `En ${d} semana${d === 1 ? "" : "s"} parte ${st.phase}: arma su plan de alimentación`, "plan");
+      }
+      for (const [ph, P] of Object.entries(plans)) if (!+P.targets?.kcal && (c.stages || []).some((st) => st.phase === ph && +st.to >= n)) add("y", `El plan de ${ph} no tiene metas de calorías y macros`, "plan");
+    }
   }
   if (c.service === "entrenamiento" && !c.ranges) add("i", "Guía de macros por defecto (1,6–2,2 g/kg de proteína)");
   if (!c.steps) add("y", "Falta la meta de pasos");

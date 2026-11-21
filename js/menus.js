@@ -201,8 +201,11 @@ act("hSave", async () => { const r = (x) => (x == null ? null : Math.round(x)); 
 // ================================================================ COACH: editor de opciones
 let MW = null; // copia de trabajo
 const clone = (x) => JSON.parse(JSON.stringify(x));
+// MW = plan de UNA etapa en edición (cada etapa del Timeline tiene su propio plan en c.plans[etapa])
+const loadMW = (c, phase) => { const P = c.plans?.[phase] || null; MW = { cid: c.id, phase, exists: !!P, menus: clone(P?.menus || []), pauta: clone(P?.pauta || {}), pautaLeg: clone(P?.pautaLeg || {}), targets: clone(P?.targets || {}), calc: clone(P?.calc || {}), dirty: false, k: 0 }; };
 export async function menusEditor(c) {
-  if (!MW || MW.cid !== c.id) MW = { cid: c.id, menus: clone(c.menus || []), pauta: clone(c.pauta || {}), pautaLeg: clone(c.pautaLeg || {}), dirty: false, k: 0 };
+  if (!MW || MW.cid !== c.id || !c.phaseList.some((x) => x.phase === MW.phase)) loadMW(c, c.curPhase);
+  else if (!MW.dirty) loadMW(c, MW.phase);
   const idx = await foodIndex();
   return `<datalist id="foodDL">${[...idx.values()].map((f) => `<option value="${esc(f.name)}">`).join("")}</datalist><div id="menuEd">${editorHtml(c)}</div>`;
 }
@@ -234,20 +237,48 @@ const macTxt = (t) => `${r0(t.kcal)} kcal · C ${r0(t.cho)} · L ${r0(t.fat)} ·
 const fmtN = (v) => (v == null || v === "" ? "" : String(Math.round(+v * 100) / 100));
 // Pauta: se crea aquí mismo (día normal y día con legumbres) y se compara con las metas del cliente
 // ¿La pauta (con el ajuste de la etapa, si tiene) calza con las metas vigentes? kcal ±5 %, macros ±10 %
-function pautaWarn(c) {
-  const eff = { ...MW.pauta }; for (const [g, d] of Object.entries(c.stageInfo?.adj || {})) if (+d) eff[g] = Math.max(0, (+eff[g] || 0) + +d);
-  const m = pMac(eff), L = [["kcal", "kcal", 0.05], ["cho", "CHO", 0.1], ["fat", "lípidos", 0.1], ["prot", "proteína", 0.1]];
-  if (!Object.values(eff).some((v) => +v) || !c.kcal) return "";
-  const off = L.filter(([k, , t]) => c[k] && Math.abs(m[k] / c[k] - 1) > t);
-  if (!off.length) return `<div class="note okn">✓ La pauta calza con las metas${c.stageInfo ? ` de <b>${esc(c.stageInfo.phase)}</b>` : ""}.</div>`;
-  return `<div class="note warnn">⚠ <b>Ajusta la pauta para calzar con las metas${c.stageInfo ? ` de ${esc(c.stageInfo.phase)}` : ""}:</b> ${off.map(([k, l]) => { const d = Math.round(m[k] - c[k]); return `${l} ${r0(m[k])} vs ${r0(c[k])} (${d > 0 ? "+" : ""}${d})`; }).join(" · ")}${c.stageInfo?.adj ? " (ya incluye el ajuste del plan de la etapa)" : ""}.</div>`;
+// ¿La pauta calza con las metas de esta etapa? kcal ±5 %, macros ±10 %
+function pautaWarn() {
+  const T = MW.targets, m = pMac(MW.pauta), L = [["kcal", "kcal", 0.05], ["cho", "CHO", 0.1], ["fat", "lípidos", 0.1], ["prot", "proteína", 0.1]];
+  if (!Object.values(MW.pauta).some((v) => +v) || !+T.kcal) return "";
+  const off = L.filter(([k, , t]) => +T[k] && Math.abs(m[k] / T[k] - 1) > t);
+  if (!off.length) return `<div class="note okn">✓ La pauta calza con las metas de <b>${esc(MW.phase)}</b>.</div>`;
+  return `<div class="note warnn">⚠ <b>Ajusta la pauta para calzar con las metas de ${esc(MW.phase)}:</b> ${off.map(([k, l]) => { const d = Math.round(m[k] - T[k]); return `${l} ${r0(m[k])} vs ${r0(T[k])} (${d > 0 ? "+" : ""}${d})`; }).join(" · ")}.</div>`;
+}
+// Metas de la etapa: calculadora propia (mantención × (1 + %), proteína y grasa por kilo, CHO completa) o los macros de la pauta
+function calcRes(c) {
+  const k = MW.calc, kg = c.lastKg, m = +k.maint || +c.kcalMaint || null, pct = k.pct !== "" && k.pct != null ? +k.pct : c.pctOf(MW.phase);
+  const pk = +k.protKg || +c.protKg || 2, fk = +k.fatKg || +c.fatKg || 0.8;
+  if (!m) return { miss: "la mantención (calcúlala en Etapas o escríbela aquí)", pct, pk, fk };
+  const kcal = Math.round(m * (1 + pct / 100)); if (!kg) return { kcal, miss: "un peso registrado", pct, pk, fk };
+  const prot = Math.round(pk * kg), fat = Math.round(fk * kg); return { kcal, prot, fat, cho: Math.max(0, Math.round((kcal - prot * 4 - fat * 9) / 4)), pct, pk, fk, m };
+}
+function targetsCard(c) {
+  const R = calcRes(c), T = MW.targets, k = MW.calc, pm = pMac(MW.pauta), col = phaseColor(MW.phase);
+  return `<div class="card tg-card" style="--pc:${col}"><div class="row between"><div><div class="card-t">Metas de ${esc(MW.phase)}</div><span class="muted small">Lo que la app le muestra al cliente las semanas de esta etapa.</span></div>
+    <div class="tg-now">${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([x, l]) => `<label>${l}<input type="number" value="${T[x] ?? ""}" data-a-change="meTg" data-k="${x}" placeholder="–"></label>`).join("")}</div></div>
+    <div class="tg-calc"><span class="muted small">Calculadora:</span>
+      <label>Mantención<input type="number" value="${k.maint ?? ""}" placeholder="${c.kcalMaint || ""}" data-a-change="meCalc" data-k="maint"></label>
+      <label>% vs mant.<input type="number" value="${k.pct ?? ""}" placeholder="${c.pctOf(MW.phase)}" data-a-change="meCalc" data-k="pct"></label>
+      <label>Proteína g/kg<input type="number" step="0.1" value="${k.protKg ?? ""}" placeholder="${c.protKg ?? 2}" data-a-change="meCalc" data-k="protKg"></label>
+      <label>Grasa g/kg<input type="number" step="0.1" value="${k.fatKg ?? ""}" placeholder="${c.fatKg ?? 0.8}" data-a-change="meCalc" data-k="fatKg"></label>
+      <span class="small">${c.lastKg ? `${r1(c.lastKg)} kg →` : ""} ${R.miss ? `<span class="muted">Falta ${esc(R.miss)}.</span>` : `<b>${R.kcal} kcal · C ${R.cho} · L ${R.fat} · P ${R.prot}</b>`}</span>
+      ${R.miss ? "" : `<button class="btn small" data-a="meTgCalc">Usar el cálculo</button>`}<button class="btn small ghost" data-a="meTgPauta" title="Las metas quedan iguales a lo que aporta la pauta">Usar los macros de la pauta (${r0(pm.kcal)} kcal)</button></div></div>`;
+}
+const phaseColor = (p) => ({ "Break de dieta": "#a855f7", "Déficit leve": "#e0484e", "Déficit moderado": "#c3242b", "Déficit agresivo": "#8e1b1f", "Mini cut": "#b0263a", "Mantención": "#7d7d86", "Recomposición corporal": "#3b82f6", "Dieta reversa": "#d6a21e", "Superávit / Volumen": "#22a35a" }[p] || "#888");
+// Pestañas: una por etapa del Timeline (y las que ya tienen plan)
+function phaseStrip(c) {
+  const sem = (x) => (x.ranges.length ? x.ranges.map(([a, b]) => (a === b ? `S${a}` : `S${a}–${b}`)).join(", ") : "sin semanas en el Timeline");
+  const when = (x) => (x.current ? "ahora" : x.startsIn != null ? `parte en ${x.startsIn} semana${x.startsIn === 1 ? "" : "s"}` : x.past ? "ya pasó" : "");
+  return `<div class="phase-strip">${c.phaseList.map((x) => `<button class="ph-tab ${x.phase === MW.phase ? "on" : ""}" style="--pc:${x.color}" data-a="mePhase" data-p="${esc(x.phase)}">
+    <b>${esc(x.phase)}</b><small>${sem(x)}${when(x) ? " · " + when(x) : ""}</small>${x.ready ? '<span class="badge g">Plan listo</span>' : `<span class="badge ${x.current || (x.startsIn != null && x.startsIn <= 2) ? "r" : "y"}">Falta el plan</span>`}</button>`).join("")}</div>`;
 }
 function pautaCard(c) {
-  const pn = MW.pauta, pl = MW.pautaLeg, mn = pMac(pn), ml = pMac(pl), goal = { kcal: c.kcal, cho: c.cho, fat: c.fat, prot: c.prot };
+  const pn = MW.pauta, pl = MW.pautaLeg, mn = pMac(pn), ml = pMac(pl), goal = MW.targets;
   const adec = (v, g) => (g ? `<small class="${Math.abs(v / g - 1) <= 0.05 ? "g" : Math.abs(v / g - 1) <= 0.1 ? "y" : "r"}">${r0((v / g) * 100)} %</small>` : "");
   const empty = !Object.values(pn).some((v) => +v);
   return `<details class="card pauta-card" ${empty || MW.openPauta ? "open" : ""}><summary class="card-t" data-a="mePautaOpen">Pauta de alimentación${empty ? ' <span class="badge y">Por crear</span>' : ` <span class="muted small">· ${r0(mn.kcal)} kcal</span>`}</summary>
-  <p class="muted small">Porciones por grupo al día. Abajo ves sus kcal y macros (por porciones de intercambio) contra las metas del cliente${c.kcal ? "" : " (no tiene metas: ponlas en Datos y objetivos)"}. Se guarda con “Guardar y publicar”.</p>
+  <p class="muted small">Porciones por grupo al día. Abajo ves sus kcal y macros (por porciones de intercambio) contra las metas de esta etapa. Se guarda con “Guardar y publicar”.</p>
   <table class="tbl pauta-t"><tr><th>Grupo</th><th>Día normal</th><th>Día con legumbres</th></tr>
   ${PG().map((g) => `<tr><td>${gdot(g)}${esc(g)}</td><td><input type="number" step="0.25" min="0" value="${fmtN(pn[g])}" data-a-change="mePauta" data-p="n" data-g="${esc(g)}"></td><td><input type="number" step="0.25" min="0" value="${fmtN(pl[g])}" data-a-change="mePauta" data-p="l" data-g="${esc(g)}"></td></tr>`).join("")}
   ${[["kcal", "Kcal"], ["cho", "CHO (g)"], ["fat", "Lípidos (g)"], ["prot", "Proteína (g)"]].map(([k, l]) => `<tr class="ptot"><td><b>${l}</b>${goal[k] ? ` <span class="muted small">meta ${goal[k]}</span>` : ""}</td><td><b>${r0(mn[k])}</b> ${adec(mn[k], goal[k])}</td><td><b>${r0(ml[k])}</b> ${adec(ml[k], goal[k])}</td></tr>`).join("")}</table>
@@ -256,18 +287,25 @@ function pautaCard(c) {
 function editorHtml(c) {
   const ms = MW.menus; if (MW.k >= ms.length) MW.k = Math.max(0, ms.length - 1);
   const mn = ms[MW.k], pauta = MW.pauta, hasLeg = ms.some((x) => x.leg);
-  const head = `<div class="card"><div class="row between"><div class="card-t">Plan de alimentación</div><span class="row gap">${MW.dirty ? '<span class="badge y">Sin guardar</span>' : ""}<label class="btn" title="Archivo ima-planes.json con planes pasados desde PDF">Importar plan<input type="file" accept=".json,application/json" hidden data-a-change="meImport"></label><button class="btn primary" data-a="meSave">Guardar y publicar</button></span></div>
+  const strip = `<div class="card plan-intro"><div class="card-t">Planes de alimentación por etapa</div><p class="muted small">Diseña un plan para cada etapa. La app le muestra al cliente el plan de la etapa marcada en su Timeline esa semana (las etapas se pintan en <b>Etapas</b>).</p>${phaseStrip(c)}</div>`;
+  if (!MW.exists && !ms.length && !Object.values(MW.pauta).some((v) => +v)) {
+    const others = Object.keys(c.plans || {}).filter((p) => p !== MW.phase);
+    return `${strip}<div class="card new-plan" style="--pc:${phaseColor(MW.phase)}"><div class="ps-name">${esc(MW.phase)}</div><p>Esta etapa aún no tiene plan de alimentación.</p>
+      <div class="row gap">${others.map((p) => `<button class="btn primary" data-a="meFrom" data-p="${esc(p)}">Partir de una copia de ${esc(p)}</button>`).join("")}<button class="btn" data-a="meFrom" data-p="">Empezar vacío</button><label class="btn ghost">Importar plan<input type="file" accept=".json,application/json" hidden data-a-change="meImport"></label></div>
+      ${others.length ? `<p class="muted small">Lo normal es copiar el plan de otra etapa y hacerle ajustes pequeños (gramajes de algún grupo).</p>` : ""}</div>`;
+  }
+  const head = `${strip}<div class="card" style="border-top:4px solid ${phaseColor(MW.phase)}"><div class="row between"><div class="card-t" style="font-size:15px;color:${phaseColor(MW.phase)}">Plan de ${esc(MW.phase)}</div><span class="row gap">${MW.dirty ? '<span class="badge y">Sin guardar</span>' : ""}<label class="btn" title="Archivo ima-planes.json con planes pasados desde PDF">Importar plan<input type="file" accept=".json,application/json" hidden data-a-change="meImport"></label><button class="btn primary" data-a="meSave">Guardar y publicar</button></span></div>
   <p class="muted small">Cada opción es un día completo (entreno AM / PM, descanso, legumbres…). El cliente la ve en “Mi plan”, toca un alimento para ver los reemplazos de su grupo y arma su lista de compras.</p>
   ${MW.imported ? `<div class="note">Plan importado: revisa las opciones y la pauta, y toca “Guardar y publicar”.</div>` : ""}
   <div class="seg scroll optseg">${ms.map((x, k) => `<button class="${k === MW.k ? "on" : ""}" style="--oc:${optColor(k)}" data-a="meOpt" data-k="${k}"><i class="gdot" style="background:${optColor(k)}"></i>${esc(x.name || "Opción " + (k + 1))}${x.leg ? " 🫘" : ""}</button>`).join("")}<button data-a="meAdd">＋ Nueva opción</button></div>
   ${ms.length && !hasLeg ? `<div class="note row between"><span>Falta el <b>día con legumbres</b>: arma una opción propia para ese día (no se le pide al cliente que modifique otra).</span><button class="btn small" data-a="meLegAdd">＋ Día con legumbres</button></div>` : ""}</div>
-  ${pautaWarn(c)}${pautaCard(c)}`;
+  ${targetsCard(c)}${pautaWarn()}${pautaCard(c)}`;
   if (!mn) return head;
   const oc = optColor(MW.k);
   const { t, por } = totals(mn);
   const pz = mn.leg && Object.values(MW.pautaLeg).some((v) => +v) ? MW.pautaLeg : pauta;
   const groups = PG().filter((g) => por[g] || pz[g]);
-  const goal = { kcal: c.kcal, cho: c.cho, fat: c.fat, prot: c.prot };
+  const goal = MW.targets;
   const side = `<aside class="me-side" style="--oc:${oc}"><div class="card"><div class="card-t"><i class="gdot" style="background:${oc}"></i>${esc(mn.name || "Opción")}</div>
     <div class="muted small">Porciones de la opción / pauta ${mn.leg ? "del día con legumbres" : "del día normal"}</div>
     <table class="tbl side-t">${groups.map((g) => { const a = Math.round((por[g] || 0) * 100) / 100, b = +pz[g] || 0, ok = !b && !a ? "" : Math.abs(a - b) < 0.02 ? "okc" : a > b ? "hic" : "lowc"; return `<tr><td>${gdot(g)}${esc(g)}</td><td class="${ok}"><b>${fmtN(a) || 0}</b> / ${fmtN(b) || 0}</td></tr>`; }).join("") || `<tr><td class="muted small">Agrega alimentos o crea la pauta.</td></tr>`}</table>
@@ -309,6 +347,12 @@ act("meMealMove", (el) => { const a = cur().meals, i = +el.dataset.i, j = i + +e
 act("meItAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).push({ name: "", cat: "", por: 1, g: 0 }); redraw(); setTimeout(() => { const ins = $$(`#menuEd [data-i="${el.dataset.i}"][data-f="name"][list]`); ins[ins.length - 1]?.focus(); }, 0); });
 act("meExAdd", (el) => { const m = cur().meals[+el.dataset.i]; (m.items ||= []).push({ name: "", cat: "", por: null, gp: null, g: 0, kcal: 0, cho: 0, fat: 0, prot: 0 }); redraw(); });
 act("meLeg", (el) => { cur().leg = el.checked; redraw(); });
+act("mePhase", async (el) => { if (MW.dirty && !(await confirmBox("Tienes cambios sin guardar en este plan. ¿Cambiar de etapa igual?"))) return; loadMW(S._coachClient, el.dataset.p); redraw(false); });
+act("meFrom", (el) => { const P = el.dataset.p ? S._coachClient.plans?.[el.dataset.p] : null; Object.assign(MW, { menus: clone(P?.menus || []), pauta: clone(P?.pauta || {}), pautaLeg: clone(P?.pautaLeg || {}), targets: {}, calc: {}, k: 0 }); if (!P) MW.menus = [newMenu("Opción 1")]; MW.exists = true; redraw(); toast(P ? `Copia del plan de ${el.dataset.p}: ajusta las metas y la pauta` : "Plan vacío creado"); });
+act("meTg", (el) => { if (el.value === "") delete MW.targets[el.dataset.k]; else MW.targets[el.dataset.k] = num(el.value); redraw(); });
+act("meCalc", (el) => { if (el.value === "") delete MW.calc[el.dataset.k]; else MW.calc[el.dataset.k] = num(el.value); redraw(); });
+act("meTgCalc", () => { const R = calcRes(S._coachClient); MW.targets = { kcal: R.kcal, cho: R.cho, fat: R.fat, prot: R.prot }; redraw(); });
+act("meTgPauta", () => { const m = pMac(MW.pauta); MW.targets = { kcal: r0(m.kcal), cho: r0(m.cho), fat: r0(m.fat), prot: r0(m.prot) }; redraw(); });
 act("mePauta", (el) => { const p = el.dataset.p === "l" ? MW.pautaLeg : MW.pauta; if (el.value === "") delete p[el.dataset.g]; else p[el.dataset.g] = num(el.value); MW.openPauta = true; redraw(); });
 act("mePautaOpen", (el) => { MW.openPauta = !el.parentElement.open; });
 act("mePautaCopy", async () => {
@@ -342,9 +386,13 @@ const exCalc = (it) => { if (it.p100 && it.g) ["kcal", "cho", "fat", "prot"].for
 act("meSave", async () => {
   const menus = MW.menus.map((mn) => ({ ...mn, meals: mn.meals.map((m) => ({ ...m, items: (m.items || []).filter((it) => it.name) })) }));
   const clean = (p) => Object.fromEntries(Object.entries(p || {}).filter(([, v]) => v !== "" && v != null && !isNaN(+v)).map(([g, v]) => [g, +v]));
-  const data = { menus, pauta: clean(MW.pauta), pautaLeg: clean(MW.pautaLeg) };
-  await db.set("clients/" + MW.cid, data); MW.menus = clone(menus); MW.dirty = false;
-  if (S._coachClient) Object.assign(S._coachClient, data); MW.imported = false; redraw(false); toast("Plan publicado ✓");
+  const c = S._coachClient || {}, plan = { menus, pauta: clean(MW.pauta), pautaLeg: clean(MW.pautaLeg), targets: clean(MW.targets), calc: MW.calc, at: Date.now() };
+  const plans = { ...(c.plans || {}), [MW.phase]: plan }, data = { plans };
+  // El plan de la etapa actual también queda como plan general (respaldo para semanas sin etapa)
+  if (c.phaseList?.find((x) => x.phase === MW.phase)?.current) Object.assign(data, { menus: plan.menus, pauta: plan.pauta, pautaLeg: plan.pautaLeg });
+  await db.set("clients/" + MW.cid, data); MW.menus = clone(menus); MW.dirty = false; MW.exists = true;
+  Object.assign(c, data); const ph = c.phaseList?.find((x) => x.phase === MW.phase); if (ph) ph.ready = true;
+  MW.imported = false; redraw(false); toast(`Plan de ${MW.phase} publicado ✓`);
 });
 // Importar un plan pasado desde PDF (archivo ima-planes.json, se prepara aparte: no queda en el repositorio público)
 const nameKey = (s) => nk(s).split(/\s+/).filter(Boolean);
@@ -361,12 +409,17 @@ act("meImport", async (el) => {
 });
 act("meImportPick", (el) => { closeSheet(); loadPlan(MW.importData.plans[+el.dataset.k]); });
 async function loadPlan(p) {
+  // El plan trae su etapa (ej. Mantención): se carga en esa pestaña si el cliente la tiene; si no, en la que estás viendo
+  const c = S._coachClient || {};
+  if (p.phase && p.phase !== MW.phase && c.phaseList?.some((x) => x.phase === p.phase)) loadMW(c, p.phase);
   const n = p.menus.length, prev = MW.menus.length;
-  if (!(await confirmBox(`Cargar el plan de ${p.name}: ${n} opciones (${p.menus.map((m) => m.name).join(", ")}).${prev ? ` Reemplaza las ${prev} opciones que tiene ahora.` : ""} No se publica hasta que toques “Guardar y publicar”.`))) return;
+  if (!(await confirmBox(`Cargar el plan de ${p.name}${p.phase ? ` (${p.phase})` : ""} en la etapa ${MW.phase}: ${n} opciones (${p.menus.map((m) => m.name).join(", ")})${p.targets ? ` y sus metas (${p.targets.kcal} kcal · C ${p.targets.cho} · L ${p.targets.fat} · P ${p.targets.prot})` : ""}.${prev ? ` Reemplaza las ${prev} opciones que tiene ahora.` : ""} No se publica hasta que toques “Guardar y publicar”.`))) return;
+  if (p.targets) MW.targets = { ...p.targets };
+  if (p.calc) { const { kg, ...k } = p.calc; MW.calc = k; }
   MW.menus = clone(p.menus).map((mn) => ({ ...mn, id: uid() })); MW.k = 0;
   if (p.pauta && Object.keys(p.pauta).length) MW.pauta = { ...p.pauta };
   if (p.pautaLeg && Object.keys(p.pautaLeg).length) MW.pautaLeg = { ...p.pautaLeg };
-  MW.imported = true;
+  MW.imported = true; MW.exists = true;
   redraw(); toast("Plan cargado: revísalo y publícalo");
 }
 export const menusDirty = () => !!MW?.dirty;

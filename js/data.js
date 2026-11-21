@@ -207,6 +207,7 @@ export const PHOTO_TYPES = [["frente", "Frente"], ["espalda", "Espalda"], ["perf
 
 // ---------- Etapas nutricionales (calendario por semanas)
 // client.stages = [{ phase, from, to, kcal, cho, fat, prot, steps, water, note }]  (from/to = n° de semana)
+export const PHASE_PCT = { "Break de dieta": 0, "Déficit leve": -10, "Déficit moderado": -20, "Déficit agresivo": -25, "Mini cut": -30, "Mantención": 0, "Recomposición corporal": -5, "Dieta reversa": 5, "Superávit / Volumen": 10 };
 export const PHASES = { "Break de dieta": "#a855f7", "Déficit leve": "#e0484e", "Déficit moderado": "#c3242b", "Déficit agresivo": "#8e1b1f", "Mini cut": "#b0263a", "Mantención": "#7d7d86", "Recomposición corporal": "#3b82f6", "Dieta reversa": "#d6a21e", "Superávit / Volumen": "#22a35a" };
 export const phaseColor = (p) => PHASES[p] || "#6b6b72";
 export function stageAt(c, date) {
@@ -217,24 +218,32 @@ export function stageAt(c, date) {
 // Cada etapa puede ajustar porciones por grupo (s.adj = { "Cereales": -1, "Aceites y grasas": -0.5 }):
 // la pauta cambia y los alimentos de ese grupo en las opciones del plan se achican (o agrandan) en la misma proporción.
 // Si la etapa no fija calorías/macros, se recalculan con los macros de las porciones de intercambio.
+// Planes de alimentación por etapa (20-nov): c.plans = { "Mantención": { menus, pauta, pautaLeg, targets: {kcal, cho, fat, prot}, calc }, … }.
+// La app muestra el plan de la etapa marcada en el Timeline para esa semana. Si esa etapa no tiene plan, queda el plan general (c.menus…).
+export const phaseAt = (c, date = ymd()) => stageAt(c, date)?.phase || c.phase || null;
+export const hasPlans = (c) => !!c.plans && Object.keys(c.plans).length > 0;
 export function applyStage(c, date = ymd()) {
-  const s = stageAt(c, date); if (!s) return c;
-  const o = { ...c, phase: s.phase || c.phase, stage: s };
-  const adj = Object.entries(s.adj || {}).filter(([, d]) => +d);
-  if (adj.length && c.pauta) {
-    const pauta = { ...c.pauta }, f = {}, dm = { kcal: 0, cho: 0, fat: 0, prot: 0 };
+  const s = stageAt(c, date), ph = s?.phase || c.phase || null, P = ph ? c.plans?.[ph] : null;
+  let o = { ...c, phase: ph || c.phase };
+  if (P) { o = { ...o, menus: P.menus || [], pauta: P.pauta || {}, pautaLeg: P.pautaLeg || {}, planPhase: ph }; for (const k of ["kcal", "cho", "fat", "prot"]) if (+P.targets?.[k]) o[k] = +P.targets[k]; }
+  if (!s) return o;
+  o.stage = s;
+  const adj = P ? [] : Object.entries(s.adj || {}).filter(([, d]) => +d); // con plan propio de la etapa, el ajuste ya está en su pauta
+  if (adj.length && o.pauta) {
+    const pauta = { ...o.pauta }, f = {}, dm = { kcal: 0, cho: 0, fat: 0, prot: 0 };
     for (const [g, d] of adj) {
       const old = +pauta[g] || 0, nu = Math.max(0, old + +d); pauta[g] = nu;
       if (old > 0) f[g] = nu / old;
       const G = GROUPS[g]; if (G) { const real = nu - old; dm.kcal += real * G[0]; dm.cho += real * G[1]; dm.fat += real * G[2]; dm.prot += real * G[3]; }
     }
     o.pauta = pauta;
-    if (c.pautaLeg) { o.pautaLeg = { ...c.pautaLeg }; for (const [g, d] of adj) if (o.pautaLeg[g] != null) o.pautaLeg[g] = Math.max(0, +o.pautaLeg[g] + +d); }
-    if (c.menus) o.menus = c.menus.map((m) => ({ ...m, meals: m.meals.map((ml) => ({ ...ml, items: ml.items.map((it) => (f[it.cat] != null && f[it.cat] !== 1 ? { ...it, por: it.por != null ? Math.round(it.por * f[it.cat] * 100) / 100 : it.por, g: it.g != null ? Math.round(it.g * f[it.cat]) : it.g, adj: true } : it)).filter((it) => !(it.adj && !it.g)) })) }));
+    if (o.pautaLeg) { o.pautaLeg = { ...o.pautaLeg }; for (const [g, d] of adj) if (o.pautaLeg[g] != null) o.pautaLeg[g] = Math.max(0, +o.pautaLeg[g] + +d); }
+    if (o.menus) o.menus = o.menus.map((m) => ({ ...m, meals: m.meals.map((ml) => ({ ...ml, items: ml.items.map((it) => (f[it.cat] != null && f[it.cat] !== 1 ? { ...it, por: it.por != null ? Math.round(it.por * f[it.cat] * 100) / 100 : it.por, g: it.g != null ? Math.round(it.g * f[it.cat]) : it.g, adj: true } : it)).filter((it) => !(it.adj && !it.g)) })) }));
     for (const k of ["kcal", "cho", "fat", "prot"]) if ((s[k] === "" || s[k] == null) && c[k]) o[k] = Math.round(c[k] + dm[k]);
   }
-  for (const k of ["kcal", "cho", "fat", "prot", "water"]) if ((s[k] === "" || s[k] == null) && s.auto?.[k] != null) o[k] = +s.auto[k];
-  for (const k of ["kcal", "cho", "fat", "prot", "steps", "water"]) if (s[k] !== "" && s[k] != null) o[k] = +s[k];
+  const fixed = (k) => P && +P.targets?.[k]; // las metas del plan de la etapa mandan
+  for (const k of ["kcal", "cho", "fat", "prot", "water"]) if (!fixed(k) && (s[k] === "" || s[k] == null) && s.auto?.[k] != null) o[k] = +s.auto[k];
+  for (const k of ["kcal", "cho", "fat", "prot", "steps", "water"]) if (!fixed(k) && s[k] !== "" && s[k] != null) o[k] = +s[k];
   return o;
 }
 export const adjTxt = (adj) => Object.entries(adj || {}).filter(([, d]) => +d).map(([g, d]) => `${g} ${+d > 0 ? "+" : "−"}${String(Math.abs(+d)).replace(".", ",")}`).join(" · ");
@@ -393,7 +402,8 @@ export function routineBlock(routine, sessions) {
       const sets = [];
       if (x.sides) for (let j = 0; j * 2 < x.sets.length; j++) { const a = x.sets[2 * j] || {}, b = x.sets[2 * j + 1] || {}; sets.push({ w: a.w, r: a.r, rir: a.rir, w2: b.w, r2: b.r }); }
       else for (const a of x.sets || []) sets.push({ w: a.w, r: a.r, rir: a.rir });
-      cells[wk] = { plan: tg, sets: sets.filter((y) => y.w !== "" || y.r !== ""), date: s.date, name: x.name };
+      const notes = (x.sets || []).map((a, k) => (a.note ? `S${(x.sides ? Math.floor(k / 2) : k) + 1}: ${a.note}` : "")).filter(Boolean);
+      cells[wk] = { plan: tg, sets: sets.filter((y) => y.w !== "" || y.r !== ""), date: s.date, name: x.name, tech: x.tech || (x.sets || []).map((a) => a.tech).find(Boolean) || "", notes, replaced: x.replaced ? x.replacedFrom : "" };
     }
     return { e, cells };
   });
