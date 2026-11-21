@@ -311,3 +311,8 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.34.3 (20-nov)
 - Datos y objetivos se guarda solo al cambiar cualquier campo (`dataAuto` → `saveData`, con aviso si falla); el botón Guardar sigue. Al cambiar la fecha de inicio avisa que las semanas y etapas se cuentan desde ese día.
 - OJO pendiente: cambiar la fecha de inicio de un cliente con historial renumera las semanas. Sesiones (`weekKey`), check-ins y retros (`S01`, `S02`…) guardan el número de semana viejo, y un check-in nuevo de la "semana 1" pisaría el antiguo de la semana 1. Falta decidir cómo manejar un "nuevo bloque" sin perder lo anterior.
+
+## v1.35.0 (20-nov) — Empezar de cero
+- Datos y objetivos → tarjeta "Empezar de cero…": hoja con fecha de semana 1 (por defecto mañana), etapa inicial (por defecto Mantención) y duración en semanas; confirmar escribiendo el primer nombre del cliente. Borra subcolecciones days, sessions, checkins, feedbacks, fbreplies, photos, measures, audios; limpia en rutinas changes/review/changed; en la ficha pone startDate, stages=[{phase,from:1,to:N}], rutReview/feedback null, weeklyGoals [], seen {}, resetAt. Mantiene ficha, rutinas, planes (plans) y acceso. No se puede deshacer.
+- Cliente con fecha de inicio futura: cabecera "empieza el …", aviso informativo "Empieza el …", el coach ve la semana 1 (no la 0), sin pendientes de revisión de rutinas hasta que parte (reviewWindow devuelve null si hoy < startDate).
+- Uso real: primer cliente oficial en la app parte así (nuevo bloque en Mantención). Sus fotos antiguas quedan en su planilla de Sheets.

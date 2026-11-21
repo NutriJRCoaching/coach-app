@@ -120,13 +120,13 @@ async function clientPanel(cid, tab, AA) {
   // Adelanta en segundo plano lo que usan las otras pestañas, así cambiar de pestaña es instantáneo
   if (PF !== cid) { PF = cid; ["routines", "sessions", "days", "checkins", "feedbacks", "measures", "exnotes"].forEach((x) => db.list(`clients/${cid}/${x}`).catch(() => {})); db.get("library/exercises").catch(() => {}); }
   const A = (AA?.A || []).filter((a) => a.c !== "i"), info = (AA?.A || []).filter((a) => a.c === "i");
-  const now = weekInfo(c, ymd());
+  const now = weekInfo(c, ymd()); if (now.n < 1) now.n = 1; // aún no empieza: se muestra la semana 1
   if (!CW || CW.cid !== cid) CW = { cid, n: now.n };
   const wDate = addDays(c.startDate || ymd(), (CW.n - 1) * 7);
   const w = weekInfo(c, wDate);
   const views = { resumen: tlView, etapas: stagesView, entrenos: trainingView, rutinas: trainingView, comida: foodView, plan: async (c) => { const cc = await planCtx(c); S._coachClient = cc; return menusEditor(cc); }, progreso: progView, checkins: checkinsView, feedback: feedbackView, datos: dataView };
   const weekNav = ["resumen", "entrenos", "comida", "feedback"].includes(tab);
-  return `<div class="row between"><h1>${esc(c.name)} <small class="muted">· ${c.service ? esc(SERVICES[c.service]) : "Asesoría sin definir"}${c.startDate ? ` · Semana ${now.n}` : ""} · <span style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</span></small></h1>
+  return `<div class="row between"><h1>${esc(c.name)} <small class="muted">· ${c.service ? esc(SERVICES[c.service]) : "Asesoría sin definir"}${c.startDate ? (c.startDate > ymd() ? ` · empieza el ${fmtDate(c.startDate)}` : ` · Semana ${now.n}`) : ""} · <span style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</span></small></h1>
   <button class="btn small" data-a="previewClient" data-id="${cid}">Ver como cliente</button></div>
   ${A.length || info.length ? `<div class="alertbar">${A.map((a) => chip(a, cid)).join("")}${info.map((a) => chip(a, cid)).join("")}</div>` : `<div class="alertbar"><span class="badge g">Todo al día ✓</span></div>`}
   <div class="row between">
@@ -236,7 +236,7 @@ const r_name = (el) => el.closest("label")?.firstChild?.textContent?.trim() || "
 // ---------- Plan de alimentación por etapa: aquí se diseña un plan para cada etapa del Timeline; la app del cliente
 // muestra solo el de la etapa de esa semana. Se pasan al editor las etapas (con sus semanas) y los valores para la calculadora.
 async function planCtx(c) {
-  const now = c.startDate ? weekInfo(c, ymd()).n : 1, st = validSt(c), cur = phaseAt(c) || "Mantención";
+  const now = c.startDate ? Math.max(1, weekInfo(c, ymd()).n) : 1, st = validSt(c), cur = phaseAt(c) || "Mantención";
   // Plan antiguo (uno solo): pasa a ser el plan de la etapa actual, con las metas generales (o las de su pauta)
   if (!hasPlans(c) && ((c.menus || []).length || Object.keys(c.pauta || {}).length)) {
     const t = {}; for (const k of ["kcal", "cho", "fat", "prot"]) if (+c[k]) t[k] = +c[k];
@@ -688,7 +688,9 @@ async function dataView(c) {
   <details><summary class="card-t">Pauta por porciones (la ve el cliente en su plan · día normal / día con legumbres)</summary><p class="muted small">Si llenas la del día con legumbres, el cliente la ve en “Mi plan” como “Día con legumbres” (o la usa la opción del plan marcada como día con legumbres).</p>
   <table class="tbl"><tr><th>Grupo</th><th>Día normal</th><th>Día con legumbres</th></tr>${Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => `<tr><td>${g}</td><td><input type="number" step="0.25" data-pauta="${esc(g)}" value="${c.pauta?.[g] ?? ""}" style="width:90px"></td><td><input type="number" step="0.25" data-pauta-leg="${esc(g)}" value="${c.pautaLeg?.[g] ?? ""}" style="width:90px"></td></tr>`).join("")}</table></details>
   <div class="card-t mt">Fechas de interés (una por línea: AAAA-MM-DD Texto)</div><textarea name="dates" rows="3">${esc((c.dates || []).map((d) => d.date + " " + d.label).join("\n"))}</textarea>
-  <div class="row gap mt"><button type="button" class="btn primary" data-a="dataSave">Guardar</button><button type="button" class="btn danger ghost" data-a="archive">Archivar cliente</button></div></form>`;
+  <div class="row gap mt"><button type="button" class="btn primary" data-a="dataSave">Guardar</button><button type="button" class="btn danger ghost" data-a="archive">Archivar cliente</button></div></form>
+  <div class="card"><div class="card-t">Empezar de cero</div><p class="small muted">Para que empiece a usar la app desde una fecha con todo limpio: borra sus registros diarios, entrenamientos, check-ins, retroalimentaciones, fotos, medidas y audios, y deja la semana 1 desde la fecha que elijas. Se mantienen su ficha, sus rutinas, sus planes de alimentación y su acceso.</p>
+  <button type="button" class="btn danger" data-a="resetOpen">Empezar de cero…</button></div>`;
 }
 document.addEventListener("rendered", async () => {
   const el = $("#wSug"); if (!el || !CW) return;
@@ -725,6 +727,28 @@ async function saveData(redraw) {
   await db.set("clients/" + CW.cid, data); resetAlerts(); if (!(fd.startDate && fd.startDate !== c0.startDate && c0.startDate)) toast("Guardado ✓"); if (redraw) refresh();
   } catch (err) { console.error(err); toast("No se pudo guardar: " + (err.message || err)); }
 }
+// Empezar de cero (ej. primer día real en la app): borra lo registrado y reinicia semanas y etapas
+act("resetOpen", async () => {
+  const c = await getClient(CW.cid), tm = addDays(ymd(), 1);
+  sheet("Empezar de cero", `<p class="small">Se borra todo lo registrado de <b>${esc(c.name)}</b> (días, entrenamientos, check-ins, retroalimentaciones, fotos, medidas y audios). Se mantienen su ficha, rutinas, planes de alimentación y acceso. <b>No se puede deshacer.</b></p>
+  <label>Semana 1 desde<input type="date" id="rzD" value="${tm}"></label>
+  <div class="grid3"><label class="span2">Etapa con la que parte<select id="rzP">${Object.keys(PHASES).map((p) => `<option ${p === "Mantención" ? "selected" : ""}>${esc(p)}</option>`).join("")}</select></label><label>Durante (semanas)<input type="number" id="rzN" value="8" min="1" max="52"></label></div>
+  <label>Para confirmar, escribe su nombre<input id="rzC" placeholder="${esc((c.name || "").split(" ")[0])}"></label>
+  <button class="btn danger big" data-a="resetDo">Borrar y empezar de cero</button>`);
+});
+act("resetDo", async () => {
+  const c = await getClient(CW.cid), first = (c.name || "").split(" ")[0].toLowerCase();
+  if (($("#rzC").value || "").trim().toLowerCase() !== first) return toast(`Escribe "${(c.name || "").split(" ")[0]}" para confirmar`);
+  const start = $("#rzD").value, phase = $("#rzP").value, n = Math.max(1, +$("#rzN").value || 8); if (!start) return toast("Elige la fecha");
+  closeSheet(); toast("Borrando…");
+  let k = 0;
+  for (const sub of ["days", "sessions", "checkins", "feedbacks", "fbreplies", "photos", "measures", "audios"]) for (const d of await db.list(`clients/${CW.cid}/${sub}`).catch(() => [])) { await db.del(`clients/${CW.cid}/${sub}/${d.id}`); k++; }
+  // Rutinas: sin marcas de cambios ni revisiones de semanas antiguas
+  for (const r of await getRoutines(CW.cid)) await db.set(`clients/${CW.cid}/routines/${r.id}`, { changes: null, review: null, exercises: (r.exercises || []).map((e) => ({ ...e, changed: false })) });
+  await db.set("clients/" + CW.cid, { startDate: start, stages: [{ phase, from: 1, to: n }], phase, rutReview: null, feedback: null, weeklyGoals: [], seen: {}, resetAt: Date.now() });
+  const c2 = await getClient(CW.cid); await stStore(c2, validSt(c2));
+  CW = null; RE = null; resetAlerts(); toast(`Listo: ${k} registros borrados. Semana 1 desde el ${fmtDate(start)} (${phase}).`, 4000); refresh();
+});
 act("accSet", async (el) => {
   const c = await getClient(CW.cid), e = emailKey(c.email); if (!e) return toast("Primero anota su correo");
   const ok = el.dataset.v === "1";

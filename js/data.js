@@ -385,7 +385,7 @@ export function payMsg(c) {
 // Revisión semanal de la rutina: la ventana parte el día del último entrenamiento de la semana
 // (o 2 días antes de que termine si no hay calendario) y dura hasta que empieza la semana siguiente.
 export function reviewWindow(c, routines, sessions, today = ymd()) {
-  if (!c.startDate || !routines.length) return null;
+  if (!c.startDate || !routines.length || today < c.startDate) return null; // aún no empieza: no hay semana que revisar
   const w = weekInfo(c, today), plan = weekPlan(c, routines, sessions, today);
   const lastTrain = plan.planned.length ? plan.planned[plan.planned.length - 1].date : addDays(w.last, -1);
   const next = weekInfo(c, addDays(w.last, 1));

@@ -82,6 +82,7 @@ export function alertsFor(c, x) {
   else if (!active) add("i", "Aún no tiene acceso a la app");
   if (active && !c.example && !x.onb?.done) add("i", "Aún no completa la bienvenida a la app");
   if (!c.startDate) add("y", "Falta la fecha de inicio (define sus semanas)");
+  else if (c.startDate > today) add("i", `Empieza el ${fmtDate(c.startDate)}`);
   const miss = [["sex", "sexo"], ["birth", "fecha de nacimiento"], ["height", "estatura"]].filter(([k]) => !c[k]).map(([, l]) => l);
   if (miss.length) add("y", "Faltan datos: " + miss.join(", "));
   if (c.service === "nutricion" && active && !x.routines.length) add("i", "Aún no arma sus rutinas en la app", "entrenos");
