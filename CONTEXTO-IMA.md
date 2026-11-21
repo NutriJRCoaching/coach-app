@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.34.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 20-nov-2026, versión **1.34.2**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -304,3 +304,6 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.34.1 (20-nov)
 - Ajustes del cliente: la lista de recordatorios (agua, comidas, pasos, peso, entrenamiento, check-in, avisos con la app cerrada) se ve siempre, atenuada hasta que activa "Activar recordatorios" (antes solo aparecía con los avisos activados y el permiso dado). Los recordatorios se guardan en el celular de cada cliente (LS `rem`), no en su ficha: en "Ver como cliente" se ve la configuración del navegador del coach.
 - Arreglo: "Tu horario de todos los días" usaba la clase `sched` del calendario del panel (7 columnas) y se veía apretado; ahora `remsched`.
+
+## v1.34.2 (20-nov)
+- Progreso del cliente: "Timeline" con la descripción "Un resumen de tus estadísticas semana a semana". En el Timeline, el calendario nutricional es un calendario del mes (`monthCal`, con flechas para cambiar de mes; `TLM`) con los días pintados por etapa y su leyenda, en vez de la barra de etapas.

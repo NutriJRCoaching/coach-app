@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { diffDays } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg } from "./data.js";
@@ -686,7 +686,7 @@ async function progress() {
     ${!fb.videoUrl ? `<button class="btn small" data-a="openFeedback">Ver y calificar</button>` : ""}` : ""}
     ${(c.weeklyGoals || []).length ? `<div class="goals-t">Tu foco esta semana</div><ul>${c.weeklyGoals.map((g) => `<li>${esc(g)}</li>`).join("")}</ul>` : ""}</div>` : ""}
   <a class="card" href="#peso"><div class="card-t">${I.scale}Peso corporal</div>${lineChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), [{ vals: wv, color: "var(--dim)", dots: true, w: 1 }, { vals: trend(wv), color: "var(--acc)" }], { h: 130 })}</a>
-  <div class="list">${has("prog_timeline") ? `<a href="#timeline"><span>Timeline y etapas<small>Tu calendario nutricional semana a semana</small></span>${I.chev}</a>` : ""}
+  <div class="list">${has("prog_timeline") ? `<a href="#timeline"><span>Timeline<small>Un resumen de tus estadísticas semana a semana</small></span>${I.chev}</a>` : ""}
   <a href="#sueno"><span>Sueño<small>Registro y estadísticas</small></span>${I.chev}</a>
   ${has("prog_photos") ? `<a href="#fotos"><span>Fotos<small>Por semana y comparador</small></span>${I.chev}</a>` : ""}
   ${has("prog_measures") ? `<a href="#medidas"><span>Medidas<small>Una vez al mes</small></span>${I.chev}</a>` : ""}
@@ -1129,6 +1129,9 @@ export function weeksTable(raw, days, routines, sessions, today = ymd()) {
       <td class="muted">${r.t.kcal || "—"}</td><td class="muted">${r.t.cho || "—"}</td><td class="muted">${r.t.fat || "—"}</td><td class="muted">${r.t.prot || "—"}</td><td class="muted">${r.t.water ? r1(r.t.water / 1000) + " L" : "—"}</td><td class="muted">${(r.t.steps || 0).toLocaleString("es-CL")}</td></tr>`; }).join("")}</tbody></table></div>
     <div class="legend small"><span><i class="okc"></i>en meta</span><span><i class="lowc"></i>ojo</span><span><i class="hic"></i>lejos de la meta</span></div>`;
 }
+// Mes que se ve en el calendario nutricional del Timeline (se puede avanzar o retroceder)
+const TLM = { m: null };
+act("tlMonth", (el) => { TLM.m = el.dataset.m; refresh(); });
 async function timelineView() {
   const raw = S.raw || {}, today = ymd(), cur = weekInfo(raw, today);
   const [days, routines, sessions] = await Promise.all([getDays(raw.startDate || addDays(today, -90), today), getRoutines(S.cid), getSessions(S.cid)]);
@@ -1136,7 +1139,7 @@ async function timelineView() {
   const next = st.find((s) => +s.from > cur.n), curStage = stageAt(raw, today);
   const dates = (raw.dates || []).filter((d) => d.date >= today);
   return `${head("Timeline", "progreso")}
-  <div class="card"><div class="card-t">Calendario nutricional</div>${stagesBar(raw, cur.n)}
+  <div class="card"><div class="card-t">Calendario nutricional</div>${monthCal(raw, { month: TLM.m || today.slice(0, 7), nav: "tlMonth" })}
   ${curStage ? `<div class="note"><b style="color:${phaseColor(curStage.phase)}">${esc(curStage.phase)}</b> · semanas ${curStage.from} a ${curStage.to}${curStage.note ? ` · ${esc(curStage.note)}` : ""}</div>` : ""}
   ${next ? `<div class="small muted">Próxima etapa: <b style="color:${phaseColor(next.phase)}">${esc(next.phase)}</b> desde la semana ${next.from}</div>` : ""}</div>
   <div class="card" style="padding:8px">${weeksTable(raw, days, routines, sessions, today)}</div>
