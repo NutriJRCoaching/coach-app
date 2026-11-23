@@ -377,4 +377,5 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 PENDIENTE:
 1. Joaquín: en la ficha de Marian, "Empezar de cero" (semana 1 desde dom 22-nov, usa la app desde lun 23-nov, Mantención) si aún no se hizo, revisar que Día de check-in = domingo, e importar `ima-rutinas-marian.json` en Entrenamiento (queda en rotación sola).
 2. Verificar en su celular la primera semana (Próximo / Sugerido, check-in del domingo 29 = semana 1).
+4. "Cambios sin guardar" sigue apareciendo en las rutinas de Marian en la cuenta real aunque no se toque nada (también después de v1.37.6). No es grave (guardar sin cambios no marca nada al cliente). Para encontrarlo: abrir su ficha con el navegador integrado logueado y comparar `RE.orig` vs `RE.r.exercises` en la consola; sospechar del listener global de `change` en `[data-rdirty]` o de alguna re-renderización que modifica RE.r.
 3. Joaquín: llenar Biblioteca → Datos para transferir (sus datos los dio en el chat del 22-nov; no se guardan en este archivo).
