@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.37.5**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.37.6**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -369,6 +369,10 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## v1.37.5 (22-nov)
 - Tabla de Clientes: la columna Pendientes queda plegada (`pendDrop`): puntos con la cantidad de rojos, amarillos e informativos (verde ✓ si no hay rojos ni amarillos); al tocarlos se despliega la lista de pendientes (queda abierta mientras no se recargue, `OPEN_P`). Pedido de Joaquín: la lista completa ocupaba demasiado espacio.
+
+
+## v1.37.6 (22-nov)
+- "Cambios sin guardar" en las rutinas aparecía en la cuenta real de Joaquín sin haber tocado nada (en el demo no se reproducía). Ahora se compara el contenido normalizado (`exDiff`/`canonX`: claves ordenadas, números como texto, sin campos vacíos ni `changed`) en vez del JSON tal cual. Si sigue apareciendo, la causa es otra (revisar el listener global de `change` en `[data-rdirty]`).
 
 PENDIENTE:
 1. Joaquín: en la ficha de Marian, "Empezar de cero" (semana 1 desde dom 22-nov, usa la app desde lun 23-nov, Mantención) si aún no se hizo, revisar que Día de check-in = domingo, e importar `ima-rutinas-marian.json` en Entrenamiento (queda en rotación sola).

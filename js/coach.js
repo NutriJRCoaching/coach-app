@@ -275,7 +275,7 @@ async function routinesView(c) {
   if ((!RE || RE.cid !== c.id) && routines.length) { const r0_ = routines[0]; RE = { cid: c.id, r: JSON.parse(JSON.stringify(r0_)), orig: JSON.stringify(r0_.exercises || []), origNote: r0_.note || "" }; }
   const ed = RE && RE.cid === c.id ? RE.r : null;
   const rv = reviewWindow(c, routines, sessions);
-  const edDirty = ed && (JSON.stringify(ed.exercises || []) !== RE.orig || (ed.note || "") !== (RE.origNote || ""));
+  const edDirty = ed && (exDiff(ed.exercises, RE.orig) || (ed.note || "") !== (RE.origNote || ""));
   return `${rv ? `<div class="card review ${rv.done ? "ok" : rv.open ? "due" : ""}"><div class="row between"><div><div class="card-t">Pendientes para la semana ${rv.next.n} · parte el ${fmtDate(rv.next.first, true)}</div>
     <p class="small">${rv.done ? "✓ Todo revisado. El cliente ve los ajustes en su semana." : rv.open ? "Ya terminó su semana: en cada rutina ajusta series, reps, RIR, kg sugerido y comentarios y toca “Guardar cambios”, o márcala “Sin cambios”." : `Se abre el ${fmtDate(rv.lastTrain)} (su último entrenamiento de la semana). Igual puedes dejarla lista antes.`}</p>
     <div class="rv-list">${rv.list.map((x) => { const dz = edDirty && ed.id === x.r.id; return `<button class="rv-item ${x.done ? "ok" : dz ? "dz" : ""}" data-a="rEdit" data-id="${x.r.id}">${x.done ? "✓" : dz ? "●" : "○"} <b>${esc(x.r.name)}</b><small>${dz ? "cambios sin guardar" : x.done ? (x.same ? "sin cambios" : "con ajustes") : "por revisar"}</small></button>`; }).join("")}</div></div>
@@ -326,7 +326,7 @@ act("rotDay", async (el) => { const c = await getClient(CW.cid), s = new Set((c.
 act("schedSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { schedule: { ...(c.schedule || {}), [el.dataset.d]: el.value || null } }); toast("Calendario guardado"); });
 act("cardioSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), [el.dataset.k]: el.type === "number" ? num(el.value) : el.value } }); toast("Guardado"); });
 act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = new Set(c.cardio?.days || []); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), days: [...s] } }); });
-act("rEdit", async (el) => { if (RE?.r && RE.r.id !== el.dataset.id && (JSON.stringify(RE.r.exercises || []) !== RE.orig || (RE.r.note || "") !== (RE.origNote || "")) && !(await confirmBox(`Tienes cambios sin guardar en ${RE.r.name}. ¿Salir sin guardarlos?`))) return; const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: JSON.parse(JSON.stringify({ id: el.dataset.id, ...r })), orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
+act("rEdit", async (el) => { if (RE?.r && RE.r.id !== el.dataset.id && (exDiff(RE.r.exercises, RE.orig) || (RE.r.note || "") !== (RE.origNote || "")) && !(await confirmBox(`Tienes cambios sin guardar en ${RE.r.name}. ¿Salir sin guardarlos?`))) return; const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: JSON.parse(JSON.stringify({ id: el.dataset.id, ...r })), orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
 // Importar rutinas (ima-rutinas.json armado desde la planilla del cliente): reemplaza sus rutinas actuales
 const nkx = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 act("rImport", async (el) => {
@@ -363,7 +363,7 @@ function blockGrid(c, r, sessions, rv) {
   migrateWSug(r);
   const prog = (y, p) => { if (!y || !p) return ""; const dw = (+y.w || 0) - (+p.w || 0), dr = (+y.r || 0) - (+p.r || 0); return dw > 0 || (dw === 0 && dr > 0) ? "up" : dw < 0 || (dw === 0 && dr < 0) ? "down" : ""; };
   const repsTxt = (e) => (e.sets || []).map((x) => x.reps ?? "").join(", "), rirTxt = (e) => [...new Set((e.sets || []).map((x) => x.rir ?? ""))].join(", ");
-  const dirty = JSON.stringify(r.exercises || []) !== RE.orig || (r.note || "") !== (RE.origNote || "") || r.isNew;
+  const dirty = exDiff(r.exercises, RE.orig) || (r.note || "") !== (RE.origNote || "") || r.isNew;
   const st = rv?.list?.find((x) => x.r.id === r.id);
   return `<div class="card blk" data-rdirty><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><span class="row gap"><span id="rDirty" class="badge y" ${dirty ? "" : "hidden"}>Cambios sin guardar</span>${st && !st.done ? `<button class="btn" data-a="rSameOne" data-id="${r.id}" data-w="${rv.next.key}" title="La semana ${revN} esta rutina queda igual">Sin cambios para la semana ${revN}</button>` : st?.done ? `<span class="badge g">${st.same ? "Semana " + revN + ": sin cambios" : "Semana " + revN + ": con ajustes"} ✓</span>` : ""}<button class="btn primary" data-a="rSave">Guardar cambios</button></span></div>
   <label>Comentario general de la rutina (lo ve al empezarla)<textarea rows="2" data-a-change="rNote" placeholder="Ej: Esta semana sube un poco el peso en los multiarticulares y cuida la bajada en todo.">${esc(r.note || "")}</textarea></label>
@@ -402,6 +402,10 @@ function routineEditor(r, lib) {
   <button class="btn" data-a="exAdd">＋ Añadir ejercicio</button></div>`;
 }
 act("setF", (el) => { const x = RE.r.exercises[+el.dataset.k].sets[+el.dataset.j]; const v = el.value.trim(), f = el.dataset.f; if (f === "w") { if (v === "") delete x.w; else x.w = v.replace(",", "."); } else x[f] = f === "rir" ? (v === "" ? "" : v.toUpperCase() === "F" ? "F" : +v) : v; const d = $("#rDirty"); if (d) d.hidden = false; });
+// ¿Hay cambios sin guardar en los ejercicios? Compara el contenido (sin importar el orden de las claves, números vs texto,
+// campos vacíos ni la marca interna "changed"): Firestore puede devolver los mismos datos con otra forma.
+const canonX = (v) => Array.isArray(v) ? v.map(canonX) : v && typeof v === "object" ? Object.keys(v).sort().filter((k) => k !== "changed" && v[k] !== "" && v[k] != null && !(Array.isArray(v[k]) && !v[k].length)).map((k) => [k, canonX(v[k])]) : String(v);
+const exDiff = (list, orig) => JSON.stringify(canonX(list || [])) !== JSON.stringify(canonX(JSON.parse(orig || "[]")));
 // Antes el kg sugerido era uno por ejercicio (e.wSug, ej. "43 / 48"): se pasa a cada serie (sets[j].w) sin marcarlo como cambio
 function migrateWSug(r) {
   const mig = (list) => (list || []).forEach((e) => { if (!e.wSug) return; const v = String(e.wSug).split("/").map((x) => x.trim().replace(",", ".")).filter(Boolean); if (!(e.sets || []).some((x) => x.w)) (e.sets || []).forEach((x, j) => (x.w = v[Math.min(j, v.length - 1)])); delete e.wSug; });
