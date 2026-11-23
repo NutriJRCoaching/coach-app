@@ -7,6 +7,8 @@ import { I } from "./icons.js";
 import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, dualChart, $, $$ } from "./ui.js";
 import { e1rm } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
+import { PAY_FIELDS } from "./data.js";
+let PAYD = null; // datos para transferir (library/payment), para la vista previa en Datos
 import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto, routineBlock, planStr, setStr, isRotation, nextInRotation, appStart } from "./data.js";
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
@@ -709,6 +711,7 @@ act("fbSave", async (el) => {
 
 // ---------- Datos y objetivos
 async function dataView(c) {
+  if (!PAYD) PAYD = (await db.get("library/payment").catch(() => null)) || {};
   const f = (k, l, type = "text", extra = "") => `<label>${l}<input name="${k}" type="${type}" value="${esc(c[k] ?? "")}" ${extra}></label>`;
   const acc = c.email ? await db.get("access/" + emailKey(c.email)).catch(() => null) : null;
   const legacy = !!(await db.get("users/" + c.id).catch(() => null)); // cuenta creada con el sistema antiguo
@@ -723,7 +726,7 @@ async function dataView(c) {
   ${f("city", "Ciudad / país (zona horaria)")}
   ${f("payDate", "Próximo pago", "date")}<label>Se renueva cada<select name="payEvery">${[["", "—"], ["30", "1 mes"], ["90", "3 meses"], ["180", "6 meses"]].map(([v, l]) => `<option value="${v}" ${String(c.payEvery ?? "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
   ${c.sheetUrl ? `<label>Planilla anterior<a class="btn small" target="_blank" href="${esc(c.sheetUrl)}">Abrir planilla</a></label>` : ""}</div>
-  ${c.payDate ? `<div class="note small"><b>Así le llega el recordatorio de pago</b> (le aparece en el inicio el mismo día; si pasa la fecha, le sale "Pago pendiente" en rojo). A ti te avisa 3 días antes:<div class="paycard mt">${payMsg(c)}</div></div>` : ""}
+  ${c.payDate ? `<div class="note small"><b>Así le llega el recordatorio de pago</b> (le aparece en el inicio el mismo día; si pasa la fecha, le sale el segundo en rojo). A ti te avisa 3 días antes. Tus datos para transferir se editan en Biblioteca → Datos para transferir:<div class="paycard mt">${payMsg(c, PAYD)}</div><div class="paycard late mt">${payMsg(c, PAYD, true)}</div></div>` : ""}
   <label>Pendientes (uno por línea · empieza con <b>!</b> si es urgente) — aparecen en amarillo o rojo<textarea name="todo" rows="3">${esc((c.todo || []).join("\n"))}</textarea></label>
   <label>Notas internas (solo las ves tú)<textarea name="notes" rows="3">${esc(c.notes || "")}</textarea></label>
   <div class="card-t mt">Información personal</div><div class="grid3">
@@ -869,12 +872,15 @@ async function library() {
     return `${h}<tr class="${diff ? "diff" : ""}"><td><b>${esc(l)}</b><br><small class="muted">${esc(d)}</small></td>${SVC_COLS.map(([sv]) => `<td class="center"><input type="checkbox" class="svck" ${val(k, sv) ? "checked" : ""} data-a-change="svcSet" data-k="${k}" data-s="${sv}"></td>`).join("")}</tr>`; }).join("")}</table>
   <p class="muted small">Las filas marcadas en color son las que cambian entre servicios. <button class="btn tiny ghost" data-a="svcReset">Volver a los valores de fábrica</button></p></div>`;
   const ob = (await db.get("library/onboarding")) || {};
+  const pd = (await db.get("library/payment")) || {};
+  const payCard = `<div class="card"><div class="card-t">Datos para transferir</div><p class="muted small">Le aparecen al cliente en el recordatorio de pago (el día que le toca y, si pasa la fecha, en "Pago pendiente"). Se guardan en tu base de datos, no en el código.</p>
+  <div class="grid3">${PAY_FIELDS.map(([k, l]) => `<label>${l}<input data-a-change="paySet" data-k="${k}" value="${esc(pd[k] || "")}"></label>`).join("")}</div></div>`;
   const obCard = `<div class="card"><div class="card-t">Bienvenida (onboarding de clientes nuevos)</div><p class="muted small">Se abre sola la primera vez que el cliente entra: tu video, tu mensaje y 5–6 pantallas cortas que explican la app según su tipo de asesoría (su servicio, instalar y activar avisos, registrar, entrenar, check-in). Queda en Más → “Bienvenida a IMA” para volver a verla.</p>
   <label>Video de bienvenida (YouTube no listado)<input id="obV" value="${esc(ob.videoUrl || "")}" placeholder="https://youtu.be/…"></label>
   <label>Mensaje de bienvenida<textarea id="obT" rows="3" placeholder="Esta es tu app de asesoría…">${esc(ob.text || "")}</textarea></label>
   <label>Link al manual de uso (opcional)<input id="obM" value="${esc(ob.manualUrl || "")}"></label>
   <div class="row gap"><button class="btn primary" data-a="obSave">Guardar</button><button class="btn" data-a="obOpen">Ver cómo se ve</button></div></div>`;
-  return `<h1>Biblioteca</h1>${obCard}${svcTable}
+  return `<h1>Biblioteca</h1>${obCard}${payCard}${svcTable}
   <div class="card"><div class="row between"><div class="card-t">Base de ejercicios (${ex.length}) · ${ex.filter((e) => e.video).length} con video · ${ex.filter((e) => e.tips).length} con tips</div><button class="btn tiny" data-a="libGuess">Asignar grupo muscular automáticamente</button></div>
   <p class="muted small">Al escribir un ejercicio en una rutina se completan solos su video, sus tips y sus reemplazos. Las variantes (agarre en V, recto, sentado…) pueden copiar los tips de la principal.</p>
   <div class="scroll-x"><table class="tbl libt"><tr><th>Ejercicio</th><th>Grupo muscular</th><th>Video</th><th>Tips</th><th>Link del video</th><th>Tips de ejecución (uno por línea)</th><th></th></tr>
@@ -890,6 +896,7 @@ async function library() {
 }
 act("svcSet", async (el) => { const m = await loadMatrix(true); m[el.dataset.k] = { ...(m[el.dataset.k] || {}), [el.dataset.s]: el.checked }; await db.set("library/services", { matrix: m, at: Date.now() }, false); await loadMatrix(true); toast("Guardado"); refresh(); });
 act("svcReset", async () => { if (!(await confirmBox("¿Volver a los valores de fábrica en todos los servicios?"))) return; await db.set("library/services", { matrix: {}, at: Date.now() }, false); await loadMatrix(true); refresh(); });
+act("paySet", async (el) => { await db.set("library/payment", { [el.dataset.k]: el.value.trim(), at: Date.now() }); PAYD = null; toast("Guardado"); });
 act("obSave", async () => { await db.set("library/onboarding", { videoUrl: $("#obV").value.trim(), text: $("#obT").value.trim(), manualUrl: $("#obM").value.trim(), at: Date.now() }, false); toast("Bienvenida guardada ✓"); });
 const libSave = async (doc, items) => { await db.set("library/" + doc, { items }, false); };
 act("libEx", async (el) => {

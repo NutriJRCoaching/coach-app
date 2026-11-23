@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.37.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.37.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -343,6 +343,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Check-in del día de inicio de semana** (data.js `ciOff`, `ciLate`, `ciWeek`, `ciOverdue`): si el día de check-in cae ≤ 2 días después de que parte la semana (ej. domingo con semanas dom–sáb), el check-in de ese día es el de la SEMANA ANTERIOR. `ciWeek(c, date)` → `{w, open}`: el sábado (último día) ya puede mandar el de esa semana; del domingo en adelante es el de la semana anterior; el pendiente/recordatorio sale el último día de la semana, el día de check-in y el siguiente. Sin `checkinDay` o con día a mitad de semana, todo sigue como antes (semana actual, pendiente los 2 últimos días). Lo usan checkinView, ciSave, el pendiente del inicio, el recordatorio y el ítem de Más. "¿Cuántos días registraste?" cuenta solo desde `appStart` (ej. "de 6"). En el panel, "No ha enviado el check-in de la semana N" sale recién pasado el día siguiente al de check-in (`ciOverdue`).
 - **Marian (primera clienta con rotación)**: archivo `ima-rutinas-marian.json` (fuera del repo, entregado en el chat del 22-nov) con Fullbody A (11 ejercicios) y Fullbody B (10), nombres y tips de "Programa y Tips", reps por serie con RIR 1, peso sugerido = lo de su última sesión en la planilla (serie 1 / serie 2) y `rotation` L-Mi-V. Abdomen y Pantorrilla eran "2-3 series": van con 2 series y la nota "la 3ª es opcional". En el registro, "Hip Thrust/Patada" = "Patada de Glúteo en Máquina" (nombre de Programa y Tips). Planilla leída con el navegador integrado vía `gviz/tq?tqx=out:csv&sheet=…` (el conector de Drive solo trae la estructura, no los valores).
 
+
+## v1.37.1 (22-nov) — Recordatorio de pago nuevo (pedido de Joaquín)
+- `payMsg(c, pay, late)` en data.js. Día del pago: "Hola {nombre} 👋 / Hoy, {martes 1 de diciembre}, se renueva tu asesoría." + datos para transferir + "Una vez transferido recuerda enviarme el comprobante. Cualquier duda o consulta puedes escribirme por WhatsApp." Vencido ("Pago pendiente", en rojo): "Tu asesoría se renovaba el … y aún no tengo registrado el pago." + datos + comprobante + "Si ya pagaste, ignora este mensaje. Si tienes alguna dificultad, escríbeme por WhatsApp y lo vemos." Fecha con el mes completo (`longDate`). Se descartó el texto anterior ("lo que llevamos hasta ahora es puro trabajo tuyo").
+- **Datos para transferir** en `library/payment` {name, rut, bank, type, number, email} (`PAY_FIELDS`), editables en Biblioteca → "Datos para transferir". NO van en el código (repo público). El cliente los lee solo el día del pago o si está vencido. Datos y objetivos muestra la vista previa de los dos mensajes.
+
 PENDIENTE:
 1. Joaquín: en la ficha de Marian, "Empezar de cero" (semana 1 desde dom 22-nov, usa la app desde lun 23-nov, Mantención) si aún no se hizo, revisar que Día de check-in = domingo, e importar `ima-rutinas-marian.json` en Entrenamiento (queda en rotación sola).
 2. Verificar en su celular la primera semana (Próximo / Sugerido, check-in del domingo 29 = semana 1).
+3. Joaquín: llenar Biblioteca → Datos para transferir (sus datos los dio en el chat del 22-nov; no se guardan en este archivo).

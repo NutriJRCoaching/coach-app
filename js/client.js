@@ -80,6 +80,7 @@ async function home() {
   const [day, routines, sessions] = await Promise.all([getDay(date), getRoutines(S.cid), getSessions(S.cid)]);
   const w = weekInfo(c, date);
   const plan = weekPlan(c, routines, sessions, date); S.wplan = plan;
+  const pay = date === ymd() && c.payDate && diffDays(c.payDate, ymd()) <= 0 ? await db.get("library/payment").catch(() => null) : null; // datos para transferir
   const tot = dayTotals(day);
   const water = sum(day.water || [], (x) => x.ml), waterGoal = c.water || 2500;
   const sl = sleepHours(day.sleep);
@@ -96,8 +97,8 @@ async function home() {
   ${date === today && today < appStart(c) ? `<div class="card startcard"><div class="card-t">${I.info}Tu plan parte ${diffDays(appStart(c), today) === 1 ? "mañana" : "el " + fmtDate(appStart(c), true)}</div><p class="small">Ese día empieza tu semana 1. Mientras, puedes recorrer la app: revisa <a href="#plan">Mi plan</a>, tus rutinas en <a href="#entreno">Entreno</a> y ajusta tus recordatorios en Más → Ajustes.</p></div>` : ""}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
-  ${date === today && c.payDate && diffDays(c.payDate, today) === 0 ? `<div class="card paycard">${payMsg(c)}</div>` : ""}
-  ${date === today && c.payDate && diffDays(c.payDate, today) < 0 ? `<div class="card paycard late"><b>Pago pendiente</b><br>Tu asesoría se renovaba el ${fmtDate(c.payDate, true)} y aún no tengo registrado el pago. Si ya pagaste, ignora este mensaje 🙌 Si tienes algún problema, escríbeme y lo vemos.</div>` : ""}
+  ${date === today && c.payDate && diffDays(c.payDate, today) === 0 ? `<div class="card paycard">${payMsg(c, pay)}</div>` : ""}
+  ${date === today && c.payDate && diffDays(c.payDate, today) < 0 ? `<div class="card paycard late">${payMsg(c, pay, true)}</div>` : ""}
   ${date === today && has("feedback") && freshFb(c) ? `<a class="card fbmini" href="#progreso"><div class="card-t">${I.info}Tu coach respondió tu check-in · Semana ${+freshFb(c).week.slice(1)}</div><div class="small muted">${freshFb(c).videoUrl ? "Tienes un video nuevo · toca para verlo" : "Toca para ver tu retroalimentación"}</div></a>` : ""}
   <div class="grid2">
     ${has("home_kcal") ? `<a class="card tile" href="#comida"><div class="card-t">${I.fire}Calorías ${status(tot.kcal, c.kcal)}</div><div class="big">${r0(tot.kcal).toLocaleString("es-CL")} <small>/ ${(c.kcal || 0).toLocaleString("es-CL")} kcal</small></div><div class="foot grow">${mini(tot.kcal, c.kcal, "k")}</div>${pctTxt(tot.kcal, c.kcal)}</a>

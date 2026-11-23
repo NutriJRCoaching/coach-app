@@ -415,9 +415,20 @@ export const weightCorr = (d) => (d?.weight ? (d.weightBath === false ? d.weight
 export const waterAuto = (kg) => (kg ? Math.round((kg * 40) / 100) * 100 : null);
 
 // Recordatorio de pago que ve el cliente (mismo texto en el panel, para revisarlo antes)
-export function payMsg(c) {
-  const first = (c.name || "").split(" ")[0];
-  return `<b>¡Hola${first ? " " + esc(first) : ""}! 💪</b><br>Hoy, <b>${fmtDate(c.payDate, true)}</b>, se renueva tu asesoría. Gracias por seguir confiando en el proceso: lo que llevamos hasta ahora es puro trabajo tuyo.<br><small class="muted">Si tienes dudas con el pago o quieres cambiar algo de tu plan, escríbeme por WhatsApp.</small>`;
+// Recordatorio de pago (inicio del cliente). Los datos para transferir viven en library/payment (los edita el coach en Biblioteca, no van en el código)
+export const PAY_FIELDS = [["name", "Nombre"], ["rut", "RUT"], ["bank", "Banco"], ["type", "Tipo de cuenta"], ["number", "N° de cuenta"], ["email", "Correo"]];
+const MONTHS_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const longDate = (s) => { const d = parseYmd(s); return `${["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][d.getDay()]} ${d.getDate()} de ${MONTHS_L[d.getMonth()]}`; };
+function payData(pay) {
+  if (!pay || !PAY_FIELDS.some(([k]) => pay[k])) return "";
+  const line2 = [pay.bank, pay.type, pay.number ? "N° " + pay.number : ""].filter(Boolean).join(" · ");
+  return `<div class="paydata"><b>Datos para transferir:</b><br>${[pay.name, line2, pay.rut ? "RUT " + pay.rut : "", pay.email].filter(Boolean).map(esc).join("<br>")}</div>`;
+}
+export function payMsg(c, pay, late = false) {
+  const first = (c.name || "").split(" ")[0], hi = `Hola${first ? " " + esc(first) : ""} 👋`;
+  return late
+    ? `<b>Pago pendiente</b><br>${hi}<br>Tu asesoría se renovaba el ${longDate(c.payDate)} y aún no tengo registrado el pago.${payData(pay)}<p>Una vez transferido recuerda enviarme el comprobante. Si ya pagaste, ignora este mensaje. Si tienes alguna dificultad, escríbeme por WhatsApp y lo vemos.</p>`
+    : `${hi}<br>Hoy, ${longDate(c.payDate)}, se renueva tu asesoría.${payData(pay)}<p>Una vez transferido recuerda enviarme el comprobante. Cualquier duda o consulta puedes escribirme por WhatsApp.</p>`;
 }
 
 // ---------- Check-in: a qué semana corresponde
