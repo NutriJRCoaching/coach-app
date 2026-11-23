@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.37.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.37.2**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -347,6 +347,13 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.37.1 (22-nov) — Recordatorio de pago nuevo (pedido de Joaquín)
 - `payMsg(c, pay, late)` en data.js. Día del pago: "Hola {nombre} 👋 / Hoy, {martes 1 de diciembre}, se renueva tu asesoría." + datos para transferir + "Una vez transferido recuerda enviarme el comprobante. Cualquier duda o consulta puedes escribirme por WhatsApp." Vencido ("Pago pendiente", en rojo): "Tu asesoría se renovaba el … y aún no tengo registrado el pago." + datos + comprobante + "Si ya pagaste, ignora este mensaje. Si tienes alguna dificultad, escríbeme por WhatsApp y lo vemos." Fecha con el mes completo (`longDate`). Se descartó el texto anterior ("lo que llevamos hasta ahora es puro trabajo tuyo").
 - **Datos para transferir** en `library/payment` {name, rut, bank, type, number, email} (`PAY_FIELDS`), editables en Biblioteca → "Datos para transferir". NO van en el código (repo público). El cliente los lee solo el día del pago o si está vencido. Datos y objetivos muestra la vista previa de los dos mensajes.
+
+
+## v1.37.2 (22-nov) — Kg sugerido por serie y semana correcta en la tabla
+- **Kg sugerido por serie** (pedido de Joaquín): en la tabla semana a semana cada serie tiene su casilla de kg junto a reps y RIR (`sets[j].w`, opcional; se guarda con punto). Se quitó la columna única "Kg sug." (`e.wSug`). Las rutinas con `wSug` antiguo se migran al abrirlas en el panel (`migrateWSug`: "43 / 48" → serie 1 = 43, serie 2 = 48) sin marcarlo como cambio; queda guardado al tocar "Guardar cambios". El cliente ve "8 reps @RIR 1 · 43 kg" en "Lo que tienes que hacer hoy" y en "Ver rutina", y el kg sugerido como texto gris en la casilla de peso. Un cambio de kg sugerido se avisa al cliente ("serie 1: peso sugerido 45 kg"). La app sigue mostrando `wSug` viejo si una rutina no se ha vuelto a guardar.
+- **Semana de "lo que va a hacer"**: ahora es la misma semana a la que se marcan los cambios al guardar: la siguiente si ya se abrió la revisión semanal; si no, la actual (y la 1 si el cliente aún no parte). Antes decía "Semana 2" para una clienta que todavía no empezaba. El botón "Sin cambios para la semana N" sigue usando la semana de la revisión.
+- RE (rutina en edición) ahora es copia profunda de la rutina (antes copia superficial que compartía los ejercicios con la caché).
+- Joaquín prefirió no dejarle pesos sugeridos a Marian: `ima-rutinas-marian.json` regenerado sin `wSug` (reimportar; ella aún no registra entrenamientos).
 
 PENDIENTE:
 1. Joaquín: en la ficha de Marian, "Empezar de cero" (semana 1 desde dom 22-nov, usa la app desde lun 23-nov, Mantención) si aún no se hizo, revisar que Día de check-in = domingo, e importar `ima-rutinas-marian.json` en Entrenamiento (queda en rotación sola).

@@ -16,7 +16,8 @@ const TECH_NEXT = { "": "igual", igual: "mejor", mejor: "peor", peor: "" };
 const TECH_L = { "": "Técnica", peor: "↓ Peor", igual: "= Igual", mejor: "↑ Mejor" };
 const EXC = ["#e0313b", "#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#14b8a6", "#ec4899", "#f97316", "#06b6d4"];
 const exColor = (i) => EXC[i % EXC.length];
-const planTxt = (t) => `${esc(t.reps || "–")} reps${t.rir !== "" && t.rir != null ? ` @RIR ${t.rir}` : ""}`;
+const kgTxt = (w) => String(w).replace(".", ",");
+const planTxt = (t) => `${esc(t.reps || "–")} reps${t.rir !== "" && t.rir != null ? ` @RIR ${t.rir}` : ""}${t.w ? ` · ${esc(kgTxt(t.w))} kg` : ""}`;
 
 // ================================================================ TU SEMANA
 export async function trainView() {
@@ -153,7 +154,7 @@ function setRow(ex, i, j) {
   const st = ex.sets[j], ref = refSet(prev, ex.exId, j), t = ex.target[j] || {};
   const grp = ex.sides && j % 2 === 0 ? `<div class="sgrp"><b>Serie ${j / 2 + 1}</b><span id="diff-${i}-${j / 2}">${pairDiff(ex, j / 2)}</span></div>` : "";
   return `${grp}<div class="set ${st.done ? "done" : ""} ${ex.sides ? "sided" : ""}" id="set-${i}-${j}"><span class="sn">${ex.sides ? `<small class="sidel ${j % 2 ? "d" : "i"}">– ${j % 2 ? "Der." : "Izq."}</small>` : `<b>${j + 1}</b>`}</span>
-  <input type="number" inputmode="decimal" step="0.5" value="${st.w}" placeholder="${ref?.w ?? ""}" data-a-change="setVal" data-j="${j}" data-k="w">
+  <input type="number" inputmode="decimal" step="0.5" value="${st.w}" placeholder="${t.w ?? ref?.w ?? ""}" data-a-change="setVal" data-j="${j}" data-k="w">
   <label class="repbox ${t.reps ? "" : "free"}">${t.reps ? `<span class="rt" title="Reps de tu plan">${esc(t.reps)}</span>` : ""}<input type="number" inputmode="numeric" value="${st.r}" placeholder="${ref?.r ?? (parseInt(t.reps) || "")}" data-a-change="setVal" data-j="${j}" data-k="r"></label>
   <button class="rirb ${st.rir === "" ? "" : "rir" + st.rir}" data-a="rirPick" data-j="${j}">${st.rir === "" ? "–" : st.rir}</button>
   ${!has("train_tech") ? "" : `<button class="techb ${st.tech || ""}" data-a="techPick" data-j="${j}">${TECH_L[st.tech || ""]}</button>`}

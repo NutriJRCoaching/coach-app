@@ -263,7 +263,7 @@ async function routinesView(c) {
   const routines = await getRoutines(c.id), lib = (await db.get("library/exercises"))?.items || [], sessions = await getSessions(c.id);
   const sched = c.schedule || {};
   // Se abre sola la primera rutina (antes había que elegirla)
-  if ((!RE || RE.cid !== c.id) && routines.length) { const r0_ = routines[0]; RE = { cid: c.id, r: { ...r0_ }, orig: JSON.stringify(r0_.exercises || []), origNote: r0_.note || "" }; }
+  if ((!RE || RE.cid !== c.id) && routines.length) { const r0_ = routines[0]; RE = { cid: c.id, r: JSON.parse(JSON.stringify(r0_)), orig: JSON.stringify(r0_.exercises || []), origNote: r0_.note || "" }; }
   const ed = RE && RE.cid === c.id ? RE.r : null;
   const rv = reviewWindow(c, routines, sessions);
   const edDirty = ed && (JSON.stringify(ed.exercises || []) !== RE.orig || (ed.note || "") !== (RE.origNote || ""));
@@ -317,7 +317,7 @@ act("rotDay", async (el) => { const c = await getClient(CW.cid), s = new Set((c.
 act("schedSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { schedule: { ...(c.schedule || {}), [el.dataset.d]: el.value || null } }); toast("Calendario guardado"); });
 act("cardioSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), [el.dataset.k]: el.type === "number" ? num(el.value) : el.value } }); toast("Guardado"); });
 act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = new Set(c.cardio?.days || []); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), days: [...s] } }); });
-act("rEdit", async (el) => { if (RE?.r && RE.r.id !== el.dataset.id && (JSON.stringify(RE.r.exercises || []) !== RE.orig || (RE.r.note || "") !== (RE.origNote || "")) && !(await confirmBox(`Tienes cambios sin guardar en ${RE.r.name}. ¿Salir sin guardarlos?`))) return; const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: { id: el.dataset.id, ...r }, orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
+act("rEdit", async (el) => { if (RE?.r && RE.r.id !== el.dataset.id && (JSON.stringify(RE.r.exercises || []) !== RE.orig || (RE.r.note || "") !== (RE.origNote || "")) && !(await confirmBox(`Tienes cambios sin guardar en ${RE.r.name}. ¿Salir sin guardarlos?`))) return; const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: JSON.parse(JSON.stringify({ id: el.dataset.id, ...r })), orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
 // Importar rutinas (ima-rutinas.json armado desde la planilla del cliente): reemplaza sus rutinas actuales
 const nkx = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 act("rImport", async (el) => {
@@ -349,15 +349,17 @@ act("rNew", () => { RE = { cid: CW.cid, r: { id: uid(), name: "Nueva rutina", ex
 // Vista del bloque: lo indicado y lo hecho semana a semana, y la próxima semana editable en la misma tabla
 function blockGrid(c, r, sessions, rv) {
   const B = routineBlock(r, sessions), weeks = B.weeks.slice(-5);
-  const nextN = rv?.next?.n || weekInfo(c, ymd()).n + 1;
+  // Semana a la que van los cambios (igual que al guardar): la siguiente si ya se abrió la revisión; si no, la actual (o la 1 si aún no parte)
+  const nextN = rv?.open ? rv.next.n : Math.max(1, weekInfo(c, [ymd(), appStart(c) || ymd()].sort().pop()).n), revN = rv?.next?.n;
+  migrateWSug(r);
   const prog = (y, p) => { if (!y || !p) return ""; const dw = (+y.w || 0) - (+p.w || 0), dr = (+y.r || 0) - (+p.r || 0); return dw > 0 || (dw === 0 && dr > 0) ? "up" : dw < 0 || (dw === 0 && dr < 0) ? "down" : ""; };
   const repsTxt = (e) => (e.sets || []).map((x) => x.reps ?? "").join(", "), rirTxt = (e) => [...new Set((e.sets || []).map((x) => x.rir ?? ""))].join(", ");
   const dirty = JSON.stringify(r.exercises || []) !== RE.orig || (r.note || "") !== (RE.origNote || "") || r.isNew;
   const st = rv?.list?.find((x) => x.r.id === r.id);
-  return `<div class="card blk" data-rdirty><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><span class="row gap"><span id="rDirty" class="badge y" ${dirty ? "" : "hidden"}>Cambios sin guardar</span>${st && !st.done ? `<button class="btn" data-a="rSameOne" data-id="${r.id}" data-w="${rv.next.key}" title="La semana ${nextN} esta rutina queda igual">Sin cambios para la semana ${nextN}</button>` : st?.done ? `<span class="badge g">${st.same ? "Semana " + nextN + ": sin cambios" : "Semana " + nextN + ": con ajustes"} ✓</span>` : ""}<button class="btn primary" data-a="rSave">Guardar cambios</button></span></div>
+  return `<div class="card blk" data-rdirty><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><span class="row gap"><span id="rDirty" class="badge y" ${dirty ? "" : "hidden"}>Cambios sin guardar</span>${st && !st.done ? `<button class="btn" data-a="rSameOne" data-id="${r.id}" data-w="${rv.next.key}" title="La semana ${revN} esta rutina queda igual">Sin cambios para la semana ${revN}</button>` : st?.done ? `<span class="badge g">${st.same ? "Semana " + revN + ": sin cambios" : "Semana " + revN + ": con ajustes"} ✓</span>` : ""}<button class="btn primary" data-a="rSave">Guardar cambios</button></span></div>
   <label>Comentario general de la rutina (lo ve al empezarla)<textarea rows="2" data-a-change="rNote" placeholder="Ej: Esta semana sube un poco el peso en los multiarticulares y cuida la bajada en todo.">${esc(r.note || "")}</textarea></label>
-  <div class="scroll-x"><table class="tbl blk-t"><tr><th rowspan="2">Ejercicio</th>${weeks.map((wk) => `<th class="wkh">Semana ${+wk.slice(1)}</th>`).join("")}<th rowspan="2" class="vs1h">vs 1ª vez</th><th class="nxh" colspan="4">Semana ${nextN} · lo que va a hacer</th></tr>
-  <tr>${weeks.map(() => `<th class="sub">indicado · hecho (kg×reps)</th>`).join("")}<th class="sub nx">Series</th><th class="sub nx">Cada serie: reps · RIR</th><th class="sub nx">Kg sug.</th><th class="sub nx">Comentario del ejercicio</th></tr>
+  <div class="scroll-x"><table class="tbl blk-t"><tr><th rowspan="2">Ejercicio</th>${weeks.map((wk) => `<th class="wkh">Semana ${+wk.slice(1)}</th>`).join("")}<th rowspan="2" class="vs1h">vs 1ª vez</th><th class="nxh" colspan="3">Semana ${nextN} · lo que va a hacer</th></tr>
+  <tr>${weeks.map(() => `<th class="sub">indicado · hecho (kg×reps)</th>`).join("")}<th class="sub nx">Series</th><th class="sub nx">Cada serie: reps · RIR · kg sugerido</th><th class="sub nx">Comentario del ejercicio</th></tr>
   ${r.exercises.map((e, k) => { const cs = B.exs.find((x) => x.e.id === e.id)?.cells || {};
     return `<tr><td class="exc"><b>${k + 1}. ${esc(e.name || "—")}</b></td>${weeks.map((wk, i) => { const cl = cs[wk], pv = i ? cs[weeks[i - 1]] : null; if (!cl) return `<td class="muted center">—</td>`;
       const pl = planStr(cl.plan), chg = pv && planStr(pv.plan) !== pl;
@@ -365,8 +367,7 @@ function blockGrid(c, r, sessions, rv) {
       ${(() => { const ks = B.weeks.filter((wk) => cs[wk]?.sets?.length); if (ks.length < 2) return `<td class="vs1 muted center">—</td>`; const f = cs[ks[0]].sets, l = cs[ks[ks.length - 1]].sets;
         return `<td class="vs1">${l.slice(0, 2).map((y, j) => { const a = f[j]; if (!a) return ""; const dw = r1((+y.w || 0) - (+a.w || 0)), dr = (+y.r || 0) - (+a.r || 0); return `<div><small class="muted">S${j + 1}</small> <b class="${dw > 0 ? "g" : dw < 0 ? "r" : ""}">${dw > 0 ? "+" : ""}${String(dw).replace(".", ",")} kg</b> <span class="${dr > 0 ? "g" : dr < 0 ? "r" : "muted"}">${dr > 0 ? "+" : ""}${dr} reps</span></div>`; }).join("")}</td>`; })()}
       <td class="nx"><input type="number" min="0" max="10" value="${(e.sets || []).length}" data-a-change="gSets" data-k="${k}" style="width:52px"></td>
-      <td class="nx"><div class="psets">${(e.sets || []).map((x, j) => `<span class="ps"><small>S${j + 1}</small><input value="${esc(x.reps ?? "")}" data-a-change="setF" data-k="${k}" data-j="${j}" data-f="reps" placeholder="8-10" title="Repeticiones de la serie ${j + 1}"><select data-a-change="setF" data-k="${k}" data-j="${j}" data-f="rir" title="RIR de la serie ${j + 1}">${["", "F", 0, 1, 2, 3, 4, 5].map((v) => `<option value="${v}" ${String(x.rir ?? "") === String(v) ? "selected" : ""}>${v === "" ? "RIR –" : v === "F" ? "Fallo" : "RIR " + v}</option>`).join("")}</select></span>`).join("") || '<span class="muted small">Pon cuántas series</span>'}</div></td>
-      <td class="nx"><input value="${esc(e.wSug || "")}" data-a-change="exF" data-k="${k}" data-f="wSug" placeholder="–" style="width:64px"></td>
+      <td class="nx"><div class="psets">${(e.sets || []).map((x, j) => `<span class="ps"><small>S${j + 1}</small><input value="${esc(x.reps ?? "")}" data-a-change="setF" data-k="${k}" data-j="${j}" data-f="reps" placeholder="8-10" title="Repeticiones de la serie ${j + 1}"><select data-a-change="setF" data-k="${k}" data-j="${j}" data-f="rir" title="RIR de la serie ${j + 1}">${["", "F", 0, 1, 2, 3, 4, 5].map((v) => `<option value="${v}" ${String(x.rir ?? "") === String(v) ? "selected" : ""}>${v === "" ? "RIR –" : v === "F" ? "Fallo" : "RIR " + v}</option>`).join("")}</select><input class="kgs" value="${esc(x.w ?? "")}" data-a-change="setF" data-k="${k}" data-j="${j}" data-f="w" placeholder="kg" inputmode="decimal" title="Kg sugerido de la serie ${j + 1} (opcional)"></span>`).join("") || '<span class="muted small">Pon cuántas series</span>'}</div></td>
       <td class="nx"><input value="${esc(e.weekNote || "")}" data-a-change="exF" data-k="${k}" data-f="weekNote" placeholder="Ej: controla la bajada" style="min-width:200px"></td></tr>`; }).join("")}</table></div>
   <p class="muted small">Cada semana muestra lo indicado (series×reps @RIR; en rojo si cambió respecto de la semana anterior) y lo hecho por serie (verde = subió peso o reps, rojo = bajó). En reps puedes poner una por serie separadas por coma (“8, 6”) o una sola para todas. ${weeks.length ? "" : "Aún no hay entrenamientos de esta rutina."}</p></div>`;
 }
@@ -391,7 +392,13 @@ function routineEditor(r, lib) {
       <button class="btn tiny" data-a="altAdd" data-k="${k}">＋ Reemplazo</button></details></div>`; }).join("")}
   <button class="btn" data-a="exAdd">＋ Añadir ejercicio</button></div>`;
 }
-act("setF", (el) => { const x = RE.r.exercises[+el.dataset.k].sets[+el.dataset.j]; const v = el.value.trim(); x[el.dataset.f] = el.dataset.f === "rir" ? (v === "" ? "" : v.toUpperCase() === "F" ? "F" : +v) : v; });
+act("setF", (el) => { const x = RE.r.exercises[+el.dataset.k].sets[+el.dataset.j]; const v = el.value.trim(), f = el.dataset.f; if (f === "w") { if (v === "") delete x.w; else x.w = v.replace(",", "."); } else x[f] = f === "rir" ? (v === "" ? "" : v.toUpperCase() === "F" ? "F" : +v) : v; const d = $("#rDirty"); if (d) d.hidden = false; });
+// Antes el kg sugerido era uno por ejercicio (e.wSug, ej. "43 / 48"): se pasa a cada serie (sets[j].w) sin marcarlo como cambio
+function migrateWSug(r) {
+  const mig = (list) => (list || []).forEach((e) => { if (!e.wSug) return; const v = String(e.wSug).split("/").map((x) => x.trim().replace(",", ".")).filter(Boolean); if (!(e.sets || []).some((x) => x.w)) (e.sets || []).forEach((x, j) => (x.w = v[Math.min(j, v.length - 1)])); delete e.wSug; });
+  if (!(r.exercises || []).some((e) => e.wSug)) return;
+  mig(r.exercises); if (RE?.r === r) { const o = JSON.parse(RE.orig || "[]"); mig(o); RE.orig = JSON.stringify(o); }
+}
 act("setAdd", (el) => { const e = RE.r.exercises[+el.dataset.k]; const l = e.sets[e.sets.length - 1] || { reps: "8-10", rir: 1 }; e.sets.push({ ...l }); refresh(); });
 act("setDel", (el) => { RE.r.exercises[+el.dataset.k].sets.splice(+el.dataset.j, 1); refresh(); });
 act("tempoF", (el) => { const e = RE.r.exercises[+el.dataset.k], t = String(e.tempo || "---").split("-"); while (t.length < 4) t.push(""); t[+el.dataset.i] = el.value; e.tempo = t.some((x) => x !== "") ? t.join("-") : ""; });
@@ -422,14 +429,14 @@ function setChanges(a, b) {
     const o = a[j], e = b[j];
     if (!o) out.push(`se agrega la serie ${j + 1} (${e.reps || "–"} reps, ${rirT(e.rir)})`);
     else if (!e) out.push(`se quita la serie ${j + 1}`);
-    else { const t = []; if (String(o.reps ?? "") !== String(e.reps ?? "")) t.push(`${o.reps || "–"} → ${e.reps || "–"} reps`); if (String(o.rir ?? "") !== String(e.rir ?? "")) t.push(`${rirT(o.rir)} → ${rirT(e.rir)}`); if (t.length) out.push(`serie ${j + 1}: ${t.join(", ")}`); }
+    else { const t = []; if (String(o.reps ?? "") !== String(e.reps ?? "")) t.push(`${o.reps || "–"} → ${e.reps || "–"} reps`); if (String(o.rir ?? "") !== String(e.rir ?? "")) t.push(`${rirT(o.rir)} → ${rirT(e.rir)}`); if (String(o.w ?? "") !== String(e.w ?? "") && e.w) t.push(`peso sugerido ${String(e.w).replace(".", ",")} kg`); if (t.length) out.push(`serie ${j + 1}: ${t.join(", ")}`); }
   }
   return out;
 }
 act("rSave", async () => {
   const c = await getClient(CW.cid), rv0 = reviewWindow(c, await getRoutines(CW.cid), await getSessions(CW.cid)), w = rv0?.open ? rv0.next : weekInfo(c, ymd());
   const old = JSON.parse(RE.orig), r = RE.r, list = [];
-  const fmtS = (s) => (s || []).map((x) => x.reps + (x.rir !== "" ? "@" + x.rir : "")).join(", ");
+  const fmtS = (s) => (s || []).map((x) => x.reps + (x.rir !== "" ? "@" + x.rir : "") + (x.w ? "·" + x.w : "")).join(", ");
   if (!r.isNew) {
     r.exercises.forEach((e, k) => {
       const o = old.find((x) => x.id === e.id); e.changed = false;
