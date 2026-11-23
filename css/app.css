@@ -31,6 +31,8 @@ label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0; } l
 .badge { display: inline-block; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 99px; background: var(--surf2); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .badge.hecho, .badge.g, .badge.tech-mejor { background: var(--g-s); color: var(--g); } .badge.hoy { background: var(--acc-s); color: var(--acc); }
 .badge.atrasado, .badge.y { background: var(--y-s); color: var(--y); } .badge.r, .badge.tech-peor { background: var(--r-s); color: var(--r); }
+.badge.sugd { background: var(--b-s); color: var(--b); }
+.rotnext { border-color: var(--acc); } .rotnext .big2 { font-size: 20px; font-weight: 800; margin: 2px 0; } .rotnext p.mt { margin-top: 8px; }
 .badge.extra, .badge.b { background: var(--b-s); color: var(--b); }
 .pill { display: inline-block; padding: 3px 9px; border-radius: 99px; background: var(--surf2); font-weight: 700; font-size: 12px; } .pill.g { color: var(--g); } .pill.y { color: var(--y); } .pill.r { color: var(--r); }
 .note { background: var(--surf2); border-radius: 10px; padding: 7px 10px; font-size: 12.5px; margin: 6px 0; color: var(--muted); }
@@ -195,6 +197,10 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .ctabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 12px 0 6px; overflow-x: auto; } .ctabs a { padding: 9px 13px; font-weight: 700; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; } .ctabs a.on { color: var(--txt); border-color: var(--acc); }
 .grid-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; } .grid-cards .card { margin: 0; }
 .sched { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.tmode { margin: 4px 0 10px; align-items: center; flex-wrap: wrap; }
+.rotcfg { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px 18px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surf2); } .rotcfg > :last-child { grid-column: 1 / -1; }
+.rot-order { margin: 4px 0 8px; padding: 0; list-style: none; max-width: 420px; } .rot-order li { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.sheet .grid2 { padding: 0; } .rot-nums { display: flex; flex-direction: column; gap: 8px; }
 .routine-list { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 .exed { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin: 8px 0; display: flex; flex-direction: column; gap: 6px; background: var(--surf2); } .exed input { background: var(--surf); padding: 7px 10px; }
 .h-in { font-size: 17px; font-weight: 800; max-width: 340px; }

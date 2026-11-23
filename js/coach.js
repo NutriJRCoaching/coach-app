@@ -7,7 +7,7 @@ import { I } from "./icons.js";
 import { act, toast, sheet, closeSheet, confirmBox, promptBox, bar, lineChart, dualChart, $, $$ } from "./ui.js";
 import { e1rm } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
-import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto, routineBlock, planStr, setStr } from "./data.js";
+import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto, routineBlock, planStr, setStr, isRotation, nextInRotation, appStart } from "./data.js";
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
@@ -126,7 +126,7 @@ async function clientPanel(cid, tab, AA) {
   const w = weekInfo(c, wDate);
   const views = { resumen: tlView, etapas: stagesView, entrenos: trainingView, rutinas: trainingView, comida: foodView, plan: async (c) => { const cc = await planCtx(c); S._coachClient = cc; return menusEditor(cc); }, progreso: progView, checkins: checkinsView, feedback: feedbackView, datos: dataView };
   const weekNav = ["resumen", "entrenos", "comida", "feedback"].includes(tab);
-  return `<div class="row between"><h1>${esc(c.name)} <small class="muted">· ${c.service ? esc(SERVICES[c.service]) : "Asesoría sin definir"}${c.startDate ? (c.startDate > ymd() ? ` · empieza el ${fmtDate(c.startDate)}` : ` · Semana ${now.n}`) : ""} · <span style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</span></small></h1>
+  return `<div class="row between"><h1>${esc(c.name)} <small class="muted">· ${c.service ? esc(SERVICES[c.service]) : "Asesoría sin definir"}${c.startDate ? (appStart(c) > ymd() ? ` · empieza el ${fmtDate(appStart(c))}` : ` · Semana ${now.n}`) : ""} · <span style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</span></small></h1>
   <button class="btn small" data-a="previewClient" data-id="${cid}">Ver como cliente</button></div>
   ${A.length || info.length ? `<div class="alertbar">${A.map((a) => chip(a, cid)).join("")}${info.map((a) => chip(a, cid)).join("")}</div>` : `<div class="alertbar"><span class="badge g">Todo al día ✓</span></div>`}
   <div class="row between">
@@ -173,7 +173,7 @@ async function tlView(c0, w) {
   if (!TLM.month) TLM.month = w.first.slice(0, 7);
   return `<div class="tl-top">
   <div class="card tl-cal">${monthCal(c0, { month: TLM.month, selWeek: w.n, nav: "tlMonth", act: "tlWeek" })}</div>
-  <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.total}</div>${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}">${s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("") || '<p class="muted small">Sin calendario de rutinas.</p>'}</div>
+  <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.total}</div>${plan.rotation ? `<p class="small muted">Rotación${plan.next?.name ? ` · próximo: <b>${esc(plan.next.name)}</b>` : ""}</p>` : ""}${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}${s.rot && s.status === "proximo" ? " sugd" : ""}">${s.rot && s.status === "proximo" ? (s.sug ? "sugerido" : "para completar") : s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("") || '<p class="muted small">Sin calendario de rutinas.</p>'}${plan.missing ? `<p class="small red">${plan.missing > 1 ? "Le faltan" : "Le falta"} ${plan.missing}: ya no alcanzan los días con descanso.</p>` : ""}</div>
   <div class="tl-side"><div class="card"><div class="card-t">Peso promedio</div><div class="big">${r1(agg(R, (r) => weightCorr(r.x))) || "—"} <small>kg</small></div>${cmp(agg(R, (r) => weightCorr(r.x)), agg(pR, (r) => weightCorr(r.x)), 1, true)} <small class="muted">vs sem. anterior</small></div>
   <div class="card"><div class="card-t">Días con registro</div><ul class="adh">${[["Comida", reg((r) => Object.values(r.x.meals || {}).some((m) => m.length))], ["Peso", reg((r) => r.x.weight)], ["Sueño", reg((r) => r.sl)], ["Pasos", reg((r) => r.x.steps)], ["Agua", reg((r) => r.water)]].map(([l, n]) => `<li><span>${l}</span><b class="${n >= 5 ? "g" : n >= 3 ? "y" : "r"}">${n}/7</b></li>`).join("")}</ul></div></div></div>
   <div class="card"><div class="row between"><div class="card-t">Tendencia · peso corporal vs ${mm[1].toLowerCase()} (últimos 56 días, media de 7 días)</div></div>
@@ -271,7 +271,7 @@ async function routinesView(c) {
     ${rv.done ? `<button class="btn small ghost" data-a="rvUndo" data-w="${rv.next.key}">Deshacer</button>` : `<button class="btn small" data-a="rvSame" data-w="${rv.next.key}">Todas sin cambios</button>`}</div></div>` : ""}
   <div class="row gap"><div class="routine-list">${routines.map((r) => `<button class="btn ${ed?.id === r.id ? "primary" : ""}" data-a="rEdit" data-id="${r.id}">${esc(r.name)}</button>`).join("")}<button class="btn ghost" data-a="rNew">＋ Nueva rutina</button><label class="btn ghost" title="Archivo ima-rutinas.json con rutinas pasadas desde su planilla">Importar rutinas<input type="file" accept=".json,application/json" hidden data-a-change="rImport"></label></div></div>
   ${ed ? blockGrid(c, ed, sessions, rv) + `<details class="card-d" ${RE.openDetail ? "open" : ""}><summary class="card-t" data-a="rDetail">Ejercicios de ${esc(ed.name)}: agregar, quitar u ordenar · video, tips, tempo, descanso y reemplazos</summary>${routineEditor(ed, lib)}</details>` : `<p class="muted">Crea la primera rutina.</p>`}
-  <details class="card-d" ${RE?.openCfg ? "open" : ""}><summary class="card-t" data-a="rCfg">Configuración: calendario semanal (qué rutina toca cada día) y cardio</summary>  <div><div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>
+  <details class="card-d" ${RE?.openCfg ? "open" : ""}><summary class="card-t" data-a="rCfg">Configuración: ${isRotation(c) ? "rotación de rutinas" : "calendario semanal (qué rutina toca cada día)"} y cardio</summary>  <div>${schedCfg(c, routines, sessions, sched)}
   <div class="cardio-ed"><div class="card-t">Cardio</div><div class="cardio-row"><label class="cw-n">Veces/semana<input type="number" min="0" value="${c.cardio?.perWeek || ""}" data-a-change="cardioSet" data-k="perWeek"></label><label class="grow">Tipo<input value="${esc(c.cardio?.type || "")}" data-a-change="cardioSet" data-k="type" placeholder="Ej: Intervalos en bicicleta estática"></label><label class="cw-n">Minutos<input type="number" value="${c.cardio?.minutes || ""}" data-a-change="cardioSet" data-k="minutes"></label><label class="cw-m">Intensidad<input value="${esc(c.cardio?.intensity || "")}" data-a-change="cardioSet" data-k="intensity" placeholder="7–8/10"></label></div>
   <label>Descripción (la ve completa al tocar Cardio)<textarea rows="4" data-a-change="cardioSet" data-k="desc" placeholder="Ej: 1 min de entrada en calor suave. Luego 4 rondas de 30 s intenso (8/10) + 60 s suave. Al terminar, 1 min de vuelta a la calma.">${esc(c.cardio?.desc || "")}</textarea></label></div>
   <div class="row gap small">Días sugeridos de cardio: ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="ck"><input type="checkbox" ${(c.cardio?.days || []).includes(d) ? "checked" : ""} data-a-change="cardioDay" data-d="${d}">${DAYS[d].slice(0, 3)}</label>`).join("")}</div></div>
@@ -284,6 +284,34 @@ act("rvUndo", async (el) => { await db.set("clients/" + CW.cid, { rutReview: nul
 // Una rutina sin cambios para la semana que viene; si ya están todas revisadas, la semana queda revisada
 async function reviewDone(w) { const c = await getClient(CW.cid), rv = reviewWindow(c, await getRoutines(CW.cid), await getSessions(CW.cid)); if (rv?.list?.every((x) => x.done)) await db.set("clients/" + CW.cid, { rutReview: { week: w, same: rv.list.every((x) => x.same), at: Date.now() } }); resetAlerts(); }
 act("rSameOne", async (el) => { await db.set(`clients/${CW.cid}/routines/${el.dataset.id}`, { review: { week: el.dataset.w, same: true, at: Date.now() } }); await reviewDone(el.dataset.w); toast("Sin cambios para la próxima semana ✓"); refresh(); });
+// Días fijos (schedule) o rotación (c.rotation: el cliente alterna las rutinas sin días fijos)
+const ROT_DEF = { perWeek: 3, days: [1, 3, 5], minRest: 1 };
+function schedCfg(c, routines, sessions, sched) {
+  const rot = isRotation(c), R = { ...ROT_DEF, ...(c.rotation || {}) }, order = (R.order || []).filter((id) => routines.some((r) => r.id === id));
+  const nm = (id) => esc(routines.find((r) => r.id === id)?.name || "Rutina");
+  const modes = `<div class="row gap tmode"><label class="ck"><input type="radio" name="tmode" value="fixed" ${rot ? "" : "checked"} data-a-change="tMode"><b>Días fijos</b></label><label class="ck"><input type="radio" name="tmode" value="rot" ${rot ? "checked" : ""} data-a-change="tMode"><b>Rotación</b></label><span class="muted small">${rot ? "Alterna las rutinas en orden, sin días fijos: le toca la que sigue a la última que hizo." : "Cada rutina tiene su día de la semana."}</span></div>`;
+  if (!rot) return modes + `<div class="sched">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label>${DAYS[d]}<select data-a-change="schedSet" data-d="${d}"><option value="">Descanso</option>${routines.map((r) => `<option value="${r.id}" ${sched[d] === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>`).join("")}</div>`;
+  const nx = order.length ? nextInRotation({ ...c, rotation: { ...R, order } }, sessions) : null, rest = routines.filter((r) => !order.includes(r.id));
+  return modes + `<div class="rotcfg">
+    <div><div class="small muted">Orden de la rotación</div><ol class="rot-order">${order.map((id, i) => `<li><b>${i + 1}. ${nm(id)}</b><span class="row gap"><button class="btn tiny ghost" data-a="rotMove" data-i="${i}" data-d="-1" ${i ? "" : "disabled"}>▲</button><button class="btn tiny ghost" data-a="rotMove" data-i="${i}" data-d="1" ${i < order.length - 1 ? "" : "disabled"}>▼</button><button class="btn tiny ghost" data-a="rotDel" data-i="${i}" title="Sacar de la rotación">✕</button></span></li>`).join("")}</ol>
+      ${rest.length ? `<select data-a-change="rotAdd"><option value="">＋ Agregar rutina…</option>${rest.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select>` : ""}
+      ${nx ? `<p class="small">Próximo entrenamiento: <b>${nm(nx.rid)}</b>${nx.lastDate ? ` <span class="muted">(el último fue el ${fmtDate(nx.lastDate)})</span>` : ` <span class="muted">(aún no entrena: parte con la primera)</span>`}</p>` : `<p class="small muted">Agrega al menos una rutina.</p>`}</div>
+    <div class="rot-nums"><label>Entrenamientos por semana<input type="number" min="1" max="7" value="${R.perWeek}" data-a-change="rotSet" data-k="perWeek"></label>
+      <label>Días de descanso mínimo entre entrenos<input type="number" min="0" max="3" value="${R.minRest}" data-a-change="rotSet" data-k="minRest"></label></div>
+    <div class="small">Días sugeridos: ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="ck"><input type="checkbox" ${R.days.map(Number).includes(d) ? "checked" : ""} data-a-change="rotDay" data-d="${d}">${DAYS[d].slice(0, 3)}</label>`).join("")}
+      <p class="muted small">Si se salta un día sugerido, la app le corre los que quedan (respetando el descanso) y le avisa si ya no alcanzan los días de la semana.</p></div></div>`;
+}
+async function rotSave(patch) { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { rotation: { ...ROT_DEF, ...(c.rotation || {}), ...patch } }); resetAlerts(); refresh(); }
+act("tMode", async (el) => {
+  const c = await getClient(CW.cid), on = el.value === "rot";
+  if (on) { const order = (c.rotation?.order || []).length ? c.rotation.order : (await getRoutines(CW.cid)).map((r) => r.id); await rotSave({ on: true, order }); toast("Rotación activada: revisa el orden y los días sugeridos"); }
+  else { await rotSave({ on: false }); toast("Días fijos: elige qué rutina toca cada día"); }
+});
+act("rotMove", async (el) => { const c = await getClient(CW.cid), o = [...(c.rotation?.order || [])], i = +el.dataset.i, j = i + +el.dataset.d; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; await rotSave({ order: o }); });
+act("rotDel", async (el) => { const c = await getClient(CW.cid), o = [...(c.rotation?.order || [])]; o.splice(+el.dataset.i, 1); await rotSave({ order: o }); });
+act("rotAdd", async (el) => { if (!el.value) return; const c = await getClient(CW.cid); await rotSave({ order: [...(c.rotation?.order || []), el.value] }); });
+act("rotSet", async (el) => { const k = el.dataset.k, v = Math.max(k === "perWeek" ? 1 : 0, Math.min(k === "perWeek" ? 7 : 3, +el.value || 0)); await rotSave({ [k]: v }); toast("Guardado"); });
+act("rotDay", async (el) => { const c = await getClient(CW.cid), s = new Set((c.rotation?.days || ROT_DEF.days).map(Number)); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await rotSave({ days: [...s].sort() }); });
 act("schedSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { schedule: { ...(c.schedule || {}), [el.dataset.d]: el.value || null } }); toast("Calendario guardado"); });
 act("cardioSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), [el.dataset.k]: el.type === "number" ? num(el.value) : el.value } }); toast("Guardado"); });
 act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = new Set(c.cardio?.days || []); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), days: [...s] } }); });
@@ -310,8 +338,10 @@ act("rImport", async (el) => {
     for (const d of r.days || []) sched[d] = id;
   }
   if (libNew || lib.length) await db.set("library/exercises", { items: lib }, false);
-  await db.set("clients/" + CW.cid, { schedule: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, sched[d] || null])), rutReview: null }); // null explícito: Firestore mezcla mapas
-  RE = null; resetAlerts(); toast(`Listo: ${data.routines.length} rutinas importadas${Object.keys(sched).length ? " con sus días" : ""}`, 4000); refresh();
+  // Si el archivo trae "rotation" ({perWeek, days, minRest}), las rutinas quedan en rotación en el orden del archivo
+  const rotation = data.rotation ? { ...ROT_DEF, ...data.rotation, on: true, order: ids } : c.rotation?.on ? { ...c.rotation, order: ids } : null;
+  await db.set("clients/" + CW.cid, { schedule: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, sched[d] || null])), rutReview: null, ...(rotation ? { rotation } : {}) }); // null explícito: Firestore mezcla mapas
+  RE = null; resetAlerts(); toast(`Listo: ${data.routines.length} rutinas importadas${rotation ? " en rotación" : Object.keys(sched).length ? " con sus días" : ""}`, 4000); refresh();
 });
 act("rNew", () => { RE = { cid: CW.cid, r: { id: uid(), name: "Nueva rutina", exercises: [], isNew: true }, orig: "[]" }; refresh(); });
 // Vista del bloque: lo indicado y lo hecho semana a semana, y la próxima semana editable en la misma tabla
@@ -688,7 +718,7 @@ async function dataView(c) {
     <div class="row gap">${acc?.ok ? `<button class="btn" data-a="accSet" data-v="0">Quitar acceso</button><button class="btn primary" data-a="copyInvite">Copiar invitación para WhatsApp</button>` : `<button class="btn primary" data-a="accSet" data-v="1">Dar acceso</button>`}</div>`}</div>
   <form class="card" id="dataF" data-a-change="dataAuto"><div class="row between"><div class="card-t">Asesoría</div><span class="muted small">Se guarda solo al cambiar cada campo</span></div><div class="grid3">
   <label>Tipo de asesoría<select name="service"><option value="">— Definir —</option>${Object.entries(SERVICES).map(([k, l]) => `<option value="${k}" ${c.service === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-  ${f("startDate", "Inicio del servicio (define el inicio de cada semana)", "date")}${f("endDate", "Fin del servicio (si tiene)", "date")}
+  ${f("startDate", "Inicio del servicio (define el inicio de cada semana)", "date")}${f("appFrom", "Empieza a usar la app (si parte después del inicio de la semana 1)", "date")}${f("endDate", "Fin del servicio (si tiene)", "date")}
   <label>Día de check-in<select name="checkinDay"><option value="">—</option>${[1, 2, 3, 4, 5, 6, 0].map((d) => `<option value="${d}" ${c.checkinDay !== "" && c.checkinDay != null && +c.checkinDay === d ? "selected" : ""}>${DAYS[d]}</option>`).join("")}</select></label>
   ${f("city", "Ciudad / país (zona horaria)")}
   ${f("payDate", "Próximo pago", "date")}<label>Se renueva cada<select name="payEvery">${[["", "—"], ["30", "1 mes"], ["90", "3 meses"], ["180", "6 meses"]].map(([v, l]) => `<option value="${v}" ${String(c.payEvery ?? "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
@@ -756,7 +786,8 @@ async function saveData(redraw) {
 act("resetOpen", async () => {
   const c = await getClient(CW.cid), tm = addDays(ymd(), 1);
   sheet("Empezar de cero", `<p class="small">Se borra todo lo registrado de <b>${esc(c.name)}</b> (días, entrenamientos, check-ins, retroalimentaciones, fotos, medidas y audios). Se mantienen su ficha, rutinas, planes de alimentación y acceso. <b>No se puede deshacer.</b></p>
-  <label>Semana 1 desde<input type="date" id="rzD" value="${tm}"></label>
+  <div class="grid2"><label>Semana 1 desde<input type="date" id="rzD" value="${tm}"><small class="muted">Define el inicio de cada semana (ej. domingo si sus semanas van de domingo a sábado)</small></label>
+  <label>Empieza a usar la app el<input type="date" id="rzA" value="${tm}"><small class="muted">Si es después: los días antes no cuentan (ni entrenos atrasados ni registros pendientes)</small></label></div>
   <div class="grid3"><label class="span2">Etapa con la que parte<select id="rzP">${Object.keys(PHASES).map((p) => `<option ${p === "Mantención" ? "selected" : ""}>${esc(p)}</option>`).join("")}</select></label><label>Durante (semanas)<input type="number" id="rzN" value="8" min="1" max="52"></label></div>
   <label>Para confirmar, escribe su nombre<input id="rzC" placeholder="${esc((c.name || "").split(" ")[0])}"></label>
   <button class="btn danger big" data-a="resetDo">Borrar y empezar de cero</button>`);
@@ -764,15 +795,16 @@ act("resetOpen", async () => {
 act("resetDo", async () => {
   const c = await getClient(CW.cid), first = (c.name || "").split(" ")[0].toLowerCase();
   if (($("#rzC").value || "").trim().toLowerCase() !== first) return toast(`Escribe "${(c.name || "").split(" ")[0]}" para confirmar`);
-  const start = $("#rzD").value, phase = $("#rzP").value, n = Math.max(1, +$("#rzN").value || 8); if (!start) return toast("Elige la fecha");
+  const start = $("#rzD").value, from = $("#rzA").value, phase = $("#rzP").value, n = Math.max(1, +$("#rzN").value || 8); if (!start) return toast("Elige la fecha");
+  if (from && (from < start || from > addDays(start, 6))) return toast("El día en que empieza a usar la app tiene que caer dentro de la semana 1");
   closeSheet(); toast("Borrando…");
   let k = 0;
   for (const sub of ["days", "sessions", "checkins", "feedbacks", "fbreplies", "photos", "measures", "audios"]) for (const d of await db.list(`clients/${CW.cid}/${sub}`).catch(() => [])) { await db.del(`clients/${CW.cid}/${sub}/${d.id}`); k++; }
   // Rutinas: sin marcas de cambios ni revisiones de semanas antiguas
   for (const r of await getRoutines(CW.cid)) await db.set(`clients/${CW.cid}/routines/${r.id}`, { changes: null, review: null, exercises: (r.exercises || []).map((e) => ({ ...e, changed: false })) });
-  await db.set("clients/" + CW.cid, { startDate: start, stages: [{ phase, from: 1, to: n }], phase, rutReview: null, feedback: null, weeklyGoals: [], seen: {}, resetAt: Date.now() });
+  await db.set("clients/" + CW.cid, { startDate: start, appFrom: from && from > start ? from : null, stages: [{ phase, from: 1, to: n }], phase, rutReview: null, feedback: null, weeklyGoals: [], seen: {}, resetAt: Date.now() });
   const c2 = await getClient(CW.cid); await stStore(c2, validSt(c2));
-  CW = null; RE = null; resetAlerts(); toast(`Listo: ${k} registros borrados. Semana 1 desde el ${fmtDate(start)} (${phase}).`, 4000); refresh();
+  CW = null; RE = null; resetAlerts(); toast(`Listo: ${k} registros borrados. Semana 1 desde el ${fmtDate(start)}${from > start ? `, usa la app desde el ${fmtDate(from)}` : ""} (${phase}).`, 5000); refresh();
 });
 act("accSet", async (el) => {
   const c = await getClient(CW.cid), e = emailKey(c.email); if (!e) return toast("Primero anota su correo");

@@ -3,7 +3,7 @@ import { db } from "./db.js";
 import { S } from "./state.js";
 import { ymd, addDays, weekInfo, diffDays, fmtDate, DAYS } from "./util.js";
 import { getRoutines, getSessions, getDays } from "./data.js";
-import { weekPlan, reviewWindow, weightCorr, phaseAt, PHASE_PCT } from "./data.js";
+import { weekPlan, reviewWindow, appStart, isRotation, ciOverdue, weightCorr, phaseAt, PHASE_PCT } from "./data.js";
 import { GROUPS, pautaExtras, pautaMac } from "./foods.js";
 
 export const SERVICES = { completa: "Coaching 1-1", entrenamiento: "Entrenamiento", nutricion: "Nutrición" };
@@ -82,7 +82,7 @@ export function alertsFor(c, x) {
   else if (!active) add("i", "Aún no tiene acceso a la app");
   if (active && !c.example && !x.onb?.done) add("i", "Aún no completa la bienvenida a la app");
   if (!c.startDate) add("y", "Falta la fecha de inicio (define sus semanas)");
-  else if (c.startDate > today) add("i", `Empieza el ${fmtDate(c.startDate)}`);
+  else if (appStart(c) > today) add("i", `${c.appFrom > c.startDate ? "Empieza a usar la app" : "Empieza"} el ${fmtDate(appStart(c))}`);
   const miss = [["sex", "sexo"], ["birth", "fecha de nacimiento"], ["height", "estatura"]].filter(([k]) => !c[k]).map(([, l]) => l);
   if (miss.length) add("y", "Faltan datos: " + miss.join(", "));
   if (c.service === "nutricion" && active && !x.routines.length) add("i", "Aún no arma sus rutinas en la app", "entrenos");
@@ -147,12 +147,19 @@ export function alertsFor(c, x) {
     const ci = Object.fromEntries(x.checkins.map((k) => [k.id, k]));
     const prev = weekInfo(c, addDays(w.first, -7));
     for (const k of [w.key, prev.n >= 1 ? prev.key : null]) if (k && ci[k] && !answered(k)) add("r", `Check-in de la semana ${+k.slice(1)} sin responder`, "checkins");
-    if (active && !c.checkinForm && prev.n >= 1 && !ci[prev.key]) add("y", `No ha enviado el check-in de la semana ${prev.n}`, "checkins");
+    const due = ciOverdue(c, today); // si su check-in es al inicio de la semana, cubre la anterior: se avisa recién pasado ese día
+    if (active && !c.checkinForm && due.n >= 1 && due.last >= appStart(c) && !ci[due.key]) add("y", `No ha enviado el check-in de la semana ${due.n}`, "checkins");
     if (c.checkinForm && c.checkinDay != null && new Date().getDay() === +c.checkinDay) add("i", "Hoy le toca el check-in por formulario", "checkins");
     if (active && trains(c)) {
       const plan = weekPlan(c, x.routines, x.sessions);
       const late = plan.slots.filter((s) => s.status === "atrasado").length;
       if (late) add("y", `${late} entrenamiento${late > 1 ? "s" : ""} atrasado${late > 1 ? "s" : ""} esta semana`, "entrenos");
+      if (plan.rotation) { // en rotación no hay "atrasados": se avisa si ya no alcanzan los días o si no respetó el descanso
+        if (plan.missing) add("y", `Le ${plan.missing > 1 ? "faltan" : "falta"} ${plan.missing} entrenamiento${plan.missing > 1 ? "s" : ""} esta semana y ya no alcanzan los días con descanso`, "entrenos");
+        const gap = (+c.rotation.minRest || 1) + 1, ds = [...new Set(x.sessions.filter((s) => s.status === "fin" && s.date >= addDays(w.first, -1) && s.date <= today).map((s) => s.date))].sort();
+        const pairs = ds.slice(1).filter((d, i) => diffDays(d, ds[i]) < gap);
+        if (pairs.length) add("y", gap === 2 ? `Entrenó 2 días seguidos (${pairs.map((d) => fmtDate(addDays(d, -1)) + " y " + fmtDate(d)).join("; ")})` : `Entrenó sin los ${gap - 1} días de descanso (${pairs.map((d) => fmtDate(d)).join(", ")})`, "entrenos");
+      }
       const wk = x.sessions.filter((s) => s.status === "fin" && s.weekKey === w.key);
       if (wk.some((s) => s.survey?.articular === "si")) add("r", "Reportó molestia articular", "entrenos");
       if (wk.some((s) => s.exercises?.some((e) => e.tech === "peor" || e.sets?.some((y) => y.tech === "peor")))) add("y", "Técnica peor en algún ejercicio", "entrenos");
@@ -160,7 +167,7 @@ export function alertsFor(c, x) {
       if (nuevos) add("i", `${nuevos} entrenamiento${nuevos > 1 ? "s" : ""} nuevo${nuevos > 1 ? "s" : ""} para revisar`, "entrenos");
     }
     if (active) {
-      const d7 = Object.values(x.days), elapsed = Math.min(7, diffDays(today, c.startDate) + 1);
+      const d7 = Object.values(x.days), elapsed = Math.min(7, diffDays(today, appStart(c)) + 1);
       const food = d7.filter((d) => Object.values(d.meals || {}).some((m) => m.length)).length, wts = d7.filter((d) => d.weight).length;
       if (eats(c) && elapsed >= 3 && food < Math.min(3, elapsed)) add("y", `Registró comida solo ${food} de los últimos 7 días`, "comida");
       if (elapsed >= 4 && wts < 3) add("y", `Solo ${wts} pesaje${wts === 1 ? "" : "s"} en los últimos 7 días`, "resumen");

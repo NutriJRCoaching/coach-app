@@ -1,7 +1,7 @@
 // Acceso a datos del cliente + lógica de entrenamiento compartida (cliente y coach)
 import { db } from "./db.js";
 import { S } from "./state.js";
-import { ymd, addDays, weekInfo, e1rm, uid, esc, fmtDate, diffDays } from "./util.js";
+import { ymd, addDays, weekInfo, e1rm, uid, esc, fmtDate, diffDays, parseYmd } from "./util.js";
 import { REAL_FOODS, realToFood } from "./realfoods.js";
 import { GROUPS } from "./foods.js";
 
@@ -420,15 +420,37 @@ export function payMsg(c) {
   return `<b>¡Hola${first ? " " + esc(first) : ""}! 💪</b><br>Hoy, <b>${fmtDate(c.payDate, true)}</b>, se renueva tu asesoría. Gracias por seguir confiando en el proceso: lo que llevamos hasta ahora es puro trabajo tuyo.<br><small class="muted">Si tienes dudas con el pago o quieres cambiar algo de tu plan, escríbeme por WhatsApp.</small>`;
 }
 
+// ---------- Check-in: a qué semana corresponde
+// Si su día de check-in cae al inicio de la semana (≤ 2 días después de que parte, ej. domingo con semanas dom–sáb),
+// el check-in de ese día es el de la SEMANA ANTERIOR. ciOff = días desde el inicio de la semana hasta el día de check-in.
+export const ciOff = (c) => (c?.checkinDay == null || c.checkinDay === "" || !c.startDate ? null : (+c.checkinDay - parseYmd(c.startDate).getDay() + 7) % 7);
+export const ciLate = (c) => { const o = ciOff(c); return o != null && o <= 2; };
+// Semana que cubre un check-in hecho hoy. open = es el momento de pedirlo (los 2 últimos días de la semana;
+// si es "atrasado": el último día de la semana, el día de check-in y el siguiente).
+export function ciWeek(c, date = ymd()) {
+  const w = weekInfo(c, date);
+  if (!ciLate(c)) return { w, open: date >= addDays(w.last, -1) };
+  const k = diffDays(date, w.first), off = ciOff(c);
+  if (k === 6) return { w, open: true }; // último día: ya puede mandar el de esta semana
+  return { w: weekInfo(c, addDays(w.first, -7)), open: k <= off + 1 };
+}
+// Semana cuyo check-in ya debió llegar (para avisarle al coach). Sin día de check-in: la semana pasada.
+export function ciOverdue(c, date = ymd()) {
+  const w = weekInfo(c, date), prev = weekInfo(c, addDays(w.first, -7));
+  if (!ciLate(c)) return prev;
+  return diffDays(date, w.first) > ciOff(c) + 1 ? prev : weekInfo(c, addDays(w.first, -14));
+}
+
 // Revisión semanal de la rutina: la ventana parte el día del último entrenamiento de la semana
 // (o 2 días antes de que termine si no hay calendario) y dura hasta que empieza la semana siguiente.
 export function reviewWindow(c, routines, sessions, today = ymd()) {
-  if (!c.startDate || !routines.length || today < c.startDate) return null; // aún no empieza: no hay semana que revisar
+  if (!c.startDate || !routines.length || today < appStart(c)) return null; // aún no empieza a usar la app: no hay semana que revisar
   const w = weekInfo(c, today), plan = weekPlan(c, routines, sessions, today);
   const lastTrain = plan.planned.length ? plan.planned[plan.planned.length - 1].date : addDays(w.last, -1);
   const next = weekInfo(c, addDays(w.last, 1));
   // Cada rutina se revisa por separado (r.review = {week, same}); la semana queda revisada si lo están todas (o se marcó todo igual)
-  const scheduled = routines.filter((r) => Object.values(c.schedule || {}).includes(r.id));
+  const inUse = isRotation(c) ? c.rotation.order : Object.values(c.schedule || {});
+  const scheduled = routines.filter((r) => inUse.includes(r.id));
   const list = (scheduled.length ? scheduled : routines).map((r) => ({ r, done: r.review?.week === next.key || r.changes?.week === next.key, same: r.review?.week === next.key && r.review.same }));
   return { open: today >= lastTrain, next, w, lastTrain, list, done: c.rutReview?.week === next.key || list.every((x) => x.done) };
 }

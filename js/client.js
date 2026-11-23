@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { diffDays } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg } from "./data.js";
@@ -143,7 +143,8 @@ async function pendings(day, plan, w) {
   if (plan.rotation && plan.missing) out.push({ t: `Te ${plan.missing > 1 ? "faltan" : "falta"} ${plan.missing} entrenamiento${plan.missing > 1 ? "s" : ""} y ya no alcanzan los días con descanso entremedio: habla con tu coach`, to: "entreno", c: "y" });
   const photos = (await db.list(P() + "/photos")).filter((p) => p.week === w.key && !["comida", "equipo"].includes(p.kind));
   if (!photos.length) out.push({ t: "Sube tus fotos de esta semana", to: "fotos", c: "y" });
-  if (ymd() >= addDays(w.last, -1) && !(await db.get(P() + "/checkins/" + w.key))) out.push({ t: "Completa tu check-in semanal", to: "checkin", c: "r" });
+  const cw = ciWeek(S.client);
+  if (cw.open && cw.w.n >= 1 && !(await db.get(P() + "/checkins/" + cw.w.key))) out.push({ t: "Completa tu check-in semanal", to: "checkin", c: "r" });
   return out;
 }
 
@@ -699,7 +700,7 @@ async function progress() {
   <a href="#sueno"><span>Sueño<small>Registro y estadísticas</small></span>${I.chev}</a>
   ${has("prog_photos") ? `<a href="#fotos"><span>Fotos<small>Por semana y comparador</small></span>${I.chev}</a>` : ""}
   ${has("prog_measures") ? `<a href="#medidas"><span>Medidas<small>Una vez al mes</small></span>${I.chev}</a>` : ""}
-  ${has("checkin") ? `<a href="#checkin"><span>Check-in semanal<small>Semana ${w.n}</small></span>${I.chev}</a>` : ""}</div>`;
+  ${has("checkin") ? `<a href="#checkin"><span>Check-in semanal<small>Semana ${ciWeek(S.client).w.n}</small></span>${I.chev}</a>` : ""}</div>`;
 }
 act("openFeedback", async () => {
   const fb = S.client.feedback; if (!fb) return;
@@ -860,7 +861,7 @@ function sleepSum(days) {
   return `<div class="ci-sleep"><div><small>Sueño promedio</small><b>${hs.length ? fh(avg(hs)) : "—"}</b><small>${hs.length} noche${hs.length === 1 ? "" : "s"} registradas</small></div><div><small>Calidad</small><b>${qs.length ? r1(avg(qs)).toString().replace(".", ",") + " / 5" : "—"}</b></div><div><small>Cafeína después de las 12</small><b>${cfn ? `${cf} de 7 días` : "—"}</b></div></div>`;
 }
 async function checkinView() {
-  const w = weekInfo(S.client, ymd()), saved = (await db.get(`${P()}/checkins/${w.key}`)) || {};
+  const w = ciWeek(S.client).w, saved = (await db.get(`${P()}/checkins/${w.key}`)) || {};
   CI = { ...saved };
   const days = await getDays(w.first, w.last);
   const regDays = Object.values(days).filter((d) => Object.values(d.meals || {}).some((m) => m.length)).length;
@@ -884,14 +885,15 @@ async function checkinView() {
     const ex = extra ? `<input class="mt" id="det-${k}" ${show ? "" : "hidden"} data-a-input="ciTxt" data-k="${k}Det" value="${esc(CI[k + "Det"] || "")}" placeholder="${esc(cond ? extra.ph : extra)}" ${cond ? `data-when="${esc(JSON.stringify(extra.when))}"` : ""}>` : "";
     return `<div class="ci-q"><div>${esc(label)}</div>${inp}${ex}</div>`;
   };
+  const d0 = [w.first, appStart(S.client)].sort().pop(), nDays = Math.max(1, Math.min(7, diffDays([w.last, ymd()].sort()[0], d0) + 1));
   return `${head(`Check-in · Semana ${w.n}`, "mas")}
-  <p class="muted small center">${fmtDate(w.first)} – ${fmtDate(w.last)}${saved.at ? " · enviado ✓ (puedes actualizarlo)" : ""}</p>
+  <p class="muted small center">${fmtDate(d0)} – ${fmtDate(w.last)}${saved.at ? " · enviado ✓ (puedes actualizarlo)" : ""}</p>
   ${prevFoco ? `<div class="ci-sec ci-open"><h3>Tu foco de la semana pasada</h3><div class="note"><b>${esc(prevFoco)}</b></div>
     ${q(["accion", "¿Cómo te fue?", ["Lo logré", "A medias", "No lo logré"]])}${q(["accionDet", "¿Qué te ayudó o qué te lo impidió?", "text"])}</div>` : ""}
   ${CHECKIN.map((sec) => `<div class="ci-sec ${sec.open ? "ci-open" : ""}"><h3>${esc(sec.t)}</h3>
     ${sec.open ? `<p class="muted small">Tómate un par de minutos en estas: son las que más me sirven para ajustar tu plan.</p>` : ""}
     ${sec.t === "Entrenamiento" && tp.total ? `<div class="ci-q"><div>Entrenamientos de la semana</div><b>${tp.doneCount} de ${tp.total}</b></div>` : ""}
-    ${sec.t === "Nutrición" ? `<div class="ci-q"><div>¿Cuántos días registraste tu alimentación en la app?</div><b>${regDays} de 7</b></div>` : ""}
+    ${sec.t === "Nutrición" ? `<div class="ci-q"><div>¿Cuántos días registraste tu alimentación en la app?</div><b>${regDays} de ${nDays}</b></div>` : ""}
     ${sec.t === "Digestión" && dep != null ? `<div class="note">Según tus registros diarios: ${r1(dep)} deposiciones por día en promedio.</div>` : ""}
     ${sec.sleep ? sleepSum(days) : ""}
     ${sec.q.map(q).join("")}
@@ -903,7 +905,7 @@ act("ciSel", (el) => (CI[el.dataset.k] = el.value));
 act("ciTxt", (el) => (CI[el.dataset.k] = el.value));
 act("ciMulti", (el) => { const s = new Set(CI[el.dataset.k] || []); el.checked ? s.add(el.value) : s.delete(el.value); CI[el.dataset.k] = [...s]; });
 act("ciSave", async () => {
-  const w = weekInfo(S.client, ymd()), days = await getDays(w.first, w.last);
+  const w = ciWeek(S.client).w, days = await getDays(w.first, w.last);
   CI.diasRegistrados = Object.values(days).filter((d) => Object.values(d.meals || {}).some((m) => m.length)).length;
   const [rts, sss] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]), tp = weekPlan(S.client, rts, sss, w.first);
   CI.entrenos = `${tp.doneCount}/${tp.total}`;
@@ -1095,7 +1097,8 @@ export async function checkReminders() {
     }
     if (r.checkin.on && nm >= toMin(r.checkin.at)) {
       const w = weekInfo(c, today);
-      if (today >= addDays(w.last, -1) && !(await db.get(P() + "/checkins/" + w.key))) once("chk-" + w.key, "Completa tu check-in semanal", "Así tu coach puede ajustar tu plan");
+      const cw = ciWeek(c, today);
+      if (cw.open && cw.w.n >= 1 && !(await db.get(P() + "/checkins/" + cw.w.key))) once("chk-" + cw.w.key, "Completa tu check-in semanal", "Así tu coach puede ajustar tu plan");
     }
   } catch (e) { console.error(e); }
 }
