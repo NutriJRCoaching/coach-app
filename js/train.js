@@ -27,8 +27,8 @@ export async function trainView() {
   const today = ymd();
   const day = (d) => { const dt = parseYmd(d); return `<span class="sd2"><b>${D3[dt.getDay()]}</b>${dt.getDate()}</span>`; };
   return `${head("Entrenamiento")}
-  <div class="card"><div class="row between"><div><div class="card-t" style="margin:0">Semana ${plan.week.n}</div><div class="muted small">${fmtDate(plan.week.first)} – ${fmtDate(plan.week.last)}</div></div><div class="big">${plan.doneCount}<small>/${plan.planned.length}</small></div></div>
-  <div class="progress"><i style="width:${plan.planned.length ? (plan.doneCount / plan.planned.length) * 100 : 0}%"></i></div></div>
+  <div class="card"><div class="row between"><div><div class="card-t" style="margin:0">Semana ${plan.week.n}</div><div class="muted small">${fmtDate(plan.week.first)} – ${fmtDate(plan.week.last)}</div></div><div class="big">${plan.doneCount}<small>/${plan.total}</small></div></div>
+  <div class="progress"><i style="width:${plan.total ? (plan.doneCount / plan.total) * 100 : 0}%"></i></div></div>
   ${cur ? `<div class="card row between" style="border-color:var(--acc)"><span><small class="muted">Sesión en curso${cur.date !== today ? " · desde el " + fmtDate(cur.date) : ""}</small><br><b>${esc(cur.routineName)}</b></span><span class="row gap"><button class="btn tiny ghost" data-a="discardById" data-id="${cur.id}">Descartar</button><a class="btn primary small" href="#sesion/${cur.id}">Continuar</a></span></div>` : ""}
   ${changed.length ? `<div class="card mod"><b>Esta semana hubo modificaciones en tu rutina</b><ul>${changed.flatMap((r) => (r.changes.list || []).map((x) => `<li><b>${esc(r.name)}:</b> ${esc(x)}</li>`)).join("")}</ul></div>` : ""}
   <div class="slots">${plan.slots.map((s) => s.rest

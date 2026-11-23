@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { diffDays } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg } from "./data.js";
@@ -47,12 +47,15 @@ const head = (title, back, right = "") => `<header class="ch">${back ? `<a href=
 
 // Qué toca cada día (debajo del número): rutina abreviada o descanso
 function dayTag(dow, d) {
-  if (d && S.client?.startDate && d < S.client.startDate) return `<i class="dtag rest"></i>`; // antes de partir
+  if (d && d < appStart(S.client)) return `<i class="dtag rest"></i>`; // antes de partir
+  const short = (n) => (n.match(/\(([^)]+)\)/) || [])[1] || (/\b([A-Z])$/.test(n.trim()) ? n.trim().split(" ")[0].slice(0, 4) + " " + n.trim().slice(-1) : n.split(" ")[0].slice(0, 4)) || "Entr.";
+  if (isRotation(S.client)) { // rotación: lo hecho y lo sugerido (según el último entreno), no días fijos
+    const sl = S.wplan?.slots?.find((x) => x.date === d);
+    return sl && !sl.rest ? `<i class="dtag ${sl.status === "hecho" ? "" : "sug"}">${esc(short(sl.name))}</i>` : `<i class="dtag rest"></i>`;
+  }
   const rid = (S.client?.schedule || {})[dow];
   if (!rid) return `<i class="dtag rest">Desc.</i>`;
-  const n = S.rtNames?.[rid] || "";
-  const short = (n.match(/\(([^)]+)\)/) || [])[1] || n.split(" ")[0].slice(0, 4) || "Entr.";
-  return `<i class="dtag">${esc(short)}</i>`;
+  return `<i class="dtag">${esc(short(S.rtNames?.[rid] || ""))}</i>`;
 }
 // Tira de días de la semana del cliente
 function dayStrip() {
@@ -60,7 +63,7 @@ function dayStrip() {
   return `<div class="strip"><button class="icon-btn" data-a="shiftDay" data-n="-7">${I.back}</button>${w.days.map((d) => { const dt = parseYmd(d); return `<button class="sd ${d === S.date ? "on" : ""} ${d === today ? "today" : ""}" data-a="pickDay" data-d="${d}"><small>${D1[dt.getDay()]}</small>${dt.getDate()}${dayTag(dt.getDay(), d)}</button>`; }).join("")}<button class="icon-btn" data-a="shiftDay" data-n="7">${I.chev}</button></div>
   ${S.date !== today
     ? `<div class="otherday" data-a="pickDay" data-d="${today}"><span>Estás registrando el <b>${fmtDate(S.date, true)}</b>${S.date > today ? " (futuro)" : ""}</span><b>Volver a hoy</b></div>`
-    : `<div class="strip-sub"><span>${fmtDate(S.date, true)} · ${w.n >= 1 ? `Semana ${w.n}` : `Partes el ${fmtDate(S.client.startDate, true)}`}</span></div>`}`;
+    : `<div class="strip-sub"><span>${fmtDate(S.date, true)} · ${S.date < appStart(S.client) ? `Partes el ${fmtDate(appStart(S.client), true)}` : `Semana ${w.n}`}</span></div>`}`;
 }
 act("pickDay", (el) => { S.date = el.dataset.d; refresh(); });
 act("shiftDay", (el) => { S.date = addDays(S.date, +el.dataset.n); refresh(); });
@@ -76,7 +79,7 @@ async function home() {
   const c = S.client, date = S.date, today = ymd();
   const [day, routines, sessions] = await Promise.all([getDay(date), getRoutines(S.cid), getSessions(S.cid)]);
   const w = weekInfo(c, date);
-  const plan = weekPlan(c, routines, sessions, date);
+  const plan = weekPlan(c, routines, sessions, date); S.wplan = plan;
   const tot = dayTotals(day);
   const water = sum(day.water || [], (x) => x.ml), waterGoal = c.water || 2500;
   const sl = sleepHours(day.sleep);
@@ -85,10 +88,12 @@ async function home() {
   const cardioDone = await cardioWeek(w);
   const inProgress = sessions.find((s) => s.status === "curso");
   const cdays = c.cardio?.days || [];
-  const trainTxt = inProgress ? `<small class="muted">Sesión en curso</small><b>${esc(inProgress.routineName)}</b>` : slot && !slot.rest ? `<small class="muted">${slot.status === "hecho" ? "Completado" : date === today ? "Hoy te toca" : "Este día toca"}</small><b>${esc(slot.name)}</b>` : `<small class="muted">Hoy</small><b>Descanso</b>`;
+  const restTxt = plan.rotation && date === today && slot?.freeToday ? `<small class="muted">Hoy puedes entrenar (opcional)</small><b>${esc(plan.next?.name || "")}</b>`
+    : plan.rotation && plan.next && plan.doneCount < plan.total ? `<small class="muted">Hoy descanso · próximo</small><b>${esc(plan.next.name)}${(() => { const n = plan.slots.find((x) => !x.rest && x.status === "proximo"); return n ? ` <span class="muted small">(${fmtDate(n.date)})</span>` : ""; })()}</b>` : `<small class="muted">Hoy</small><b>Descanso</b>`;
+  const trainTxt = inProgress ? `<small class="muted">Sesión en curso</small><b>${esc(inProgress.routineName)}</b>` : slot && !slot.rest ? `<small class="muted">${slot.status === "hecho" ? "Completado" : date === today ? "Hoy te toca" : plan.rotation ? "Sugerido para este día" : "Este día toca"}</small><b>${esc(slot.name)}</b>` : restTxt;
   if (date === today) { setTimeout(maybeOnboard, 400); setTimeout(askYesterdaySteps, 1200); }
   return `<header class="topbar ima"><img src="icons/logo.png?v=ima2" class="hdr-logo" alt="IMA"><div class="brand-t">INTELIGENCIA MUSCULAR APLICADA</div>${bellBtn(pend)}</header>${dayStrip()}
-  ${date === today && c.startDate && today < c.startDate ? `<div class="card startcard"><div class="card-t">${I.info}Tu plan parte ${diffDays(c.startDate, today) === 1 ? "mañana" : "el " + fmtDate(c.startDate, true)}</div><p class="small">Ese día empieza tu semana 1. Mientras, puedes recorrer la app: revisa <a href="#plan">Mi plan</a>, tus rutinas en <a href="#entreno">Entreno</a> y ajusta tus recordatorios en Más → Ajustes.</p></div>` : ""}
+  ${date === today && today < appStart(c) ? `<div class="card startcard"><div class="card-t">${I.info}Tu plan parte ${diffDays(appStart(c), today) === 1 ? "mañana" : "el " + fmtDate(appStart(c), true)}</div><p class="small">Ese día empieza tu semana 1. Mientras, puedes recorrer la app: revisa <a href="#plan">Mi plan</a>, tus rutinas en <a href="#entreno">Entreno</a> y ajusta tus recordatorios en Más → Ajustes.</p></div>` : ""}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   ${date === today && c.payDate && diffDays(c.payDate, today) === 0 ? `<div class="card paycard">${payMsg(c)}</div>` : ""}
@@ -107,7 +112,7 @@ async function home() {
       <div class="legend-mini"><span>● hecho</span><span>○ sugerido</span></div><div class="foot">${c.cardio?.desc || c.cardio?.type ? `<button class="btn tiny ghost" data-a="cardioPlan">Ver</button>` : ""}<button class="btn tiny" data-a="cardioAdd">Registrar</button></div></div>` : ""}
     ${has("home_digest") ? `<div class="card tile"><div class="card-t">${I.gut}Digestión</div><div class="row between"><span class="small muted">Deposiciones</span><div class="stepper-s"><button data-a="depo" data-n="-1">−</button><b>${day.depos ?? 0}</b><button data-a="depo" data-n="1">+</button></div></div>
       <div class="foot"><button class="btn tiny" data-a="gutNote">${day.gut ? "Molestias ●" : "¿Molestias?"}</button></div></div>` : ""}
-    ${has("home_train") && has("train_tab") ? `<a class="card tile wide train-tile" href="#${inProgress ? "sesion/" + inProgress.id : "entreno"}"><div class="card-t" style="margin:0">${I.dumbbell}</div><div class="tt">${trainTxt}<span class="muted small">${plan.doneCount} de ${plan.planned.length} entrenamientos esta semana</span></div>${slot && !slot.rest && slot.status !== "hecho" || inProgress ? `<span class="btn primary small">${inProgress ? "Continuar" : "Empezar"}</span>` : I.chev}</a>` : ""}
+    ${has("home_train") && has("train_tab") ? `<a class="card tile wide train-tile" href="#${inProgress ? "sesion/" + inProgress.id : "entreno"}"><div class="card-t" style="margin:0">${I.dumbbell}</div><div class="tt">${trainTxt}<span class="muted small">${plan.doneCount} de ${plan.total} entrenamientos esta semana</span></div>${slot && !slot.rest && slot.status !== "hecho" || inProgress || slot?.freeToday ? `<span class="btn primary small">${inProgress ? "Continuar" : "Empezar"}</span>` : I.chev}</a>` : ""}
   </div>`;
 }
 
@@ -126,7 +131,7 @@ act("bellOpen", () => {
 });
 async function pendings(day, plan, w) {
   const out = [], h = new Date().getHours();
-  if (S.client.startDate && ymd() < S.client.startDate) return out; // aún no parte: nada pendiente
+  if (ymd() < appStart(S.client)) return out; // aún no parte: nada pendiente
   if (!day.weight) out.push({ t: "Registrar tu peso de hoy", to: "peso", c: "y" });
   const meals = Object.values(day.meals || {}).filter((m) => m.length).length;
   if (h >= 11 && meals === 0) out.push({ t: "Aún no registras comidas hoy", to: "comida", c: "r" });
@@ -135,6 +140,7 @@ async function pendings(day, plan, w) {
   if (!day.sleep) out.push({ t: "Registrar cómo dormiste", to: "sueno", c: "y" });
   for (const s of plan.slots) if (s.status === "atrasado") out.push({ t: `Entrenamiento atrasado: ${s.name} (${fmtDate(s.date)})`, to: "entreno", c: "y" });
   const hoy = plan.slots.find((s) => s.status === "hoy"); if (hoy) out.push({ t: `Hoy te toca ${hoy.name}`, to: "entreno", c: "b" });
+  if (plan.rotation && plan.missing) out.push({ t: `Te ${plan.missing > 1 ? "faltan" : "falta"} ${plan.missing} entrenamiento${plan.missing > 1 ? "s" : ""} y ya no alcanzan los días con descanso entremedio: habla con tu coach`, to: "entreno", c: "y" });
   const photos = (await db.list(P() + "/photos")).filter((p) => p.week === w.key && !["comida", "equipo"].includes(p.kind));
   if (!photos.length) out.push({ t: "Sube tus fotos de esta semana", to: "fotos", c: "y" });
   if (ymd() >= addDays(w.last, -1) && !(await db.get(P() + "/checkins/" + w.key))) out.push({ t: "Completa tu check-in semanal", to: "checkin", c: "r" });
@@ -884,7 +890,7 @@ async function checkinView() {
     ${q(["accion", "¿Cómo te fue?", ["Lo logré", "A medias", "No lo logré"]])}${q(["accionDet", "¿Qué te ayudó o qué te lo impidió?", "text"])}</div>` : ""}
   ${CHECKIN.map((sec) => `<div class="ci-sec ${sec.open ? "ci-open" : ""}"><h3>${esc(sec.t)}</h3>
     ${sec.open ? `<p class="muted small">Tómate un par de minutos en estas: son las que más me sirven para ajustar tu plan.</p>` : ""}
-    ${sec.t === "Entrenamiento" && tp.planned.length ? `<div class="ci-q"><div>Entrenamientos de la semana</div><b>${tp.doneCount} de ${tp.planned.length}</b></div>` : ""}
+    ${sec.t === "Entrenamiento" && tp.total ? `<div class="ci-q"><div>Entrenamientos de la semana</div><b>${tp.doneCount} de ${tp.total}</b></div>` : ""}
     ${sec.t === "Nutrición" ? `<div class="ci-q"><div>¿Cuántos días registraste tu alimentación en la app?</div><b>${regDays} de 7</b></div>` : ""}
     ${sec.t === "Digestión" && dep != null ? `<div class="note">Según tus registros diarios: ${r1(dep)} deposiciones por día en promedio.</div>` : ""}
     ${sec.sleep ? sleepSum(days) : ""}
@@ -900,7 +906,7 @@ act("ciSave", async () => {
   const w = weekInfo(S.client, ymd()), days = await getDays(w.first, w.last);
   CI.diasRegistrados = Object.values(days).filter((d) => Object.values(d.meals || {}).some((m) => m.length)).length;
   const [rts, sss] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]), tp = weekPlan(S.client, rts, sss, w.first);
-  CI.entrenos = `${tp.doneCount}/${tp.planned.length}`;
+  CI.entrenos = `${tp.doneCount}/${tp.total}`;
   await db.set(`${P()}/checkins/${w.key}`, { ...CI, at: Date.now(), date: ymd() }, false);
   toast("Check-in enviado ✓"); go("inicio");
 });
@@ -1118,7 +1124,7 @@ export function weeksTable(raw, days, routines, sessions, today = ymd()) {
     const T = (k) => avg(reg.map((d) => dayTotals(d)[k]));
     const plan = weekPlan(raw, routines, sessions, w.first);
     const wAvg = A((d) => weightCorr(d));
-    rows.push({ n, w, t, reg: reg.length, kcal: T("kcal"), cho: T("cho"), fat: T("fat"), prot: T("prot"), ses: `${plan.doneCount}/${plan.planned.length}`, steps: A((d) => d.steps), cardio: sum(D.flatMap((d) => d.cardio || []), (x) => x.min), weight: wAvg, dW: wAvg && prevAvg ? wAvg - prevAvg : null, sleep: A((d) => sleepHours(d.sleep)), cur: n === cur.n });
+    rows.push({ n, w, t, reg: reg.length, kcal: T("kcal"), cho: T("cho"), fat: T("fat"), prot: T("prot"), ses: `${plan.doneCount}/${plan.total}`, steps: A((d) => d.steps), cardio: sum(D.flatMap((d) => d.cardio || []), (x) => x.min), weight: wAvg, dW: wAvg && prevAvg ? wAvg - prevAvg : null, sleep: A((d) => sleepHours(d.sleep)), cur: n === cur.n });
     if (wAvg) prevAvg = wAvg;
   }
   let curPh = "";

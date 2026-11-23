@@ -93,7 +93,7 @@ async function overview(clients, ALL) {
     <td>${c.service ? esc(SERVICES[c.service]) : '<span class="badge r">Definir</span>'}${c.modalidad ? `<br><small class="muted">${esc(c.modalidad)}</small>` : ""}</td>
     <td>${w ? `${w.n}<br><small style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</small>` : "—"}</td>
     <td>${checkinDayTxt(c)}${c.checkinForm ? '<br><small class="muted">formulario</small>' : ""}${lastCi ? `<br><small class="muted">últ. sem. ${+lastCi.id.slice(1)}</small>` : ""}</td>
-    <td>${active({ x, c }) && plan && plan.planned.length ? `<span class="pill ${plan.doneCount >= plan.planned.length ? "g" : ""}">${plan.doneCount}/${plan.planned.length}</span>` : "—"}</td>
+    <td>${active({ x, c }) && plan && plan.total ? `<span class="pill ${plan.doneCount >= plan.total ? "g" : ""}">${plan.doneCount}/${plan.total}</span>` : "—"}</td>
     <td>${active({ x, c }) && c.service !== "entrenamiento" ? `<span class="pill ${foodDays >= 5 ? "g" : foodDays >= 3 ? "y" : "r"}">${foodDays}/7</span>` : "—"}</td><td>${active({ x, c }) ? `<span class="pill ${wDays >= 5 ? "g" : wDays >= 3 ? "y" : "r"}">${wDays}/7</span>` : "—"}</td>
     <td class="ovchips">${A.map((a) => chip(a, c.id)).join(" ") || '<span class="badge g">Al día</span>'}</td></tr>`).join("") || `<tr><td colspan="9" class="muted">Aún no tienes clientes. Crea uno con “＋ Nuevo cliente” o usa “Importar clientes”.</td></tr>`}</table>`;
 }
@@ -173,7 +173,7 @@ async function tlView(c0, w) {
   if (!TLM.month) TLM.month = w.first.slice(0, 7);
   return `<div class="tl-top">
   <div class="card tl-cal">${monthCal(c0, { month: TLM.month, selWeek: w.n, nav: "tlMonth", act: "tlWeek" })}</div>
-  <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.planned.length}</div>${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}">${s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("") || '<p class="muted small">Sin calendario de rutinas.</p>'}</div>
+  <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.total}</div>${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}">${s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("") || '<p class="muted small">Sin calendario de rutinas.</p>'}</div>
   <div class="tl-side"><div class="card"><div class="card-t">Peso promedio</div><div class="big">${r1(agg(R, (r) => weightCorr(r.x))) || "—"} <small>kg</small></div>${cmp(agg(R, (r) => weightCorr(r.x)), agg(pR, (r) => weightCorr(r.x)), 1, true)} <small class="muted">vs sem. anterior</small></div>
   <div class="card"><div class="card-t">Días con registro</div><ul class="adh">${[["Comida", reg((r) => Object.values(r.x.meals || {}).some((m) => m.length))], ["Peso", reg((r) => r.x.weight)], ["Sueño", reg((r) => r.sl)], ["Pasos", reg((r) => r.x.steps)], ["Agua", reg((r) => r.water)]].map(([l, n]) => `<li><span>${l}</span><b class="${n >= 5 ? "g" : n >= 3 ? "y" : "r"}">${n}/7</b></li>`).join("")}</ul></div></div></div>
   <div class="card"><div class="row between"><div class="card-t">Tendencia · peso corporal vs ${mm[1].toLowerCase()} (últimos 56 días, media de 7 días)</div></div>
@@ -543,7 +543,7 @@ async function preanalysis(c0, w) {
   const good = [], work = [], answer = [], skip = [];
   const wA = A(D, (d) => weightCorr(d)), wP = A(P, (d) => weightCorr(d)), kcal = T("kcal"), prot = T("prot"), steps = A(D, (d) => d.steps), sl = A(D, (d) => sleepHours(d.sleep)), water = A(D, (d) => sum(d.water || [], (y) => y.ml));
   // entrenamiento
-  if (plan.planned.length) (plan.doneCount >= plan.planned.length ? good : work).push(`Entrenamientos: <b>${plan.doneCount} de ${plan.planned.length}</b>`);
+  if (plan.total) (plan.doneCount >= plan.total ? good : work).push(`Entrenamientos: <b>${plan.doneCount} de ${plan.total}</b>`);
   if (comp) (up / comp >= 0.3 ? good : skip).push(`Progresó en <b>${up} de ${comp}</b> series vs la semana pasada${gains.length ? ` (${[...new Set(gains)].slice(0, 3).map(esc).join(", ")})` : ""}`);
   if (wk.some((x) => x.survey?.articular === "si") || /Moderado|Alto/.test(ci?.articular || "")) work.push(`Molestia articular: ${esc(ci?.articularDet || wk.find((x) => x.survey?.articularDet)?.survey?.articularDet || "revisar")}`);
   if (wk.some((x) => x.exercises.some((e) => e.tech === "peor" || e.sets.some((y) => y.tech === "peor")))) work.push("Técnica peor en algún ejercicio: revisa sus videos");

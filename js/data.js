@@ -1,7 +1,7 @@
 // Acceso a datos del cliente + lógica de entrenamiento compartida (cliente y coach)
 import { db } from "./db.js";
 import { S } from "./state.js";
-import { ymd, addDays, weekInfo, e1rm, uid, esc, fmtDate } from "./util.js";
+import { ymd, addDays, weekInfo, e1rm, uid, esc, fmtDate, diffDays } from "./util.js";
 import { REAL_FOODS, realToFood } from "./realfoods.js";
 import { GROUPS } from "./foods.js";
 
@@ -71,14 +71,52 @@ export function foodCheck(f) {
 
 // ---------- Semana de entrenamiento: qué toca y en qué estado está
 // schedule: { "1": routineId, "2": routineId, ... } (0=domingo)
+// Fecha desde la que el cliente usa la app (puede ser después del inicio de la semana 1, ej. semana dom–sáb y parte el lunes)
+export const appStart = (c) => [c?.startDate || "", c?.appFrom || ""].sort().pop() || "";
+// Rotación (ej. Fullbody A/B sin días fijos): c.rotation = { on, order:[rid…], perWeek, days:[dow sugeridos], minRest }
+export const isRotation = (c) => !!(c?.rotation?.on && (c.rotation.order || []).length);
+export function nextInRotation(c, sessions) {
+  const order = c.rotation.order, last = sessions.filter((s) => s.status === "fin" && order.includes(s.routineId) && (!c.startDate || s.date >= c.startDate)).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.startedAt || 0) - (a.startedAt || 0))[0];
+  return { rid: last ? order[(order.indexOf(last.routineId) + 1) % order.length] : order[0], lastDate: last?.date || null };
+}
+function rotationPlan(client, routines, sessions, w, today) {
+  const R = client.rotation, order = R.order, per = +R.perWeek || 3, gap = (+R.minRest || 1) + 1, sug = (R.days || []).map(Number);
+  const from = appStart(client), nameOf = (rid) => routines.find((x) => x.id === rid)?.name || "Rutina";
+  const done = sessions.filter((s) => s.status === "fin" && s.weekKey === w.key).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const byDate = {}; for (const s of done) (byDate[s.date] ||= []).push(s);
+  const { rid: next, lastDate } = nextInRotation(client, sessions);
+  // Días posibles desde hoy (o desde el inicio): respetan el descanso mínimo desde el último entreno
+  const start = [today, w.first, from].sort().pop(), left = Math.max(0, per - done.length), pick = [];
+  let prev = lastDate, ri = order.indexOf(next);
+  const ok = (d) => d >= start && d <= w.last && !byDate[d] && (!prev || diffDays(d, prev) >= gap);
+  const cand = w.days.filter((d) => d >= start);
+  for (let i = 0; i < cand.length && pick.length < left; i++) {
+    const d = cand[i]; if (!ok(d)) continue;
+    const isSug = sug.includes(new Date(d + "T12:00").getDay());
+    // ¿Alcanzan los días que quedan si no entrena este día? (cada entreno necesita "gap" días)
+    const restDays = diffDays(w.last, d), need = left - pick.length;
+    const fitsLater = (restDays >= 1 ? Math.floor((restDays - 1) / gap) + 1 : 0) >= need;
+    if (isSug || !fitsLater || (d === today && !sug.length)) { pick.push({ d, rid: order[ri % order.length], sug: isSug }); ri++; prev = d; }
+  }
+  const missing = w.last < from ? 0 : Math.max(0, left - pick.length);
+  const pmap = Object.fromEntries(pick.map((x) => [x.d, x]));
+  const slots = w.days.map((d) => {
+    if (byDate[d]) { const s = byDate[d][0]; return { date: d, rid: s.routineId, name: s.routineName || nameOf(s.routineId), status: "hecho", session: s }; }
+    const p = pmap[d]; if (!p) return { date: d, rest: true, freeToday: d === today && left > 0 && ok(d) };
+    return { date: d, rid: p.rid, name: nameOf(p.rid), status: d === today ? "hoy" : "proximo", sug: p.sug, rot: true };
+  });
+  const planned = slots.filter((s) => !s.rest);
+  return { week: w, slots, planned, doneCount: done.length, rotation: true, perWeek: per, missing, next: { rid: next, name: nameOf(next) }, total: per };
+}
 export function weekPlan(client, routines, sessions, date = ymd()) {
   const w = weekInfo(client, date);
   const today = ymd();
-  const sched = client.startDate && w.last < client.startDate ? {} : client.schedule || {}; // semanas antes de partir: sin entrenamientos
+  if (isRotation(client)) return w.last < appStart(client) ? { week: w, slots: w.days.map((d) => ({ date: d, rest: true })), planned: [], total: 0, doneCount: 0, rotation: true, missing: 0 } : rotationPlan(client, routines, sessions, w, today);
+  const sched = w.last < appStart(client) ? {} : client.schedule || {}; // semanas antes de partir: sin entrenamientos
   const done = sessions.filter((s) => s.weekKey === w.key && s.status === "fin");
   const used = new Set();
   const slots = w.days.map((d) => {
-    const rid = sched[new Date(d + "T12:00").getDay()];
+    const rid = d < appStart(client) ? null : sched[new Date(d + "T12:00").getDay()]; // días antes de que parta en la app: nada
     if (!rid) return { date: d, rest: true };
     const r = routines.find((x) => x.id === rid);
     const s = done.find((x) => x.routineId === rid && !used.has(x.id));
@@ -87,7 +125,7 @@ export function weekPlan(client, routines, sessions, date = ymd()) {
     return { date: d, rid, name: r?.name || "Rutina", status, session: s };
   });
   const planned = slots.filter((s) => !s.rest);
-  return { week: w, slots, planned, doneCount: planned.filter((s) => s.status === "hecho").length };
+  return { week: w, slots, planned, total: planned.length, doneCount: planned.filter((s) => s.status === "hecho").length };
 }
 
 // Sesión de la semana anterior (misma rutina) para comparar
