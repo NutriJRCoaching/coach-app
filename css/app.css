@@ -606,3 +606,9 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; col
 .ci-q.ci-cont { margin-top: -6px; padding-top: 0; border-top: 0; }
 .ci-sleep { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 6px 0 10px; } .ci-sleep div { background: var(--surf2); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; text-align: center; } .ci-sleep b { font-size: 15px; margin: 2px 0; } .ci-sleep small { font-size: 10.5px; color: var(--muted); }
 .ci-num { display: flex; align-items: center; gap: 8px; margin-top: 6px; } .ci-num b { width: 16px; color: var(--acc); } .ci-num input { flex: 1; }
+
+/* Pendientes plegados en la tabla de clientes */
+.pdrop summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; } .pdrop summary::-webkit-details-marker { display: none; }
+.pdot { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; font-size: 11.5px; font-weight: 800; }
+.pdot.r { background: var(--r-s); color: var(--r); } .pdot.y { background: var(--y-s); color: var(--y); } .pdot.g { background: var(--g-s); color: var(--g); } .pdot.i { background: var(--surf2); color: var(--muted); }
+.pdrop[open] summary .muted { display: none; } .pdlist { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }

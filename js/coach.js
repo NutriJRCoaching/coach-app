@@ -39,6 +39,15 @@ async function allAlerts(clients) {
   }
   return AL.busy && !AL.dirty ? AL.busy : computeAlerts(clients);
 }
+// Pendientes de un cliente plegados: puntos con la cantidad por color (rojo / amarillo / gris, o verde si está al día); al tocar se despliega la lista
+const OPEN_P = new Set();
+function pendDrop(A, cid) {
+  const n = (k) => A.filter((a) => a.c === k).length, r = n("r"), y = n("y"), i = n("i");
+  const dots = `${r ? `<span class="pdot r" title="Urgentes">${r}</span>` : ""}${y ? `<span class="pdot y" title="Pendientes">${y}</span>` : ""}${!r && !y ? `<span class="pdot g" title="Al día">✓</span>` : ""}${i ? `<span class="pdot i" title="Informativos">${i}</span>` : ""}`;
+  if (!A.length) return `<div class="pdrop">${dots}</div>`;
+  return `<details class="pdrop" ${OPEN_P.has(cid) ? "open" : ""} data-cid="${cid}"><summary data-a="pdTog" data-cid="${cid}">${dots}<span class="muted small">ver</span></summary><div class="pdlist">${A.map((a) => chip(a, cid)).join(" ")}</div></details>`;
+}
+act("pdTog", (el) => { const id = el.dataset.cid; el.parentElement.open ? OPEN_P.delete(id) : OPEN_P.add(id); });
 const chip = (a, cid) => `<a class="badge ${a.c === "i" ? "" : a.c}" href="#coach/c/${cid}/${a.tab}">${esc(a.t)}</a>`;
 
 const TABS = [["datos", "Datos y objetivos"], ["resumen", "Timeline semanal"], ["etapas", "Etapas"], ["entrenos", "Entrenamiento"], ["comida", "Alimentación"], ["plan", "Plan alimentación"], ["progreso", "Progreso"], ["checkins", "Check-ins"], ["feedback", "Retroalimentación"]];
@@ -89,7 +98,7 @@ async function overview(clients, ALL) {
   const active = (r) => r.x.access?.ok || r.c.example;
   return `<div class="row between"><h1>Clientes</h1><div class="row gap"><button class="btn small" data-a="exampleClient">Crear cliente de ejemplo</button></div></div>
   <div class="ov-sum"><div class="ov r"><b>${nR}</b><span>con algo urgente</span></div><div class="ov y"><b>${nY}</b><span>con pendientes</span></div><div class="ov g"><b>${rows.length - nR - nY}</b><span>al día</span></div><div class="ov"><b>${rows.filter(active).length}/${rows.length}</b><span>con acceso a la app</span></div></div>
-  <p class="muted small">${fmtDate(today, true)} · <span class="badge r">rojo</span> urgente · <span class="badge y">amarillo</span> pendiente · <span class="badge">gris</span> informativo. Toca un pendiente para ir directo a resolverlo.</p>
+  <p class="muted small">${fmtDate(today, true)} · <span class="badge r">rojo</span> urgente · <span class="badge y">amarillo</span> pendiente · <span class="badge">gris</span> informativo. Toca los puntos de un cliente para ver sus pendientes y luego uno para ir directo a resolverlo.</p>
   <table class="tbl big ovt"><tr><th></th><th>Cliente</th><th>Asesoría</th><th>Semana</th><th>Check-in</th><th>Entrenos</th><th>Comida</th><th>Pesajes</th><th>Pendientes</th></tr>
   ${rows.map(({ c, x, A, w, plan, foodDays, wDays, lastCi, lv }) => `<tr><td><span class="lv ${lv}"></span></td><td><a href="#coach/c/${c.id}/resumen"><b>${esc(c.name)}</b></a>${c.example ? ' <span class="badge">ejemplo</span>' : ""}<br><small class="muted">${x.access?.ok ? "✓ con acceso" : c.email ? "sin acceso aún" : "sin correo"}</small></td>
     <td>${c.service ? esc(SERVICES[c.service]) : '<span class="badge r">Definir</span>'}${c.modalidad ? `<br><small class="muted">${esc(c.modalidad)}</small>` : ""}</td>
@@ -97,7 +106,7 @@ async function overview(clients, ALL) {
     <td>${checkinDayTxt(c)}${c.checkinForm ? '<br><small class="muted">formulario</small>' : ""}${lastCi ? `<br><small class="muted">últ. sem. ${+lastCi.id.slice(1)}</small>` : ""}</td>
     <td>${active({ x, c }) && plan && plan.total ? `<span class="pill ${plan.doneCount >= plan.total ? "g" : ""}">${plan.doneCount}/${plan.total}</span>` : "—"}</td>
     <td>${active({ x, c }) && c.service !== "entrenamiento" ? `<span class="pill ${foodDays >= 5 ? "g" : foodDays >= 3 ? "y" : "r"}">${foodDays}/7</span>` : "—"}</td><td>${active({ x, c }) ? `<span class="pill ${wDays >= 5 ? "g" : wDays >= 3 ? "y" : "r"}">${wDays}/7</span>` : "—"}</td>
-    <td class="ovchips">${A.map((a) => chip(a, c.id)).join(" ") || '<span class="badge g">Al día</span>'}</td></tr>`).join("") || `<tr><td colspan="9" class="muted">Aún no tienes clientes. Crea uno con “＋ Nuevo cliente” o usa “Importar clientes”.</td></tr>`}</table>`;
+    <td class="ovchips">${pendDrop(A, c.id)}</td></tr>`).join("") || `<tr><td colspan="9" class="muted">Aún no tienes clientes. Crea uno con “＋ Nuevo cliente” o usa “Importar clientes”.</td></tr>`}</table>`;
 }
 
 act("newClient", () => sheet("Nuevo cliente", `<p class="muted small">Se crea su ficha para que vayas cargando su plan. El cliente crea su propia contraseña con este correo y solo puede entrar cuando le des acceso.</p>
