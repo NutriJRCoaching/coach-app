@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { diffDays } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, gtxt, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, gtxt, regSoFar, hasFood, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg, payState } from "./data.js";
@@ -1132,7 +1132,8 @@ export function weeksTable(raw, days, routines, sessions, today = ymd()) {
     const T = (k) => avg(reg.map((d) => dayTotals(d)[k]));
     const plan = weekPlan(raw, routines, sessions, w.first);
     const wAvg = A((d) => weightCorr(d));
-    rows.push({ n, w, t, reg: reg.length, kcal: T("kcal"), cho: T("cho"), fat: T("fat"), prot: T("prot"), ses: `${plan.doneCount}/${plan.total}`, steps: A((d) => d.steps), cardio: sum(D.flatMap((d) => d.cardio || []), (x) => x.min), weight: wAvg, dW: wAvg && prevAvg ? wAvg - prevAvg : null, sleep: A((d) => sleepHours(d.sleep)), cur: n === cur.n });
+    const rq = regSoFar(raw, w, Object.fromEntries(w.days.map((d) => [d, days[d] || {}])), hasFood, today);
+    rows.push({ n, w, t, reg: rq.n ? `${rq.k}/${rq.n}` : "—", kcal: T("kcal"), cho: T("cho"), fat: T("fat"), prot: T("prot"), ses: `${plan.doneCount}/${plan.total}`, steps: A((d) => d.steps), cardio: sum(D.flatMap((d) => d.cardio || []), (x) => x.min), weight: wAvg, dW: wAvg && prevAvg ? wAvg - prevAvg : null, sleep: A((d) => sleepHours(d.sleep)), cur: n === cur.n });
     if (wAvg) prevAvg = wAvg;
   }
   let curPh = "";
@@ -1141,7 +1142,7 @@ export function weeksTable(raw, days, routines, sessions, today = ymd()) {
     <tr><th></th><th colspan="2">Coaching</th><th colspan="5">Nutrición (registro)</th><th colspan="5">Métricas diarias</th><th colspan="6">Metas</th></tr>
     <tr><th>Sem.</th><th>Fecha</th><th>Etapa</th><th>Días reg.</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Sesiones</th><th>Pasos</th><th>Cardio</th><th>Peso prom.</th><th>Sueño</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Agua</th><th>Pasos</th></tr></thead>
     <tbody>${rows.map((r) => { curPh = r.t.phase || ""; return `<tr class="${r.cur ? "cur" : ""}"><td>${r.n}</td><td>${fmtDate(r.w.first)}</td><td><span class="ph" style="background:${phaseColor(r.t.phase)}">${esc(r.t.phase || "—")}</span></td>
-      <td>${r.reg}/7</td>${cell(r.kcal, r.t.kcal, r0, "kcal")}${cell(r.cho, r.t.cho, r0, "cho")}${cell(r.fat, r.t.fat, r0, "fat")}${cell(r.prot, r.t.prot, r0, "prot")}<td>${r.ses}</td>${cell(r.steps, r.t.steps, (v) => r0(v).toLocaleString("es-CL"), "steps")}<td>${r.cardio ? r.cardio + " min" : "—"}</td>
+      <td>${r.reg}</td>${cell(r.kcal, r.t.kcal, r0, "kcal")}${cell(r.cho, r.t.cho, r0, "cho")}${cell(r.fat, r.t.fat, r0, "fat")}${cell(r.prot, r.t.prot, r0, "prot")}<td>${r.ses}</td>${cell(r.steps, r.t.steps, (v) => r0(v).toLocaleString("es-CL"), "steps")}<td>${r.cardio ? r.cardio + " min" : "—"}</td>
       <td>${r.weight ? r1(r.weight) + (r.dW != null ? ` <small class="muted">(${r.dW > 0 ? "+" : ""}${r1(r.dW)})</small>` : "") : "—"}</td><td style="color:${sleepColor(r.sleep)}">${r.sleep ? r1(r.sleep) + " h" : "—"}</td>
       <td class="muted">${r.t.kcal || "—"}</td><td class="muted">${r.t.cho || "—"}</td><td class="muted">${r.t.fat || "—"}</td><td class="muted">${r.t.prot || "—"}</td><td class="muted">${r.t.water ? r1(r.t.water / 1000) + " L" : "—"}</td><td class="muted">${(r.t.steps || 0).toLocaleString("es-CL")}</td></tr>`; }).join("")}</tbody></table></div>
     <div class="legend small"><span><i class="okc"></i>en meta</span><span><i class="lowc"></i>ojo</span><span><i class="hic"></i>lejos de la meta</span></div>`;

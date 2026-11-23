@@ -3,7 +3,7 @@ import { db } from "./db.js";
 import { S } from "./state.js";
 import { ymd, addDays, weekInfo, diffDays, fmtDate, DAYS } from "./util.js";
 import { getRoutines, getSessions, getDays } from "./data.js";
-import { weekPlan, reviewWindow, payState, appStart, isRotation, ciOverdue, weightCorr, phaseAt, PHASE_PCT } from "./data.js";
+import { weekPlan, reviewWindow, payState, regSoFar, hasFood, appStart, isRotation, ciOverdue, weightCorr, phaseAt, PHASE_PCT } from "./data.js";
 import { GROUPS, pautaExtras, pautaMac } from "./foods.js";
 
 export const SERVICES = { completa: "Coaching 1-1", entrenamiento: "Entrenamiento", nutricion: "Nutrición" };
@@ -16,7 +16,7 @@ export const emailKey = (e) => String(e || "").trim().toLowerCase();
 export async function loadCtx(c) {
   const today = ymd();
   const [routines, sessions, days, checkins, feedbacks, fbreplies, access, onb] = await Promise.all([
-    getRoutines(c.id), getSessions(c.id), getDays(addDays(today, -6), today, c.id),
+    getRoutines(c.id), getSessions(c.id), getDays([addDays(today, -6), c.startDate ? weekInfo(c, today).first : today].sort()[0], today, c.id),
     db.list(`clients/${c.id}/checkins`), db.list(`clients/${c.id}/feedbacks`), db.list(`clients/${c.id}/fbreplies`),
     c.email ? db.get("access/" + emailKey(c.email)).catch(() => null) : null,
     db.get(`clients/${c.id}/settings/onboarding`).catch(() => null)
@@ -167,10 +167,10 @@ export function alertsFor(c, x) {
       if (nuevos) add("i", `${nuevos} entrenamiento${nuevos > 1 ? "s" : ""} nuevo${nuevos > 1 ? "s" : ""} para revisar`, "entrenos");
     }
     if (active) {
-      const d7 = Object.values(x.days), elapsed = Math.min(7, diffDays(today, appStart(c)) + 1);
-      const food = d7.filter((d) => Object.values(d.meals || {}).some((m) => m.length)).length, wts = d7.filter((d) => d.weight).length;
-      if (eats(c) && elapsed >= 3 && food < Math.min(3, elapsed)) add("y", `Registró comida solo ${food} de los últimos 7 días`, "comida");
-      if (elapsed >= 4 && wts < 3) add("y", `Solo ${wts} pesaje${wts === 1 ? "" : "s"} en los últimos 7 días`, "resumen");
+      // Proporcional a lo que va de su semana: avisa si ya le faltan 2 o más días sin registrar comida, o menos de 3 de cada 7 pesajes
+      const F = regSoFar(c, w, x.days, hasFood, today), W = regSoFar(c, w, x.days, (d) => d.weight, today);
+      if (eats(c) && F.n - F.k >= 2) add("y", `Registró comida ${F.k} de ${F.n} días de esta semana`, "comida");
+      if (W.n >= 3 && W.k < Math.ceil((W.n * 3) / 7)) add("y", `Se pesó ${W.k} de ${W.n} días de esta semana`, "resumen");
     }
   }
   const order = { r: 0, y: 1, i: 2 };

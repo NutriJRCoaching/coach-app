@@ -9,7 +9,7 @@ import { e1rm } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
 import { PAY_FIELDS } from "./data.js";
 let PAYD = null; // datos para transferir (library/payment), para la vista previa en Datos
-import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto, routineBlock, planStr, setStr, isRotation, nextInRotation, appStart, payState } from "./data.js";
+import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto, routineBlock, planStr, setStr, isRotation, nextInRotation, appStart, payState, regSoFar, trainSoFar, hasFood, ratioCls } from "./data.js";
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
@@ -89,8 +89,8 @@ async function overview(clients, ALL) {
     const { x, A } = ALL[c.id] || { x: { routines: [], sessions: [], days: {}, checkins: [] }, A: [] };
     const w = c.startDate ? weekInfo(c, today) : null;
     const plan = w ? weekPlan(c, x.routines, x.sessions) : null;
-    const d7 = Object.values(x.days || {});
-    const foodDays = d7.filter((d) => Object.values(d.meals || {}).some((m) => m.length)).length, wDays = d7.filter((d) => d.weight).length;
+    const F = w ? regSoFar(c, w, x.days || {}, hasFood, today) : { k: 0, n: 0 }, W = w ? regSoFar(c, w, x.days || {}, (d) => d.weight, today) : { k: 0, n: 0 };
+    const foodDays = F, wDays = W;
     const lastCi = [...x.checkins].sort((a, b) => b.id.localeCompare(a.id))[0];
     return { c, x, A, w, plan, foodDays, wDays, lastCi, lv: levelOf(A) };
   }).sort((a, b) => "ryg".indexOf(a.lv) - "ryg".indexOf(b.lv) || a.c.name.localeCompare(b.c.name));
@@ -104,8 +104,8 @@ async function overview(clients, ALL) {
     <td>${c.service ? esc(SERVICES[c.service]) : '<span class="badge r">Definir</span>'}${c.modalidad ? `<br><small class="muted">${esc(c.modalidad)}</small>` : ""}</td>
     <td>${w ? `${w.n}<br><small style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</small>` : "—"}</td>
     <td>${checkinDayTxt(c)}${c.checkinForm ? '<br><small class="muted">formulario</small>' : ""}${lastCi ? `<br><small class="muted">últ. sem. ${+lastCi.id.slice(1)}</small>` : ""}</td>
-    <td>${active({ x, c }) && plan && plan.total ? `<span class="pill ${plan.doneCount >= plan.total ? "g" : ""}">${plan.doneCount}/${plan.total}</span>` : "—"}</td>
-    <td>${active({ x, c }) && c.service !== "entrenamiento" ? `<span class="pill ${foodDays >= 5 ? "g" : foodDays >= 3 ? "y" : "r"}">${foodDays}/7</span>` : "—"}</td><td>${active({ x, c }) ? `<span class="pill ${wDays >= 5 ? "g" : wDays >= 3 ? "y" : "r"}">${wDays}/7</span>` : "—"}</td>
+    <td>${active({ x, c }) && plan && plan.total ? `${(() => { const t = trainSoFar(plan, today); return `<span class="pill ${t.done >= t.due ? "g" : t.due - t.done >= 2 ? "r" : "y"}" title="Hechos / los que le correspondían hasta hoy (de ${t.total} en la semana)">${t.done}/${t.due}</span><br><small class="muted">de ${t.total}</small>`; })()}` : "—"}</td>
+    <td>${active({ x, c }) && c.service !== "entrenamiento" ? (foodDays.n ? `<span class="pill ${ratioCls(foodDays.k, foodDays.n)}" title="Días con comida registrada / días que van de su semana">${foodDays.k}/${foodDays.n}</span>` : '<span class="muted small">recién parte</span>') : "—"}</td><td>${active({ x, c }) ? (wDays.n ? `<span class="pill ${ratioCls(wDays.k, wDays.n)}" title="Días con peso / días que van de su semana">${wDays.k}/${wDays.n}</span>` : '<span class="muted small">recién parte</span>') : "—"}</td>
     <td class="ovchips">${pendDrop(A, c.id)}</td></tr>`).join("") || `<tr><td colspan="9" class="muted">Aún no tienes clientes. Crea uno con “＋ Nuevo cliente” o usa “Importar clientes”.</td></tr>`}</table>`;
 }
 
@@ -176,7 +176,7 @@ async function tlView(c0, w) {
     ["sleep", "Sueño (h)", (r) => r.sl, c.sleep, r1, (r) => r.sl],
     ["cardio", "Cardio (min)", (r) => r.cardio, null, r0, (r) => sum(r.x.cardio || [], (y) => y.min)]
   ];
-  const reg = (f) => R.filter(f).length;
+  const dmap = Object.fromEntries(R.map((r) => [r.d, r])), reg = (f) => regSoFar(c0, w, dmap, f); // proporcional a lo que va de la semana
   // gráfico: peso vs la métrica elegida, últimos 56 días, con media móvil de 7 días
   const keys = Array.from({ length: 56 }, (_, i) => addDays(ymd(), i - 55));
   const wv = keys.map((k) => weightCorr(allDays[k])), mm = METRICS.find((x) => x[0] === TLM.m), mv = keys.map((k) => dayVal(allDays[k], TLM.m));
@@ -184,9 +184,9 @@ async function tlView(c0, w) {
   if (!TLM.month) TLM.month = w.first.slice(0, 7);
   return `<div class="tl-top">
   <div class="card tl-cal">${monthCal(c0, { month: TLM.month, selWeek: w.n, nav: "tlMonth", act: "tlWeek" })}</div>
-  <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.total}</div>${plan.rotation ? `<p class="small muted">Rotación${plan.next?.name ? ` · próximo: <b>${esc(plan.next.name)}</b>` : ""}</p>` : ""}${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}${s.rot && s.status === "proximo" ? " sugd" : ""}">${s.rot && s.status === "proximo" ? (s.sug ? "sugerido" : "para completar") : s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("") || '<p class="muted small">Sin calendario de rutinas.</p>'}${plan.missing ? `<p class="small red">${plan.missing > 1 ? "Le faltan" : "Le falta"} ${plan.missing}: ya no alcanzan los días con descanso.</p>` : ""}</div>
+  <div class="card"><div class="card-t">Entrenamientos</div><div class="big">${plan.doneCount}/${plan.total}</div>${(() => { const t = trainSoFar(plan); return w.first <= ymd() && ymd() <= w.last && t.due < t.total ? `<p class="small ${t.done >= t.due ? "g" : "y"}">${t.done} de ${t.due} hasta hoy</p>` : ""; })()}${plan.rotation ? `<p class="small muted">Rotación${plan.next?.name ? ` · próximo: <b>${esc(plan.next.name)}</b>` : ""}</p>` : ""}${plan.slots.filter((s) => !s.rest).map((s) => `<div class="small"><span class="badge ${s.status}${s.rot && s.status === "proximo" ? " sugd" : ""}">${s.rot && s.status === "proximo" ? (s.sug ? "sugerido" : "para completar") : s.status}</span> ${esc(s.name)} · ${fmtDate(s.date)}</div>`).join("") || '<p class="muted small">Sin calendario de rutinas.</p>'}${plan.missing ? `<p class="small red">${plan.missing > 1 ? "Le faltan" : "Le falta"} ${plan.missing}: ya no alcanzan los días con descanso.</p>` : ""}</div>
   <div class="tl-side"><div class="card"><div class="card-t">Peso promedio</div><div class="big">${r1(agg(R, (r) => weightCorr(r.x))) || "—"} <small>kg</small></div>${cmp(agg(R, (r) => weightCorr(r.x)), agg(pR, (r) => weightCorr(r.x)), 1, true)} <small class="muted">vs sem. anterior</small></div>
-  <div class="card"><div class="card-t">Días con registro</div><ul class="adh">${[["Comida", reg((r) => Object.values(r.x.meals || {}).some((m) => m.length))], ["Peso", reg((r) => r.x.weight)], ["Sueño", reg((r) => r.sl)], ["Pasos", reg((r) => r.x.steps)], ["Agua", reg((r) => r.water)]].map(([l, n]) => `<li><span>${l}</span><b class="${n >= 5 ? "g" : n >= 3 ? "y" : "r"}">${n}/7</b></li>`).join("")}</ul></div></div></div>
+  <div class="card"><div class="card-t">Días con registro</div><ul class="adh">${[["Comida", reg((r) => Object.values(r.x.meals || {}).some((m) => m.length))], ["Peso", reg((r) => r.x.weight)], ["Sueño", reg((r) => r.sl)], ["Pasos", reg((r) => r.x.steps)], ["Agua", reg((r) => r.water)]].map(([l, n]) => `<li><span>${l}</span><b class="${ratioCls(n.k, n.n)}">${n.n ? `${n.k}/${n.n}` : "—"}</b></li>`).join("")}</ul></div></div></div>
   <div class="card"><div class="row between"><div class="card-t">Tendencia · peso corporal vs ${mm[1].toLowerCase()} (últimos 56 días, media de 7 días)</div></div>
   <div class="chips">${METRICS.map(([k, l, col]) => `<button class="chip ${k === TLM.m ? "on" : ""}" style="${k === TLM.m ? `background:${col};border-color:${col}` : ""}" data-a="tlMetric" data-k="${k}">${l}</button>`).join("")}</div>
   ${dualChart(keys.map((k) => k.slice(8) + "/" + k.slice(5, 7)), { vals: wv, trend: ma7(wv), color: "var(--txt)", unit: "kg" }, { vals: mv, trend: ma7(mv), color: mm[2], unit: mm[3], goal: goalOf })}
@@ -605,9 +605,9 @@ async function preanalysis(c0, w) {
     (jk === "okc" ? skip : jk === "hic" ? work : skip).push(`Calorías: <b>${r0(kcal)}</b> de ${c.kcal || "—"} en promedio (${food.length} días registrados)`);
     if (c.prot) (prot >= c.prot * 0.9 ? good : prot < c.prot * 0.75 ? work : skip).push(`Proteína: <b>${r0(prot)} g</b> de ${c.prot}`);
   }
-  (food.length >= 5 ? good : food.length < 3 ? work : skip).push(`Registró su comida <b>${food.length} de 7</b> días`);
-  const nW = D.filter((d) => d.weight).length;
-  if (nW < 3) work.push(`Solo <b>${nW}</b> pesajes`);
+  const dm = Object.fromEntries(w.days.map((d) => [d, days[d] || {}])), Fq = regSoFar(c, w, dm, hasFood), Wq = regSoFar(c, w, dm, (d) => d.weight); // proporcional a lo que va de la semana
+  if (Fq.n) (Fq.k / Fq.n >= 0.7 ? good : Fq.k / Fq.n < 0.4 ? work : skip).push(`Registró su comida <b>${Fq.k} de ${Fq.n}</b> días`);
+  if (Wq.n >= 3 && Wq.k < Math.ceil((Wq.n * 3) / 7)) work.push(`Se pesó <b>${Wq.k} de ${Wq.n}</b> días`);
   if (wA && wP) { const d = r1(wA - wP), cut = /Déficit|Mini cut/.test(ph), bulk = /Superávit|reversa/.test(ph); const t = `Peso: <b>${r1(wA)} kg</b> (${d > 0 ? "+" : ""}${d} vs semana pasada)`; ((cut && d > 0.2) || (bulk && d < -0.2)) ? work.push(t + " · va en contra de la etapa") : ((cut && d < 0) || (bulk && d > 0) ? good : skip).push(t); }
   if (steps && c.steps) (steps >= c.steps ? good : steps < c.steps * 0.7 ? work : skip).push(`Pasos: <b>${r0(steps).toLocaleString("es-CL")}</b> de ${c.steps.toLocaleString("es-CL")}`);
   if (sl) (sl < (c.sleep || 8) - 1 ? work : skip).push(`Sueño: <b>${r1(sl)} h</b> en promedio`);

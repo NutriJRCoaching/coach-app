@@ -108,6 +108,20 @@ function rotationPlan(client, routines, sessions, w, today) {
   const planned = slots.filter((s) => !s.rest);
   return { week: w, slots, planned, doneCount: done.length, rotation: true, perWeek: per, missing, next: { rid: next, name: nameOf(next) }, total: per };
 }
+// ---------- Adherencia proporcional a lo que va de la semana (pedido de Joaquín: el martes, 2 de 2 está perfecto, no "2/7")
+// Días que cuentan: desde el inicio de la semana (o desde que usa la app) hasta ayer; hoy cuenta solo si ya lo registró.
+export function regSoFar(c, w, dayMap, test, today = ymd()) {
+  const from = [w.first, appStart(c) || w.first].sort().pop(), ds = w.days.filter((d) => d >= from && d <= today);
+  const ok = (d) => !!(dayMap[d] && test(dayMap[d])), k = ds.filter(ok).length;
+  return { k, n: ds.filter((d) => d < today).length + (ds.includes(today) && ok(today) ? 1 : 0) };
+}
+// Entrenamientos que ya correspondían: los del plan menos los que todavía quedan por delante (hoy incluido si no lo ha hecho)
+export function trainSoFar(plan, today = ymd()) {
+  const ahead = (plan.slots || []).filter((s) => !s.rest && s.status !== "hecho" && s.date >= today).length;
+  return { done: plan.doneCount || 0, due: Math.max(plan.doneCount || 0, (plan.total || 0) - ahead), total: plan.total || 0 };
+}
+export const hasFood = (d) => Object.values(d?.meals || {}).some((m) => m.length);
+export const ratioCls = (k, n) => (!n ? "" : k / n >= 0.7 ? "g" : k / n >= 0.4 ? "y" : "r");
 export function weekPlan(client, routines, sessions, date = ymd()) {
   const w = weekInfo(client, date);
   const today = ymd();
