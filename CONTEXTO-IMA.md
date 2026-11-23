@@ -374,6 +374,11 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.37.6 (22-nov)
 - "Cambios sin guardar" en las rutinas aparecía en la cuenta real de Joaquín sin haber tocado nada (en el demo no se reproducía). Ahora se compara el contenido normalizado (`exDiff`/`canonX`: claves ordenadas, números como texto, sin campos vacíos ni `changed`) en vez del JSON tal cual. Si sigue apareciendo, la causa es otra (revisar el listener global de `change` en `[data-rdirty]`).
 
+
+## René (22-nov) — paso a la app desde cero
+- `ima-rutinas-rene.json` (fuera del repo, entregado en el chat del 22-nov): 4 rutinas con días fijos (Tren Inferior A lun, Tren Superior A mar, Tren Inferior B jue, Tren Superior B vie), 30 ejercicios, series/reps de su última semana de la planilla, sin pesos sugeridos, tips de "Programa y Tips" (typos corregidos: Leg Extension, Dip Machine Hammer Strength). En su planilla el RIR está como RPE: @10 = RIR 0, @9 = RIR 1, @8 = RIR 2 (RDL). Las casillas de reps vacías de la última semana se llenaron con las de la semana anterior (Leg Extension B, Prensa HS, Abductores B, Dip Machine, Jalón B). Aductores B: 1 serie sin reps fijas, RIR 0. Leg Curl va como "Leg Curl Unilateral" (nombre de Programa y Tips; en el registro decía "Leg Curl Sentado") → la app le pide Izq/Der.
+- Partida: "Empezar de cero" con semana 1 desde el lunes 23-nov (semanas lun–dom), check-in sábado, Mantención. Está en Alemania (la app usa la hora de su celular).
+
 PENDIENTE:
 1. Joaquín: en la ficha de Marian, "Empezar de cero" (semana 1 desde dom 22-nov, usa la app desde lun 23-nov, Mantención) si aún no se hizo, revisar que Día de check-in = domingo, e importar `ima-rutinas-marian.json` en Entrenamiento (queda en rotación sola).
 2. Verificar en su celular la primera semana (Próximo / Sugerido, check-in del domingo 29 = semana 1).
