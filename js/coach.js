@@ -977,13 +977,6 @@ async function stagesView(c) {
   <div class="chips">${Object.keys(PHASES).map((p) => `<button class="chip ${STB.brush === p ? "on" : ""}" style="${STB.brush === p ? `background:${phaseColor(p)};border-color:${phaseColor(p)}` : `box-shadow:inset 3px 0 0 ${phaseColor(p)}`}" data-a="stBrush" data-p="${esc(p)}">${p}</button>`).join("")}<button class="chip ${STB.brush === "" ? "on" : ""}" data-a="stBrush" data-p="">Borrar</button></div>
   <div class="st-cals"><div>${monthCal(c, { month: STB.month, nav: "stMonth", act: "stPaint", selWeek: now })}</div><div>${monthCal(c, { month: nextM(STB.month), act: "stPaint", selWeek: now })}</div></div></div>
   ${reqCard(c, kg)}
-  <div class="card"><div class="card-t">Base del cálculo</div><div class="grid4">
-    <label>Mantención actual (kcal/día)<input type="number" value="${maint ?? ""}" placeholder="${c.kcal || ""}" data-a-change="stBase" data-k="kcalMaint"></label>
-    <label>Peso para el cálculo<input disabled value="${kg ? r1(kg) + " kg (último registrado)" : "sin pesajes"}"></label>
-    <label>Proteína por defecto (g/kg)<input type="number" step="0.1" value="${c.protKg ?? 2}" data-a-change="stBase" data-k="protKg"></label>
-    <label>Grasa por defecto (g/kg)<input type="number" step="0.1" value="${c.fatKg ?? 0.8}" data-a-change="stBase" data-k="fatKg"></label></div>
-    <p class="muted small">Son los valores de partida de la calculadora de cada plan (Plan alimentación → Metas de la etapa): kcal = mantención × (1 + % de la etapa), proteína y grasa por kilo, los carbohidratos completan. En cada plan puedes cambiarlos. Agua: automática, ${40} ml por kg del último peso${kg ? ` = <b>${waterAuto(kg)} ml</b>` : ""}.</p>
-    <details><summary class="small">% por defecto de cada etapa (aplica a todos tus clientes)</summary><div class="grid4">${Object.keys(PHASES).map((p) => `<label>${p}<input type="number" step="1" value="${pctDef(p)}" data-a-change="stPctDef" data-p="${esc(p)}"></label>`).join("")}</div></details></div>
   <div class="card scroll-x"><table class="tbl stt"><tr><th>Etapa</th><th>Semanas</th><th>Plan de alimentación y metas</th><th>Pasos</th><th>Cardio</th><th>Nota para el cliente</th></tr>
   ${st.map((x, i) => { const P = c.plans?.[x.phase], T = P?.targets || {}, soon = x.from - now;
     return `<tr><td><span class="dotc" style="background:${phaseColor(x.phase)}"></span><b>${esc(x.phase)}</b></td>
@@ -991,7 +984,8 @@ async function stagesView(c) {
     <td>${P ? `<span class="badge g">Plan listo</span> <span class="small">${T.kcal ? `${T.kcal} kcal · C ${T.cho ?? "–"} · L ${T.fat ?? "–"} · P ${T.prot ?? "–"}` : '<span class="muted">sin metas</span>'}</span>` : `<span class="badge ${x.to >= now && soon <= 2 ? "r" : "y"}">Falta el plan</span>`} <a class="btn tiny" href="#coach/c/${c.id}/plan">${P ? "Ver" : "Armarlo"}</a></td>
     <td>${inp("steps", i, x.steps, 76, c.steps || "")}</td><td><input value="${esc(x.cardio || "")}" data-a-change="stF" data-i="${i}" data-k="cardio" placeholder="ej: 3×25 min" style="width:96px"></td>
     <td><input value="${esc(x.note || "")}" data-a-change="stF" data-i="${i}" data-k="note" style="width:220px" placeholder="La ve en su Timeline y en su plan"></td></tr>`; }).join("") || `<tr><td colspan="6" class="muted">Pinta semanas en el calendario para crear etapas.</td></tr>`}</table>
-  <p class="muted small">Cada etapa usa su propio plan de alimentación (con sus metas de calorías y macros), que se arma en <b>Plan alimentación</b>. Las semanas que ya pasaron quedan como se planificaron.</p></div>`;
+  <p class="muted small">Cada etapa usa su propio plan de alimentación (con sus metas de calorías y macros), que se arma en <b>Plan alimentación</b>. Las semanas que ya pasaron quedan como se planificaron.</p></div>
+  <div class="card"><details><summary class="small muted">% por defecto de cada etapa (aplica a todos tus clientes)</summary><div class="grid4">${Object.keys(PHASES).map((p) => `<label>${p}<input type="number" step="1" value="${pctDef(p)}" data-a-change="stPctDef" data-p="${esc(p)}"></label>`).join("")}</div></details></div>`;
 }
 // Requerimientos: gasto en reposo (Mifflin-St Jeor, Harris-Benedict revisada o Katch-McArdle con % de grasa) × factor de actividad
 const ACT_F = [[1.2, "Sedentario (poco movimiento, < 5.000 pasos)"], [1.375, "Ligero (5.000–7.500 pasos o entrena 1–3 días)"], [1.55, "Moderado (7.500–10.000 pasos y entrena 3–5 días)"], [1.725, "Alto (> 10.000 pasos y entrena 5–6 días)"], [1.9, "Muy alto (trabajo físico + entrenamiento)"]];

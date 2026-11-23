@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.38.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.38.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -380,6 +380,10 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - En Plan alimentación → "Metas de la etapa" (`tgBalance`, `tgSet` en menus.js): Calorías, Proteína, Lípidos y Carbohidratos en tarjetas, cada macro en **g y g/kg** (con el último peso, `c.lastKg`, o el peso guardado `calc.kg`), **% de las kcal** y lo que aporta la pauta (verde si calza: kcal ±5 %, macros ±10 %).
 - **Compensador** (`MW.calc.comp`, se guarda con el plan; por defecto Lípidos, se elige con "Al cambiar un macro se ajusta: Lípidos / Carbohidratos"): al cambiar un macro, el compensador absorbe la diferencia para mantener las kcal; al cambiar las kcal, se ajusta el compensador; al cambiar el compensador mismo, cambian las kcal. Si el compensador quedaría negativo, queda en 0 y suben las kcal. Pedido de Joaquín: subir la proteína a 2 g/kg y que bajen solas las grasas para acercar las metas a la pauta.
 - La calculadora de abajo (mantención × %, "Usar el cálculo", "Usar los macros de la pauta") sigue igual. `meTg` (casillas antiguas) quedó sin uso.
+
+
+## v1.38.1 (22-nov)
+- Etapas: se quitó la tarjeta "Base del cálculo" (mantención actual, peso, proteína y grasa por defecto): a Joaquín le confundía y sobraba. La mantención se fija con "Usar X kcal como mantención" del cálculo de requerimientos o en la calculadora de cada plan; proteína y grasa se ajustan en las metas balanceadas del plan. Los "% por defecto de cada etapa" quedaron plegados al final de Etapas. `kcalMaint`, `protKg`, `fatKg` siguen en la ficha (los usa la calculadora como valores de partida).
 
 ## René (22-nov) — paso a la app desde cero
 - `ima-rutinas-rene.json` (fuera del repo, entregado en el chat del 22-nov): 4 rutinas con días fijos (Tren Inferior A lun, Tren Superior A mar, Tren Inferior B jue, Tren Superior B vie), 30 ejercicios, series/reps de su última semana de la planilla, sin pesos sugeridos, tips de "Programa y Tips" (typos corregidos: Leg Extension, Dip Machine Hammer Strength). En su planilla el RIR está como RPE: @10 = RIR 0, @9 = RIR 1, @8 = RIR 2 (RDL). Las casillas de reps vacías de la última semana quedaron en 8, 6 (decisión de Joaquín: "ante la duda, 8, 6"): Leg Extension B, Prensa HS, Abductores B, Dip Machine, Jalón B. Aductores B: 1 serie de 8, RIR 0. El leg curl es "Leg Curl Unilateral Acostado" (la app le pide Izq/Der).
