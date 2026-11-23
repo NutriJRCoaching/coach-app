@@ -260,3 +260,9 @@ function registerSW() {
     setInterval(check, 15 * 60 * 1000);
   }).catch(() => {});
 }
+
+// Guardados rechazados por el servidor (permiso, tamaño…): se muestran en vez de perderse en silencio
+window.addEventListener("ima-write-error", (e) => {
+  const { path, code, msg } = e.detail || {}, what = /\/photos\//.test(path) ? "la foto" : "un cambio";
+  toast(code === "permission-denied" ? `No se pudo guardar ${what}: sin permiso. Avísale a tu coach.` : /size|exceeds|too large/i.test(msg) ? `No se pudo guardar ${what}: es demasiado grande.` : `No se pudo guardar ${what} (${code || "error"}). Intenta de nuevo.`, 6000);
+});

@@ -12,6 +12,8 @@ const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
 const clean = (o) => JSON.parse(JSON.stringify(o ?? null));
 const parentOf = (p) => p.split("/").slice(0, -1).join("/");
 
+// Si el servidor rechaza un guardado (permiso, documento muy grande…), se avisa en pantalla en vez de perderse en silencio
+function writeError(path, e) { try { window.dispatchEvent(new CustomEvent("ima-write-error", { detail: { path, code: e?.code || "", msg: e?.message || String(e) } })); } catch {} }
 // ---------------------------------------------------------- DEMO
 const local = {
   mem: new Map(), watchers: new Set(), idb: null, authCbs: [],
@@ -138,7 +140,7 @@ const fire = {
   set(path, data, merge = true) {
     const { doc, setDoc } = this.m;
     this.forget(path);
-    setDoc(doc(this.db, path), clean(data), { merge }).catch((e) => console.error("set", path, e));
+    setDoc(doc(this.db, path), clean(data), { merge }).catch((e) => { console.error("set", path, e); writeError(path, e); });
     return Promise.resolve();
   },
   del(path) { this.forget(path); const { doc, deleteDoc } = this.m; deleteDoc(doc(this.db, path)).catch(console.error); return Promise.resolve(); },

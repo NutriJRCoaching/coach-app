@@ -53,17 +53,23 @@ export const sleepColor = (h) => (h == null ? "var(--surf2)" : h < 6 ? "#ef4444"
 export const e1rm = (w, r, rir) => (+w || 0) * (1 + ((+r || 0) + (rir == null || rir === "F" ? 0 : +rir)) / 30);
 
 // Comprime una imagen a JPEG (para fotos)
-export function compressImage(file, max = 900, q = 0.72) {
-  return new Promise((res, rej) => {
-    const img = new Image(); const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const s = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement("canvas"); c.width = img.width * s; c.height = img.height * s;
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-      res(c.toDataURL("image/jpeg", q));
-    };
-    img.onerror = rej; img.src = url;
-  });
+// Achica la foto a JPEG (base64) para guardarla en Firestore. Garantiza que quede bajo ~800 KB (el límite de un documento es 1 MB)
+// bajando la calidad y el tamaño si hace falta. Si el celular no puede leer el formato (ej. HEIC en Android) lanza un error claro.
+export async function compressImage(file, max = 900, q = 0.72, limit = 800000) {
+  let src = null, w = 0, h = 0;
+  try { src = await createImageBitmap(file, { imageOrientation: "from-image" }); w = src.width; h = src.height; } catch {}
+  if (!src) src = await new Promise((res, rej) => { const img = new Image(), url = URL.createObjectURL(file); img.onload = () => { URL.revokeObjectURL(url); res(img); }; img.onerror = () => { URL.revokeObjectURL(url); rej(new Error(/hei[cf]/i.test(file.type + file.name) ? "El formato HEIC no se puede leer en este celular: saca la foto en JPG (Ajustes de la cámara → Formato → Más compatible) o elige una captura de pantalla." : "No se pudo leer la imagen (formato no compatible).")); }; img.src = url; }).then((img) => { w = img.naturalWidth || img.width; h = img.naturalHeight || img.height; return img; });
+  let size = max, data = "";
+  for (let i = 0; i < 6; i++) {
+    const s = Math.min(1, size / Math.max(w, h)), c = document.createElement("canvas"); c.width = Math.round(w * s); c.height = Math.round(h * s);
+    c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+    data = c.toDataURL("image/jpeg", q);
+    if (data.length <= limit) break;
+    if (q > 0.5) q -= 0.1; else size = Math.round(size * 0.8);
+  }
+  src.close?.();
+  if (!data || data.length < 100) throw new Error("No se pudo procesar la imagen.");
+  return data;
 }
 
 // Media móvil exponencial (tendencia del peso)

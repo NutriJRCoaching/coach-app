@@ -250,7 +250,7 @@ act("mealNote", async (el) => {
 });
 act("mealNoteSave", async (el) => { const day = await getDay(S.date); await setDay(S.date, { mealNotes: { ...(day.mealNotes || {}), [el.dataset.m]: $("#mN").value } }); closeSheet(); refresh(); });
 act("mealPhoto", async (el) => {
-  const f = el.files[0]; if (!f) return; const data = await compressImage(f, 700, 0.6); const id = uid();
+  const f = el.files[0]; if (!f) return; let data; try { data = await compressImage(f, 700, 0.6); } catch (e) { el.value = ""; return toast(e.message || "No se pudo leer la foto", 6000); } const id = uid();
   await db.set(`${P()}/photos/${id}`, { kind: "comida", meal: el.dataset.m, date: S.date, week: weekInfo(S.client, S.date).key, data, at: Date.now() });
   closeSheet(); toast("Foto guardada"); refresh();
 });
@@ -795,9 +795,10 @@ async function photosView() {
 act("photoWeek", (el) => { photoWeek = el.value; refresh(); });
 act("cmp", (el) => { el.dataset.k === "a" ? (cmpA = el.value) : (cmpB = el.value); refresh(); });
 act("photoUp", async (el) => {
-  const f = el.files[0]; if (!f) return; toast("Subiendo…");
-  const data = await compressImage(f, 1000, 0.72);
-  await db.set(`${P()}/photos/${uid()}`, { kind: el.dataset.t, week: photoWeek, date: ymd(), data, at: Date.now() }); refresh();
+  const f = el.files[0]; if (!f) return; toast("Procesando la foto…");
+  let data; try { data = await compressImage(f, 1000, 0.72); } catch (e) { el.value = ""; return toast(e.message || "No se pudo leer la foto", 6000); }
+  el.value = "";
+  await db.set(`${P()}/photos/${uid()}`, { kind: el.dataset.t, week: photoWeek, date: ymd(), data, at: Date.now() }); toast(navigator.onLine ? "Foto guardada ✓" : "Foto guardada: se sube al volver la señal"); refresh();
 });
 
 
@@ -931,7 +932,7 @@ async function equipView() {
   return `${head("Mi equipamiento", "mas")}<div class="card"><p class="muted small">Sube fotos de las máquinas y equipos que tienes disponibles. Así tu coach arma la rutina con lo que realmente hay.</p>
   <div class="thumbs big">${ph.map((p) => `<img src="${p.data}" data-a="viewPhoto" data-id="${p.id}">`).join("")}<label class="padd">＋<input type="file" accept="image/*" multiple hidden data-a-change="equipUp"></label></div></div>`;
 }
-act("equipUp", async (el) => { for (const f of el.files) { const data = await compressImage(f, 900, 0.65); await db.set(`${P()}/photos/${uid()}`, { kind: "equipo", data, at: Date.now(), week: weekInfo(S.client).key }); } refresh(); });
+act("equipUp", async (el) => { for (const f of el.files) { let data; try { data = await compressImage(f, 900, 0.65); } catch (e) { toast(e.message || "No se pudo leer la foto", 6000); continue; } await db.set(`${P()}/photos/${uid()}`, { kind: "equipo", data, at: Date.now(), week: weekInfo(S.client).key }); } refresh(); });
 async function infoView() {
   const c = S.client;
   const rows = [["Nombre", c.name], ["Fecha de nacimiento", c.birth ? fmtDate(c.birth) : ""], ["Sexo", { M: "Masculino", F: "Femenino" }[c.sex] || ""], ["Estatura", c.height ? c.height + " cm" : ""], ["Inicio de la asesoría", c.startDate ? fmtDate(c.startDate) : ""], ["Etapa actual", c.phase], ["Objetivo", c.goal]];

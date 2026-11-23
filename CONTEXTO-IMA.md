@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.38.4**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.38.5**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -395,6 +395,13 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Regla de Joaquín: la adherencia se mide contra lo que corresponde **hasta hoy** en la semana del cliente (que puede partir cualquier día), no contra 7 días ni contra la semana completa. Ej.: el martes, 2 de 2 entrenamientos está perfecto.
 - data.js: `regSoFar(c, w, dayMap, test, today)` → `{k, n}`: días desde el inicio de la semana (o `appStart`) hasta ayer; hoy suma solo si ya lo registró. `trainSoFar(plan)` → `{done, due, total}`: `due` = total del plan menos lo que queda por delante (hoy incluido si no lo ha hecho; sirve para días fijos y rotación). `hasFood`, `ratioCls` (verde ≥ 70 %, amarillo ≥ 40 %, rojo).
 - Se usa en: tabla de Clientes (Entrenos "hechos/hasta hoy" con "de N"; Comida y Pesajes k/n), Timeline semanal ("Días con registro" k/n y "X de Y hasta hoy" en Entrenamientos), preanálisis de la retro, tabla de semanas del cliente ("Días reg." k/n) y campana (comida: avisa si le faltan 2 o más días de esta semana; pesajes: menos de 3 de cada 7, desde 3 días). loadCtx ahora carga los días desde el inicio de la semana actual (o 7 días atrás, lo que sea antes).
+
+
+## v1.38.5 (23-nov) — Fotos que no se subían
+- Un cliente reportó que no se le subían las fotos. Causas posibles que fallaban en silencio: imagen que el celular no puede leer (HEIC en Android → `img.onerror` sin aviso, quedaba en "Subiendo…"), foto que pasa de 1 MB en base64 (Firestore la rechaza) y errores del servidor que solo iban a la consola.
+- `compressImage` (util.js): usa `createImageBitmap` (respeta la orientación) con respaldo `<img>`; baja calidad y luego tamaño hasta quedar bajo ~800 KB; si no puede leer el archivo lanza un error con explicación (HEIC → cómo sacar en JPG). Fotos de progreso, de comida y de equipo muestran ese error en un toast; al guardar dice "Foto guardada ✓" (o "se sube al volver la señal").
+- `db.set` (Firestore): si el servidor rechaza el guardado dispara `ima-write-error`; app.js muestra un toast ("sin permiso", "demasiado grande" o el código). Antes esos errores se perdían.
+- Pendiente: confirmar con el cliente qué pasaba exactamente (celular, mensaje) si sigue fallando.
 
 ## René (22-nov) — paso a la app desde cero
 - `ima-rutinas-rene.json` (fuera del repo, entregado en el chat del 22-nov): 4 rutinas con días fijos (Tren Inferior A lun, Tren Superior A mar, Tren Inferior B jue, Tren Superior B vie), 30 ejercicios, series/reps de su última semana de la planilla, sin pesos sugeridos, tips de "Programa y Tips" (typos corregidos: Leg Extension, Dip Machine Hammer Strength). En su planilla el RIR está como RPE: @10 = RIR 0, @9 = RIR 1, @8 = RIR 2 (RDL). Las casillas de reps vacías de la última semana quedaron en 8, 6 (decisión de Joaquín: "ante la duda, 8, 6"): Leg Extension B, Prensa HS, Abductores B, Dip Machine, Jalón B. Aductores B: 1 serie de 8, RIR 0. El leg curl es "Leg Curl Unilateral Acostado" (la app le pide Izq/Der).
