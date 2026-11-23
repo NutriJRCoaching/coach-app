@@ -748,6 +748,7 @@ async function dataView(c) {
   ${f("steps", "Pasos", "number")}${f("water", "Agua (ml)", "number")}${f("sleep", "Sueño (h)", "number", 'step="0.5"')}${f("rest", "Descanso entre series por defecto (s)", "number")}</div>
   <p class="muted small">Agua: si la dejas en blanco es <b>automática</b> (40 ml por kg del último peso registrado): hoy sería <b id="wSug">—</b>.</p>
   <div class="card-t mt">Plan de alimentación</div><label>Link al PDF del plan (respaldo en Drive; el plan se arma en “Plan alimentación”)<input name="planUrl" value="${esc(c.plan?.pdfUrl || "")}"></label>
+  <label>Indicaciones del plan (las ve el cliente abajo de su plan; déjalo vacío para no mostrar nada)<textarea name="planNotes" rows="2">${esc(c.plan?.notes || "")}</textarea></label>
   ${c.service === "entrenamiento" ? `<div class="card-t mt">Guía de macros (solo entrenamiento · el cliente ve rangos en vez de un plan)</div><p class="muted small">Gramos por kg de peso. Si dejas en blanco calorías y macros de arriba, su meta diaria es el punto medio de estos rangos.</p>
   <div class="grid3">${[["prot", "Proteína"], ["cho", "Carbohidratos"], ["fat", "Grasas"]].map(([k, l]) => { const v = c.ranges?.[k] || DEFAULT_RANGES[k]; return `<label>${l} (g/kg)<span class="row gap"><input type="number" step="0.1" data-rng="${k}" data-i="0" value="${v[0]}"><span>a</span><input type="number" step="0.1" data-rng="${k}" data-i="1" value="${v[1]}"></span></label>`; }).join("")}</div>` : ""}
   <details><summary class="card-t">Pauta por porciones (la ve el cliente en su plan · día normal / día con legumbres)</summary><p class="muted small">Si llenas la del día con legumbres, el cliente la ve en “Mi plan” como “Día con legumbres” (o la usa la opción del plan marcada como día con legumbres).</p>
@@ -784,7 +785,7 @@ async function saveData(redraw) {
     if (ne) await db.set("access/" + ne, { cid: CW.cid, name: fd.name, ok: !!acc?.ok, at: Date.now() });
     data.email = ne;
   }
-  data.plan = { ...(c0.plan || {}), pdfUrl: fd.planUrl };
+  data.plan = { ...(c0.plan || {}), pdfUrl: fd.planUrl, ...(fd.planNotes !== undefined ? { notes: fd.planNotes.trim() } : {}) };
   data.dates = fd.dates.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => ({ date: l.slice(0, 10), label: l.slice(11) }));
   data.pauta = {}; $$("[data-pauta]").forEach((i) => { if (i.value !== "") data.pauta[i.dataset.pauta] = num(i.value); });
   data.pautaLeg = {}; $$("[data-pauta-leg]").forEach((i) => { if (i.value !== "") data.pautaLeg[i.dataset.pautaLeg] = num(i.value); });

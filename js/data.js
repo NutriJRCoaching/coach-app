@@ -431,6 +431,14 @@ export function payMsg(c, pay, late = false) {
     : `${hi}<br>Hoy, ${longDate(c.payDate)}, se renueva tu asesoría.${payData(pay)}<p>Una vez transferido recuerda enviarme el comprobante. Cualquier duda o consulta puedes escribirme por WhatsApp.</p>`;
 }
 
+// ---------- Textos en femenino si la clienta es mujer (c.sex === "F"). Las respuestas se guardan igual (en masculino) para no romper comparaciones; solo cambia lo que se muestra.
+const FEM = { orgulloso: "orgullosa", adolorido: "adolorida", seguro: "segura", hambriento: "hambrienta", satisfecho: "satisfecha", recuperado: "recuperada", relajado: "relajada", despierto: "despierta" };
+export const isFem = (c = S.client) => c?.sex === "F";
+export function gtxt(s, c = S.client) {
+  if (!isFem(c) || !s) return s;
+  return String(s).replace(/\b(orgulloso|adolorido|seguro|hambriento|satisfecho|recuperado|relajado|despierto)\b/gi, (w) => { const f = FEM[w.toLowerCase()]; return w[0] === w[0].toUpperCase() ? f[0].toUpperCase() + f.slice(1) : f; });
+}
+
 // ---------- Check-in: a qué semana corresponde
 // Si su día de check-in cae al inicio de la semana (≤ 2 días después de que parte, ej. domingo con semanas dom–sáb),
 // el check-in de ese día es el de la SEMANA ANTERIOR. ciOff = días desde el inicio de la semana hasta el día de check-in.
@@ -439,6 +447,12 @@ export const ciLate = (c) => { const o = ciOff(c); return o != null && o <= 2; }
 // Semana que cubre un check-in hecho hoy. open = es el momento de pedirlo (los 2 últimos días de la semana;
 // si es "atrasado": el último día de la semana, el día de check-in y el siguiente).
 export function ciWeek(c, date = ymd()) {
+  const r = ciWeek0(c, date), from = appStart(c);
+  // Antes de su primera semana en la app (ej. el domingo antes de partir): se muestra el check-in de la semana en que parte, sin pedirlo
+  if (r.w.n < 1 || (from && r.w.last < from)) return { w: weekInfo(c, [date, from].sort().pop()), open: false };
+  return r;
+}
+function ciWeek0(c, date) {
   const w = weekInfo(c, date);
   if (!ciLate(c)) return { w, open: date >= addDays(w.last, -1) };
   const k = diffDays(date, w.first), off = ciOff(c);

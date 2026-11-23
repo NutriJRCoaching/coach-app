@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { diffDays } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, gtxt, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg } from "./data.js";
@@ -700,7 +700,7 @@ async function progress() {
   <div class="list">${has("prog_timeline") ? `<a href="#timeline"><span>Timeline<small>Un resumen de tus estadísticas semana a semana</small></span>${I.chev}</a>` : ""}
   <a href="#sueno"><span>Sueño<small>Registro y estadísticas</small></span>${I.chev}</a>
   ${has("prog_photos") ? `<a href="#fotos"><span>Fotos<small>Por semana y comparador</small></span>${I.chev}</a>` : ""}
-  ${has("prog_measures") ? `<a href="#medidas"><span>Medidas<small>Una vez al mes</small></span>${I.chev}</a>` : ""}
+  ${has("prog_measures") ? `<a href="#medidas"><span>Medidas<small>${MEASURES_SOON ? "Próximamente" : "Una vez al mes"}</small></span>${I.chev}</a>` : ""}
   ${has("checkin") ? `<a href="#checkin"><span>Check-in semanal<small>Semana ${ciWeek(S.client).w.n}</small></span>${I.chev}</a>` : ""}</div>`;
 }
 act("openFeedback", async () => {
@@ -754,7 +754,7 @@ async function sleepView() {
   return `${head("Sueño", "progreso")}${dayStrip()}
   <div class="card"><div class="card-t">${I.moon}Noche que terminó el ${fmtDate(S.date)}</div>
   <div class="grid2" style="margin:0"><label>Me acosté a las<input id="sB" type="time" value="${s.bed || "23:00"}"></label><label>Desperté a las<input id="sW" type="time" value="${s.wake || "07:00"}"></label></div>
-  <label>Minutos despierto durante la noche<input id="sA" type="number" inputmode="numeric" value="${s.awake || ""}" placeholder="0"></label>
+  <label>${gtxt("Minutos despierto durante la noche")}<input id="sA" type="number" inputmode="numeric" value="${s.awake || ""}" placeholder="0"></label>
   <div class="card-t">Calidad del sueño (1 a 5)</div>${chips("q", [1, 2, 3, 4, 5].map((n) => [n, n]), s.quality || "", "sleepQ")}
   <div class="card-t">¿Tomaste alguna fuente de cafeína después de las 12:00 el día de ayer?</div>${chips("caf", [["1", "Sí", "r"], ["0", "No", "g"]], d.cafPM == null ? "" : d.cafPM ? "1" : "0", "sleepCaf")}
   <button class="btn primary big" data-a="sleepSave">Guardar</button></div>
@@ -802,7 +802,11 @@ act("photoUp", async (el) => {
 
 
 // ---------- Medidas
+// Medidas en pausa (pedido de Joaquín, 22-nov): va a grabar videos de cómo medirse. Mientras, el cliente ve "Próximamente"
+// y no puede abrir la guía "Cómo medir". Para reactivarlas: MEASURES_SOON = false.
+const MEASURES_SOON = true;
 async function measuresView() {
+  if (MEASURES_SOON) return `${head("Medidas", "progreso")}<div class="card center soon"><div class="card-t">Próximamente</div><p class="small muted">Muy pronto vas a poder registrar tus medidas aquí, con videos que te muestran cómo medir cada zona.</p></div>`;
   const all = (await db.list(P() + "/measures")).sort((a, b) => b.id.localeCompare(a.id));
   const last = all[0];
   return `${head("Medidas", "progreso")}
@@ -812,7 +816,7 @@ async function measuresView() {
   <button class="btn primary big" data-a="measureSave">Guardar medición</button></div>
   ${all.length ? `<div class="card scroll-x"><table class="tbl"><tr><th>Zona</th>${all.slice(0, 6).map((m) => `<th>${fmtDate(m.id)}</th>`).join("")}</tr>${MEASURE_ZONES.map(([k, l]) => `<tr><td>${l}</td>${all.slice(0, 6).map((m) => `<td>${m[k] ?? "—"}</td>`).join("")}</tr>`).join("")}</table></div>` : ""}`;
 }
-act("measureGuide", () => sheet("Cómo medir", `<ol class="guide"><li>Usa una cinta métrica flexible.</li><li>Mide sobre la piel, de pie y relajado, sin contraer.</li><li>La cinta firme pero sin apretar ni hundir la piel.</li><li><b>El cero siempre debe quedar bajo la cinta.</b></li><li>Mide dos veces cada zona y anota el promedio.</li><li>Mide siempre a la misma hora, idealmente en ayunas.</li></ol>
+act("measureGuide", () => MEASURES_SOON ? null : sheet("Cómo medir", `<ol class="guide"><li>Usa una cinta métrica flexible.</li><li>Mide sobre la piel, de pie y relajado, sin contraer.</li><li>La cinta firme pero sin apretar ni hundir la piel.</li><li><b>El cero siempre debe quedar bajo la cinta.</b></li><li>Mide dos veces cada zona y anota el promedio.</li><li>Mide siempre a la misma hora, idealmente en ayunas.</li></ol>
   ${MEASURE_ZONES.map(([, l, h]) => `<div class="li"><b>${l}:</b> ${h}</div>`).join("")}`));
 act("measureSave", async () => {
   const data = {}; $$("[data-z]").forEach((i) => { const v = num(i.value); if (v != null) data[i.dataset.z] = v; });
@@ -878,13 +882,13 @@ async function checkinView() {
     else if (type === "line") inp = `<input data-a-input="ciTxt" data-k="${k}" value="${esc(CI[k] || "")}" placeholder="${esc(ph || "Ejercicio, peso × reps")}">`;
     else if (type === "list3") inp = [1, 2, 3].map((n) => `<div class="ci-num"><b>${n}</b><input data-a-input="ciTxt" data-k="${k}${n}" value="${esc(CI[k + n] || "")}"></div>`).join("");
     else if (type === "num") inp = `<input type="number" step="0.1" inputmode="decimal" data-a-input="ciTxt" data-k="${k}" value="${esc(CI[k] ?? "")}">`;
-    else if (type.multi) inp = `<div class="ci-grid">${type.multi.map((o) => `<label><input type="checkbox" data-a-change="ciMulti" data-k="${k}" value="${esc(o)}" ${(CI[k] || []).includes(o) ? "checked" : ""}>${esc(o)}</label>`).join("")}</div>`;
-    else if (type.length > 6) inp = `<select data-a-change="ciSel" data-k="${k}"><option value="">—</option>${type.map((o) => `<option ${CI[k] === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
-    else inp = chips(k, type.map((o) => [o, o]), CI[k], "ciChip");
+    else if (type.multi) inp = `<div class="ci-grid">${type.multi.map((o) => `<label><input type="checkbox" data-a-change="ciMulti" data-k="${k}" value="${esc(o)}" ${(CI[k] || []).includes(o) ? "checked" : ""}>${esc(gtxt(o))}</label>`).join("")}</div>`;
+    else if (type.length > 6) inp = `<select data-a-change="ciSel" data-k="${k}"><option value="">—</option>${type.map((o) => `<option value="${esc(o)}" ${CI[k] === o ? "selected" : ""}>${esc(gtxt(o))}</option>`).join("")}</select>`;
+    else inp = chips(k, type.map((o) => [o, gtxt(o)]), CI[k], "ciChip");
     // Detalle: siempre (texto) o solo con ciertas respuestas ({ when, ph }), p. ej. "¿Por qué?" si marca Malo
     const cond = extra && typeof extra === "object", show = !cond || (extra.when || []).includes(CI[k]);
-    const ex = extra ? `<input class="mt" id="det-${k}" ${show ? "" : "hidden"} data-a-input="ciTxt" data-k="${k}Det" value="${esc(CI[k + "Det"] || "")}" placeholder="${esc(cond ? extra.ph : extra)}" ${cond ? `data-when="${esc(JSON.stringify(extra.when))}"` : ""}>` : "";
-    return `<div class="ci-q"><div>${esc(label)}</div>${inp}${ex}</div>`;
+    const ex = extra ? `<input class="mt" id="det-${k}" ${show ? "" : "hidden"} data-a-input="ciTxt" data-k="${k}Det" value="${esc(CI[k + "Det"] || "")}" placeholder="${esc(gtxt(cond ? extra.ph : extra))}" ${cond ? `data-when="${esc(JSON.stringify(extra.when))}"` : ""}>` : "";
+    return `<div class="ci-q"><div>${esc(gtxt(label))}</div>${inp}${ex}</div>`;
   };
   const d0 = [w.first, appStart(S.client)].sort().pop(), nDays = Math.max(1, Math.min(7, diffDays([w.last, ymd()].sort()[0], d0) + 1));
   return `${head(`Check-in · Semana ${w.n}`, "mas")}

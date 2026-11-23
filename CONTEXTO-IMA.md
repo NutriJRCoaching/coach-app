@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.37.2**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.37.3**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -354,6 +354,13 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Semana de "lo que va a hacer"**: ahora es la misma semana a la que se marcan los cambios al guardar: la siguiente si ya se abrió la revisión semanal; si no, la actual (y la 1 si el cliente aún no parte). Antes decía "Semana 2" para una clienta que todavía no empezaba. El botón "Sin cambios para la semana N" sigue usando la semana de la revisión.
 - RE (rutina en edición) ahora es copia profunda de la rutina (antes copia superficial que compartía los ejercicios con la caché).
 - Joaquín prefirió no dejarle pesos sugeridos a Marian: `ima-rutinas-marian.json` regenerado sin `wSug` (reimportar; ella aún no registra entrenamientos).
+
+
+## v1.37.3 (22-nov) — Medidas "Próximamente", check-in antes de partir, femenino e indicaciones del plan
+- **Medidas en pausa**: `MEASURES_SOON = true` en client.js. El cliente ve "Medidas · Próximamente" en Progreso y una tarjeta "Próximamente" en vez del formulario; la guía "Cómo medir" no se abre. Joaquín no está conforme con las indicaciones por zona (MEASURE_ZONES en data.js) y va a grabar videos de cómo medirse. Para reactivar: `MEASURES_SOON = false` (y revisar los textos de MEASURE_ZONES con él).
+- **Check-in antes de partir**: `ciWeek` ya no devuelve la semana 0 (el domingo antes de que Marian partiera decía "Semana 0 · lun 23 nov – sáb 21 nov"). Si la semana que tocaría es anterior a `appStart`, muestra la semana en que parte (S01) sin pedirlo (`open: false`).
+- **Textos en femenino**: `gtxt(texto, c)` e `isFem(c)` en data.js (c.sex === "F"). Cambia orgulloso, adolorido, seguro, hambriento, satisfecho, recuperado, relajado y despierto. Se aplica a las preguntas, opciones y "¿Por qué?" del check-in y a "Minutos despierto/a" del sueño. **Las respuestas se guardan en masculino** (valor canónico, para que las comparaciones y el panel no cambien); solo cambia lo que se muestra. La bienvenida ya usaba "Bienvenida". Si aparecen textos nuevos con género, pasarlos por `gtxt` o agregar la palabra a `FEM`.
+- **Indicaciones del plan** (`client.plan.notes`, se muestran abajo de "Mi plan"): vuelve el campo en Datos y objetivos → Plan de alimentación ("Indicaciones del plan…"); antes venían del import y no se podían editar. Joaquín pidió sacar la nota del yogur de Marian (la borra él dejando el campo vacío).
 
 PENDIENTE:
 1. Joaquín: en la ficha de Marian, "Empezar de cero" (semana 1 desde dom 22-nov, usa la app desde lun 23-nov, Mantención) si aún no se hizo, revisar que Día de check-in = domingo, e importar `ima-rutinas-marian.json` en Entrenamiento (queda en rotación sola).
