@@ -612,3 +612,10 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; col
 .pdot { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; font-size: 11.5px; font-weight: 800; }
 .pdot.r { background: var(--r-s); color: var(--r); } .pdot.y { background: var(--y-s); color: var(--y); } .pdot.g { background: var(--g-s); color: var(--g); } .pdot.i { background: var(--surf2); color: var(--muted); }
 .pdrop[open] summary .muted { display: none; } .pdlist { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Metas balanceadas del plan */
+.tg-bal { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.tgm { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surf2); } .tgm.comp { border-color: var(--y); }
+.tgm-in { display: flex; align-items: center; gap: 6px; } .tgm-in input { width: 90px; font-weight: 800; text-align: center; } .tgm-in small { color: var(--muted); }
+.tgm.kc input { font-size: 16px; } .tg-comp { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; }
+@media (max-width: 899px) { .tg-bal { grid-template-columns: 1fr 1fr; } }

@@ -256,7 +256,7 @@ function calcRes(c) {
 function targetsCard(c) {
   const R = calcRes(c), T = MW.targets, k = MW.calc, pm = pautaMac(MW.pauta, pautaExtras(MW.menus)), col = phaseColor(MW.phase);
   return `<div class="card tg-card" style="--pc:${col}"><div class="row between"><div><div class="card-t">Metas de ${esc(MW.phase)}</div><span class="muted small">Lo que la app le muestra al cliente las semanas de esta etapa.</span></div>
-    <div class="tg-now">${[["kcal", "Kcal"], ["cho", "CHO"], ["fat", "Lípidos"], ["prot", "Proteína"]].map(([x, l]) => `<label>${l}<input type="number" value="${T[x] ?? ""}" data-a-change="meTg" data-k="${x}" placeholder="–"></label>`).join("")}</div></div>
+    </div>${tgBalance(c, T, pm)}
     <div class="tg-calc"><span class="muted small">Calculadora:</span>
       <label>Mantención<input type="number" value="${k.maint ?? ""}" placeholder="${c.kcalMaint || ""}" data-a-change="meCalc" data-k="maint"></label>
       <label>% vs mant.<input type="number" value="${k.pct ?? ""}" placeholder="${c.pctOf(MW.phase)}" data-a-change="meCalc" data-k="pct"></label>
@@ -265,6 +265,38 @@ function targetsCard(c) {
       <span class="small">${k.kg ? `<span class="muted">metas puestas con ${String(k.kg).replace(".", ",")} kg · </span>` : ""}${c.lastKg ? `${r1(c.lastKg)} kg hoy →` : ""} ${R.miss ? `<span class="muted">Falta ${esc(R.miss)}.</span>` : `<b>${R.kcal} kcal · C ${R.cho} · L ${R.fat} · P ${R.prot}</b>`}</span>
       ${R.miss ? "" : `<button class="btn small" data-a="meTgCalc">Usar el cálculo</button>`}<button class="btn small ghost" data-a="meTgPauta" title="Las metas quedan iguales a lo que aporta la pauta">Usar los macros de la pauta (${r0(pm.kcal)} kcal)</button></div></div>`;
 }
+// Metas balanceadas: kcal fija; al cambiar un macro (en g o g/kg) el macro "compensador" se ajusta para mantener las kcal.
+// Al cambiar las kcal, se ajusta el compensador. Si cambias el compensador mismo, cambian las kcal.
+const KF = { cho: 4, fat: 9, prot: 4 };
+const tgKg = () => S._coachClient?.lastKg || +MW.calc.kg || null;
+function tgBalance(c, T, pm) {
+  const kg = tgKg(), comp = MW.calc.comp || "fat", kc = +T.kcal || 0;
+  const pctK = (x) => (kc && T[x] ? Math.round((T[x] * KF[x] * 100) / kc) : null);
+  const diff = (x) => { if (!pm || !+T[x]) return ""; const d = Math.round(pm[x] - T[x]), bad = Math.abs(pm[x] / T[x] - 1) > (x === "kcal" ? 0.05 : 0.1); return `<small class="${bad ? "r" : "g"}" title="Lo que aporta la pauta vs la meta">pauta ${r0(pm[x])}${d ? ` (${d > 0 ? "+" : ""}${d})` : " ✓"}</small>`; };
+  const mac = (x, l) => `<div class="tgm ${x === comp ? "comp" : ""}"><b>${l}${x === comp ? ' <span class="badge">se ajusta</span>' : ""}</b>
+    <span class="tgm-in"><input type="number" value="${T[x] ?? ""}" data-a-change="meTgM" data-k="${x}" placeholder="–"><small>g</small></span>
+    <span class="tgm-in"><input type="number" step="0.05" value="${kg && T[x] ? r2(T[x] / kg) : ""}" data-a-change="meTgK" data-k="${x}" placeholder="–" ${kg ? "" : "disabled"}><small>g/kg</small></span>
+    <small class="muted">${pctK(x) != null ? pctK(x) + " % de las kcal" : "&nbsp;"}</small>${diff(x)}</div>`;
+  return `<div class="tg-bal"><div class="tgm kc"><b>Calorías</b><span class="tgm-in"><input type="number" value="${T.kcal ?? ""}" data-a-change="meTgM" data-k="kcal" placeholder="–"><small>kcal</small></span><small class="muted">${kg ? `peso ${r1(kg)} kg` : "sin peso: no hay g/kg"}</small>${diff("kcal")}</div>
+    ${mac("prot", "Proteína")}${mac("fat", "Lípidos")}${mac("cho", "Carbohidratos")}
+    <div class="tg-comp small"><span class="muted">Al cambiar un macro se ajusta:</span><label class="ck"><input type="radio" name="tgcomp" value="fat" ${comp === "fat" ? "checked" : ""} data-a-change="meTgComp">Lípidos</label><label class="ck"><input type="radio" name="tgcomp" value="cho" ${comp === "cho" ? "checked" : ""} data-a-change="meTgComp">Carbohidratos</label></div></div>`;
+}
+const r2 = (v) => Math.round(v * 100) / 100;
+function tgSet(k, v) {
+  const T = MW.targets, comp = MW.calc.comp || "fat", others = ["cho", "fat", "prot"].filter((x) => x !== comp);
+  if (v === "" || v == null || isNaN(v)) delete T[k]; else T[k] = Math.max(0, Math.round(v));
+  const sumK = (list) => list.reduce((a, x) => a + (+T[x] || 0) * KF[x], 0);
+  if (k === comp || !+T.kcal) T.kcal = Math.round(sumK(["cho", "fat", "prot"])); // cambió el compensador (o no hay kcal): cambian las kcal
+  else { // cambió otro macro o las kcal: el compensador absorbe la diferencia
+    const g = Math.round((T.kcal - sumK(others)) / KF[comp]);
+    T[comp] = Math.max(0, g); if (g < 0) T.kcal = Math.round(sumK(["cho", "fat", "prot"]));
+  }
+  const kg = tgKg(); if (S._coachClient?.lastKg) MW.calc.kg = Math.round(S._coachClient.lastKg * 10) / 10; else if (kg) MW.calc.kg = kg;
+  redraw();
+}
+act("meTgM", (el) => tgSet(el.dataset.k, el.value === "" ? "" : num(el.value)));
+act("meTgK", (el) => { const kg = tgKg(); if (!kg) return; tgSet(el.dataset.k, el.value === "" ? "" : num(el.value) * kg); });
+act("meTgComp", (el) => { MW.calc.comp = el.value; redraw(); });
 const phaseColor = (p) => ({ "Break de dieta": "#a855f7", "Déficit leve": "#e0484e", "Déficit moderado": "#c3242b", "Déficit agresivo": "#8e1b1f", "Mini cut": "#b0263a", "Mantención": "#7d7d86", "Recomposición corporal": "#3b82f6", "Dieta reversa": "#d6a21e", "Superávit / Volumen": "#22a35a" }[p] || "#888");
 // Pestañas: una por etapa del Timeline (y las que ya tienen plan)
 function phaseStrip(c) {
