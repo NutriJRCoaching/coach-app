@@ -416,6 +416,15 @@ export const waterAuto = (kg) => (kg ? Math.round((kg * 40) / 100) * 100 : null)
 
 // Recordatorio de pago que ve el cliente (mismo texto en el panel, para revisarlo antes)
 // Recordatorio de pago (inicio del cliente). Los datos para transferir viven en library/payment (los edita el coach en Biblioteca, no van en el código)
+// Estado del pago: la fecha de pago es FIJA (payDate, ej. el 9 de cada mes). "Posponer" no la mueve: guarda payGrace
+// (plazo acordado) y hasta ese día no se avisa. Devuelve null | "pronto" (≤ 3 días, solo coach) | "hoy" | "vencido" | "pospuesto".
+export function payState(c, today = ymd()) {
+  if (!c?.payDate) return null;
+  const d = diffDays(c.payDate, today);
+  if (d > 0) return d <= 3 ? "pronto" : null;
+  if (c.payGrace && today < c.payGrace) return "pospuesto";
+  return d === 0 ? "hoy" : "vencido";
+}
 export const PAY_FIELDS = [["name", "Nombre"], ["rut", "RUT"], ["bank", "Banco"], ["type", "Tipo de cuenta"], ["number", "N° de cuenta"], ["email", "Correo"]];
 const MONTHS_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const longDate = (s) => { const d = parseYmd(s); return `${["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][d.getDay()]} ${d.getDate()} de ${MONTHS_L[d.getMonth()]}`; };

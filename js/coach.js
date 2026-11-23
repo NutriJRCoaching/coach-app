@@ -9,7 +9,7 @@ import { e1rm } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, trend, DAYS, embedUrl, pad } from "./util.js";
 import { PAY_FIELDS } from "./data.js";
 let PAYD = null; // datos para transferir (library/payment), para la vista previa en Datos
-import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto, routineBlock, planStr, setStr, isRotation, nextInRotation, appStart } from "./data.js";
+import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCorr, STOOL_KG, waterAuto, routineBlock, planStr, setStr, isRotation, nextInRotation, appStart, payState } from "./data.js";
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
@@ -745,7 +745,7 @@ async function dataView(c) {
   <label>Día de check-in<select name="checkinDay"><option value="">—</option>${[1, 2, 3, 4, 5, 6, 0].map((d) => `<option value="${d}" ${c.checkinDay !== "" && c.checkinDay != null && +c.checkinDay === d ? "selected" : ""}>${DAYS[d]}</option>`).join("")}</select></label>
   ${f("city", "Ciudad / país (zona horaria)")}
   ${f("payDate", "Próximo pago", "date")}<label>Se renueva cada<select name="payEvery">${[["", "—"], ["30", "1 mes"], ["90", "3 meses"], ["180", "6 meses"]].map(([v, l]) => `<option value="${v}" ${String(c.payEvery ?? "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-  ${c.payDate ? `<label>Pago${c.payDate <= ymd() ? ` <span class="badge ${c.payDate < ymd() ? "r" : "y"}">${c.payDate < ymd() ? "vencido" : "hoy"}</span>` : ""}<span class="row gap"><button type="button" class="btn small" data-a="payDone" title="Registra el pago y pasa la fecha al próximo período">✓ Pagó</button><button type="button" class="btn small ghost" data-a="payLater" title="Mueve la fecha del pago (no le aparece el aviso hasta ese día)">Posponer…</button></span></label>` : ""}
+  ${c.payDate ? `<label>Pago${(() => { const ps = payState(c); return ps === "vencido" ? ' <span class="badge r">vencido</span>' : ps === "hoy" ? ' <span class="badge y">hoy</span>' : ps === "pospuesto" ? ` <span class="badge">pospuesto al ${fmtDate(c.payGrace)}</span>` : ""; })()}<span class="row gap"><button type="button" class="btn small" data-a="payDone" title="Registra el pago y pasa la fecha al próximo período">✓ Pagó</button><button type="button" class="btn small ghost" data-a="payLater" title="Mueve la fecha del pago (no le aparece el aviso hasta ese día)">Posponer…</button></span></label>` : ""}
   ${c.sheetUrl ? `<label>Planilla anterior<a class="btn small" target="_blank" href="${esc(c.sheetUrl)}">Abrir planilla</a></label>` : ""}</div>
   ${c.payDate ? `<div class="note small"><b>Así le llega el recordatorio de pago</b> (le aparece en el inicio el mismo día; si pasa la fecha, le sale el segundo en rojo). A ti te avisa 3 días antes. Tus datos para transferir se editan en Biblioteca → Datos para transferir:<div class="paycard mt">${payMsg(c, PAYD)}</div><div class="paycard late mt">${payMsg(c, PAYD, true)}</div></div>` : ""}
   <label>Pendientes (uno por línea · empieza con <b>!</b> si es urgente) — aparecen en amarillo o rojo<textarea name="todo" rows="3">${esc((c.todo || []).join("\n"))}</textarea></label>
@@ -811,14 +811,15 @@ async function saveData(redraw) {
 // Pago: "Pagó" avanza la fecha al próximo período (o la borra si no se renueva); "Posponer" la mueve (el aviso al cliente se va hasta ese día)
 act("payDone", async () => {
   const c = await getClient(CW.cid), every = +c.payEvery || 0;
-  let next = null; if (every) { next = c.payDate; do next = every === 30 ? addMonths(next, 1) : addDays(next, every); while (next <= ymd()); }
-  await db.set("clients/" + CW.cid, { payDate: next, paidAt: Date.now(), lastPaid: c.payDate }); resetAlerts();
+  // La fecha es fija: avanza exactamente un período desde la fecha que tocaba (aunque haya pagado atrasado)
+  const next = every ? (every === 30 ? addMonths(c.payDate, 1) : addDays(c.payDate, every)) : null;
+  await db.set("clients/" + CW.cid, { payDate: next, payGrace: null, paidAt: Date.now(), lastPaid: c.payDate }); resetAlerts();
   toast(next ? `Pago registrado. Próximo pago: ${fmtDate(next)}` : "Pago registrado (sin próxima fecha)", 3500); refresh();
 });
 act("payLater", async () => {
   const c = await getClient(CW.cid);
-  const b = sheet("Posponer pago", `<p class="small">Hasta esa fecha ${esc((c.name || "").split(" ")[0])} no ve el aviso de pago y a ti no te aparece como vencido.</p><label>Nueva fecha de pago<input type="date" id="plD" value="${addDays(ymd(), 7)}" min="${addDays(ymd(), 1)}"></label><button class="btn primary big" id="plOk">Posponer</button>`);
-  b.querySelector("#plOk").onclick = async () => { const d = b.querySelector("#plD").value; if (!d) return; await db.set("clients/" + CW.cid, { payDate: d }); closeSheet(); resetAlerts(); toast(`Pago pospuesto al ${fmtDate(d)}`); refresh(); };
+  const b = sheet("Posponer pago", `<p class="small">La fecha de pago sigue siendo el <b>${fmtDate(c.payDate)}</b> (la próxima se cuenta desde ahí). Hasta el día que elijas, ${esc((c.name || "").split(" ")[0])} no ve el aviso de pago y a ti no te aparece como vencido.</p><label>Plazo para pagar hasta<input type="date" id="plD" value="${addDays(ymd(), 7)}" min="${addDays(ymd(), 1)}"></label><button class="btn primary big" id="plOk">Posponer</button>`);
+  b.querySelector("#plOk").onclick = async () => { const d = b.querySelector("#plD").value; if (!d) return; await db.set("clients/" + CW.cid, { payGrace: d }); closeSheet(); resetAlerts(); toast(`Plazo de pago hasta el ${fmtDate(d)}`); refresh(); };
 });
 const addMonths = (d, n) => { const x = new Date(d + "T12:00"); const day = x.getDate(); x.setMonth(x.getMonth() + n); if (x.getDate() !== day) x.setDate(0); return ymd(x); };
 act("resetOpen", async () => {

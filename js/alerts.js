@@ -3,7 +3,7 @@ import { db } from "./db.js";
 import { S } from "./state.js";
 import { ymd, addDays, weekInfo, diffDays, fmtDate, DAYS } from "./util.js";
 import { getRoutines, getSessions, getDays } from "./data.js";
-import { weekPlan, reviewWindow, appStart, isRotation, ciOverdue, weightCorr, phaseAt, PHASE_PCT } from "./data.js";
+import { weekPlan, reviewWindow, payState, appStart, isRotation, ciOverdue, weightCorr, phaseAt, PHASE_PCT } from "./data.js";
 import { GROUPS, pautaExtras, pautaMac } from "./foods.js";
 
 export const SERVICES = { completa: "Coaching 1-1", entrenamiento: "Entrenamiento", nutricion: "Nutrición" };
@@ -129,7 +129,7 @@ export function alertsFor(c, x) {
   }
   // Cumpleaños (aviso el día antes y el mismo día) y pagos
   if (c.birth) { const md = c.birth.slice(5), tm = addDays(today, 1).slice(5); if (md === today.slice(5)) add("y", "🎂 Hoy está de cumpleaños"); else if (md === tm) add("y", "🎂 Mañana está de cumpleaños"); }
-  if (c.payDate) { const d = diffDays(c.payDate, today); if (d < 0) add("r", `Pago vencido desde el ${fmtDate(c.payDate)}`); else if (d === 0) add("r", "Hoy le toca pagar"); else if (d <= 3) add("y", `Le toca pagar el ${fmtDate(c.payDate)}`); }
+  if (c.payDate) { const ps = payState(c, today); if (ps === "vencido") add("r", `Pago vencido desde el ${fmtDate(c.payDate)}${c.payGrace ? ` (plazo hasta el ${fmtDate(c.payGrace)})` : ""}`); else if (ps === "hoy") add("r", "Hoy le toca pagar"); else if (ps === "pronto") add("y", `Le toca pagar el ${fmtDate(c.payDate)}`); else if (ps === "pospuesto") add("i", `Pago del ${fmtDate(c.payDate)} pospuesto hasta el ${fmtDate(c.payGrace)}`); }
   // Pendientes anotados a mano ("!" al inicio = urgente)
   (c.todo || []).forEach((t) => { const u = t.startsWith("!"); add(u ? "r" : "y", u ? t.slice(1).trim() : t); });
 

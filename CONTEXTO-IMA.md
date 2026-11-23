@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.38.2**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 22-nov-2026, versión **1.38.3**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -387,7 +387,8 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 
 ## v1.38.2 (23-nov) — Pago: "Pagó" y "Posponer"
-- Datos y objetivos, junto al próximo pago: **✓ Pagó** (avanza `payDate` al próximo período según `payEvery`, 1 mes = mismo día del mes siguiente, hasta quedar en el futuro; guarda `lastPaid` y `paidAt`; sin `payEvery` borra la fecha) y **Posponer…** (elige una fecha nueva; hasta ese día el cliente no ve el aviso y el coach no lo ve vencido). Badge "vencido"/"hoy".
+- Datos y objetivos, junto al próximo pago: **✓ Pagó** y **Posponer…**. Badge "vencido" / "hoy" / "pospuesto al …".
+- v1.38.3: **la fecha de pago es fija** (pedido de Joaquín: no depende de cuándo pagó, porque se puede atrasar). "Pagó" avanza `payDate` exactamente un período desde la fecha que tocaba (1 mes = mismo día del mes siguiente), borra `payGrace` y guarda `lastPaid`/`paidAt`; sin `payEvery` borra la fecha. "Posponer" NO mueve `payDate`: guarda `payGrace` (plazo acordado) y hasta ese día el cliente no ve el aviso; después vuelve a salir "Pago pendiente" con la fecha original. `payState(c)` en data.js → null / "pronto" (≤ 3 días, solo coach) / "hoy" / "vencido" / "pospuesto"; lo usan el inicio del cliente, la campana (gris "pospuesto hasta…") y Datos.
 
 ## René (22-nov) — paso a la app desde cero
 - `ima-rutinas-rene.json` (fuera del repo, entregado en el chat del 22-nov): 4 rutinas con días fijos (Tren Inferior A lun, Tren Superior A mar, Tren Inferior B jue, Tren Superior B vie), 30 ejercicios, series/reps de su última semana de la planilla, sin pesos sugeridos, tips de "Programa y Tips" (typos corregidos: Leg Extension, Dip Machine Hammer Strength). En su planilla el RIR está como RPE: @10 = RIR 0, @9 = RIR 1, @8 = RIR 2 (RDL). Las casillas de reps vacías de la última semana quedaron en 8, 6 (decisión de Joaquín: "ante la duda, 8, 6"): Leg Extension B, Prensa HS, Abductores B, Dip Machine, Jalón B. Aductores B: 1 serie de 8, RIR 0. El leg curl es "Leg Curl Unilateral Acostado" (la app le pide Izq/Der).
