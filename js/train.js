@@ -4,7 +4,8 @@ import { db } from "./db.js";
 import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, chips, beep, notify, confirmBox, $, $$ } from "./ui.js";
 import { LS, esc, ymd, fmtDate, weekInfo, r1, num, embedUrl, uid, pad, parseYmd, D3, compressImage } from "./util.js";
-import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest, splitSides, setProgress } from "./data.js";
+import { saveAudio, loadAudio, delAudio } from "./audiostore.js";
+import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest, splitSides, setProgress, repsEff, exProgress, sessionProgress } from "./data.js";
 import { I } from "./icons.js";
 import { has } from "./features.js";
 
@@ -16,6 +17,9 @@ const TECH_NEXT = { "": "igual", igual: "mejor", mejor: "peor", peor: "" };
 const TECH_L = { "": "Técnica", peor: "↓ Peor", igual: "= Igual", mejor: "↑ Mejor" };
 const EXC = ["#e0313b", "#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#14b8a6", "#ec4899", "#f97316", "#06b6d4"];
 const exColor = (i) => EXC[i % EXC.length];
+// Número del ejercicio dentro de la rutina (los extras no cuentan) y color: el extra toma el color del ejercicio que lo antecede
+const exNum = (list, k) => list.slice(0, k + 1).filter((e) => !e.extra).length;
+const exCol = (list, k) => list[k]?.extra ? "var(--b)" : exColor(exNum(list, k) - 1);
 const kgTxt = (w) => String(w).replace(".", ",");
 const planTxt = (t) => `${esc(t.reps || "–")} reps${t.rir !== "" && t.rir != null ? ` @RIR ${t.rir}` : ""}${t.w ? ` · ${esc(kgTxt(t.w))} kg` : ""}`;
 
@@ -133,9 +137,9 @@ export async function sessionView(id) {
   const hasTips = ex.video || ex.notes || ex.alts?.length || exNote.text || exNote.photos?.length;
   return `<header class="ch sess"><a href="#entreno" class="icon-btn">${I.back}</a><h2>${esc(s.routineName)}</h2><span class="row"><span class="clock" id="clock">${timeSince(s.startedAt)}</span><button class="btn tiny primary" data-a="finishAsk">Terminar</button></span></header>
   ${s.coachNote && i === 0 ? `<div class="coachnote rnote"><b>Tu coach para hoy:</b> ${esc(s.coachNote)}</div>` : ""}
-  <div class="extabs">${s.exercises.map((e, k) => { const done = e.sets.length && e.sets.every((x) => x.done); return `<button class="${k === i ? "on" : ""} ${done ? "done" : ""} ${e.extra ? "extra" : ""} ${e.changed ? "chg" : ""}" style="--exc:${exColor(k)}" data-a="exGo" data-i="${k}">${k + 1}</button>`; }).join("")}</div>
-  <div class="card ex ${ex.extra ? "extra" : ""}" style="--exc:${exColor(i)}">
-    <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra</span>' : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
+  <div class="extabs">${s.exercises.map((e, k) => { const done = e.sets.length && e.sets.every((x) => x.done); return `<button class="${k === i ? "on" : ""} ${done ? "done" : ""} ${e.extra ? "extra" : ""} ${e.changed ? "chg" : ""}" style="--exc:${exCol(s.exercises, k)}" data-a="exGo" data-i="${k}" title="${e.extra ? "Ejercicio extra (fuera de tu rutina)" : ""}">${e.extra ? "+" : exNum(s.exercises, k)}</button>`; }).join("")}</div>
+  <div class="card ex ${ex.extra ? "extra" : ""}" style="--exc:${exCol(s.exercises, i)}">
+    <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra · fuera de la rutina</span>' : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
     <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video && has("train_videos") ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
     ${ex.weekNote || ex.wSug ? `<div class="coachnote">${ex.weekNote ? `<b>Tu coach:</b> ${esc(ex.weekNote)}` : ""}${ex.wSug ? `${ex.weekNote ? "<br>" : ""}<b>Peso sugerido:</b> ${esc(ex.wSug)} kg` : ""}</div>` : ""}
     ${!has("train_targets") ? `<div class="goal"><small>Registra el peso y las repeticiones de cada serie</small></div>` : ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div>${ex.tempo || ex.rest ? `<small class="muted">${ex.tempo ? `Tempo ${esc(ex.tempo)} (bajada-pausa-subida-pausa)` : ""}${ex.tempo && ex.rest ? " · " : ""}${ex.rest ? `Descanso ${Math.floor(ex.rest / 60)}:${String(ex.rest % 60).padStart(2, "0")}` : ""}</small>` : ""}</div>` : `<div class="goal"><small>Series libres</small></div>`}
@@ -160,13 +164,15 @@ function setRow(ex, i, j) {
   ${!has("train_tech") ? "" : `<button class="techb ${st.tech || ""}" data-a="techPick" data-j="${j}">${TECH_L[st.tech || ""]}</button>`}
   <div class="setinfo" id="si-${i}-${j}">${setInfo(ex, j)}</div></div>`;
 }
-// Diferencia entre lados de una misma serie
+// Diferencia entre lados de una misma serie: se comparan las reps "efectivas" (reps + RIR).
+// Ej.: izq. 7 reps RIR 1 (= 8) vs der. 7 reps RIR 7 (= 14) → 6 reps de diferencia, NO están parejos. Hasta 1 rep de diferencia cuenta como parejo.
 function pairDiff(ex, p) {
   const a = ex.sets[p * 2], b = ex.sets[p * 2 + 1]; if (!a || !b || a.r === "" || b.r === "") return "";
-  const dr = b.r - a.r, dw = a.w !== "" && b.w !== "" ? r1(b.w - a.w) : 0;
-  if (!dr && !dw) return `<span class="g">Lados parejos ✓</span>`;
-  const parts = []; if (dw) parts.push(`${dw > 0 ? "+" : ""}${dw} kg`); if (dr) parts.push(`${dr > 0 ? "+" : ""}${dr} rep${Math.abs(dr) > 1 ? "s" : ""}`);
-  return `<span class="${dr < 0 || dw < 0 ? "y" : "b"}">Der. vs Izq.: ${parts.join(" · ")}</span>`;
+  const ea = repsEff(a), eb = repsEff(b), dr = eb - ea, dw = a.w !== "" && b.w !== "" ? r1(b.w - a.w) : 0;
+  if (!dw && Math.abs(dr) <= 1) return `<span class="g">Lados parejos ✓</span>`;
+  const parts = []; if (dw) parts.push(`${dw > 0 ? "+" : ""}${dw} kg`);
+  if (dr) parts.push(`${dr > 0 ? "+" : ""}${dr} rep${Math.abs(dr) > 1 ? "s" : ""} contando el RIR (${ea} vs ${eb})`);
+  return `<span class="${Math.abs(dr) >= 3 || dw ? "y" : "b"}">Der. vs Izq.: ${parts.join(" · ")}</span>`;
 }
 function setInfo(ex, j) {
   const st = ex.sets[j], ref = refSet(prev, ex.exId, j);
@@ -298,11 +304,13 @@ act("setupPhotoDel", async (el) => {
   if (!(await confirmBox("¿Eliminar foto?"))) return; const n = await db.get(`${P()}/exnotes/${cur().exId}`);
   n.photos.splice(+el.dataset.k, 1); await db.set(`${P()}/exnotes/${cur().exId}`, { photos: n.photos }); $('[data-a="tips"]')?.click();
 });
-act("addExtra", () => sheet("Ejercicio extra", `<p class="muted small">Quedará marcado en otro color para que tu coach lo vea.</p><input id="xN" placeholder="Nombre del ejercicio"><button class="btn primary big" data-a="addExtraOk">Añadir</button>`));
+act("addExtra", () => sheet("Ejercicio extra", `<p class="muted small">Se agrega justo después de <b>${esc(cur().name)}</b> y queda marcado como extra (fuera de tu rutina) para que tu coach lo vea.</p><input id="xN" placeholder="Nombre del ejercicio"><button class="btn primary big" data-a="addExtraOk">Añadir</button>`));
 act("addExtraOk", () => {
   const name = $("#xN").value.trim(); if (!name) return;
-  S.session.exercises.push({ exId: "x-" + uid(), name, extra: true, target: [], alts: [], sets: [{ w: "", r: "", rir: "", note: "", tech: "", done: false }], inc: 2.5 });
-  S.exIdx = S.session.exercises.length - 1; save(); closeSheet(); refresh();
+  // Va justo después del ejercicio en que estás (y de los extras que ya le hayas agregado), no al final
+  const L = S.session.exercises; let at = (S.exIdx || 0) + 1; while (at < L.length && L[at].extra) at++;
+  L.splice(at, 0, { exId: "x-" + uid(), name, extra: true, after: L[S.exIdx || 0]?.exId || null, target: [], alts: [], sets: [{ w: "", r: "", rir: "", note: "", tech: "", done: false }], inc: 2.5 });
+  S.exIdx = at; save(); closeSheet(); refresh();
 });
 act("sessComment", () => sheet("Comentario de la sesión", `<textarea id="cmT" rows="3" placeholder="Ej: tuve que cambiar el orden de los ejercicios porque…">${esc(S.session.comment || "")}</textarea><button class="btn primary big" data-a="sessCommentOk">Guardar</button>`));
 act("sessCommentOk", () => { S.session.comment = $("#cmT").value; save(); closeSheet(); refresh(); });
@@ -402,16 +410,16 @@ export async function summaryView(id) {
   document.getElementById("app")?.classList.remove("in-session");
   const sv = s.survey || {}, mins = s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) : null;
   const sets = s.exercises.reduce((t, e) => t + e.sets.filter((x) => x.done || x.w !== "").length, 0);
-  const prog = s.exercises.flatMap((e) => e.sets.map((x, j) => setProgress(x, refSet(prev, e.exId, j)))).filter(Boolean);
-  const nUp = prog.filter((p) => p.k === "up").length, nComp = prog.filter((p) => p.k !== "new").length;
-  const audio = await db.get(`${P()}/audios/${s.id}`);
+  const SP = sessionProgress(s, prev), nUp = SP.up.length, nComp = SP.comp;
+  const PGI = { up: "▲", down: "▼", bad: "⚠", mix: "↕", same: "•", new: "•" };
+  const audio = await loadAudio(`${P()}/audios`, s.id);
   return `${head("Resumen de la sesión", "entreno")}
   <div class="card"><h3>${esc(s.routineName)}</h3><div class="muted small">${fmtDate(s.date, true)}${mins ? ` · ${mins} min` : ""}</div>
   <div class="stats3 mt"><div><b>${s.exercises.filter((e) => e.sets.some((x) => x.w !== "" || x.done)).length}</b><small>Ejercicios</small></div><div><b>${sets}</b><small>Series</small></div><div><b>${sv.intensidad ?? sv.dureza ?? "—"}</b><small>Intensidad /10</small></div></div></div>
-  ${s.exercises.map((e) => { const done = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!done.length) return ""; return `<div class="card ${e.extra ? "extra" : ""}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge b">Extra</span>' : ""}${e.replaced ? ` <small class="muted">(en vez de ${esc(e.replacedFrom)})</small>` : ""}
+  ${s.exercises.map((e) => { const done = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!done.length) return ""; const xp = has("train_suggest") ? exProgress(e, prev) : null; return `<div class="card ${e.extra ? "extra" : ""}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge b">Extra</span>' : ""}${xp && xp.k !== "new" ? ` <span class="prog ${xp.k === "mix" ? "same" : xp.k}">${PGI[xp.k]} ${xp.t}</span>` : ""}${e.replaced ? ` <small class="muted">(en vez de ${esc(e.replacedFrom)})</small>` : ""}
     ${e.sets.map((x, j) => { if (x.w === "" && x.r === "") return ""; const ref = refSet(prev, e.exId, j); const dw = ref && x.w !== "" && ref.w !== "" ? r1(x.w - ref.w) : 0, dr = ref && x.r !== "" && ref.r !== "" ? x.r - ref.r : 0;
       return `<div class="li row between small"><span>${e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`}: <b>${x.w || "–"} kg × ${x.r || "–"}</b>${x.rir !== "" ? " RIR " + x.rir : ""}${x.tech ? ` <span class="badge tech-${x.tech}">Téc. ${x.tech}</span>` : ""}${(() => { const pg = !has("train_suggest") ? null : setProgress(x, ref); return pg ? `<br><span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</span><span>${ref ? `<span class="muted">${ref.w}×${ref.r}</span> ${dw ? `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw}kg</span>` : ""} ${dr ? `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr}r</span>` : ""}` : ""}</span></div>`; }).join("")}</div>`; }).join("")}
-  ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} series con progreso</b><small class="muted">vs la semana pasada · cuenta subir peso, más reps, o mismas reps con más reserva (si la técnica no empeoró)</small></div>` : ""}
+  ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} ejercicio${nComp > 1 ? "s" : ""} con progreso</b><small class="muted">${[SP.same.length && `${SP.same.length} se mantuvo${SP.same.length > 1 ? "ron" : ""}`, SP.mix.length && `${SP.mix.length} mixto${SP.mix.length > 1 ? "s" : ""}`, SP.down.length && `${SP.down.length} bajó${SP.down.length > 1 ? "ron" : ""}`, SP.bad.length && `${SP.bad.length} con técnica peor`].filter(Boolean).join(" · ")}${SP.same.length || SP.mix.length || SP.down.length || SP.bad.length ? "<br>" : ""}vs la semana pasada · un ejercicio progresa si sube el peso o las reps contando el RIR (reps + reserva) en alguna serie, sin que otra baje ni empeore la técnica</small></div>` : ""}
   ${s.comment ? `<div class="card note">${esc(s.comment)}</div>` : ""}
   ${has("train_audio") ? `<div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
     ${audio?.data ? `<audio controls src="${audio.data}"></audio><button class="btn primary big" data-a="audioShare">Enviar audio por WhatsApp</button><button class="btn ghost block" data-a="audioRec">Grabar de nuevo</button>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>` : ""}
@@ -422,25 +430,26 @@ export async function summaryView(id) {
 act("sessDelete", async () => {
   const s = S.session; if (!s) return;
   if (!(await confirmBox(`Se elimina "${s.routineName}" del ${fmtDate(s.date)} con todas sus series y su audio. No se puede deshacer. ¿Eliminar?`, "Eliminar"))) return;
-  await db.del(`${P()}/sessions/${s.id}`); db.del(`${P()}/audios/${s.id}`).catch?.(() => {});
+  await db.del(`${P()}/sessions/${s.id}`); delAudio(`${P()}/audios`, s.id);
   S.session = null; toast("Entrenamiento eliminado"); go("entreno");
 });
 // ---------- Audio de retroalimentación (se guarda para el coach; máx. 3 min)
 let REC = null;
 act("audioRec", async () => {
   if (REC) { REC.stop(); return; }
-  let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("Activa el permiso de micrófono"); }
+  // Calidad: antes se grababa a 24 kbps (sonaba distorsionado). Ahora 64 kbps en m4a (o 48 kbps en Opus), mono, sin cancelación de eco (no hay llamada)
+  let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true } }); } catch { return toast("Activa el permiso de micrófono"); }
   const type = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find((t) => MediaRecorder.isTypeSupported(t)) || "";
-  const mr = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 24000 }), chunks = [];
+  const mr = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: /mp4/.test(type) ? 64000 : 48000 }), chunks = [];
   const t0 = Date.now(), btn = () => $('[data-a="audioRec"]');
   mr.ondataavailable = (e) => chunks.push(e.data);
   mr.onstop = async () => {
     clearInterval(tick); stream.getTracks().forEach((t) => t.stop()); REC = null;
     const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
-    if (blob.size > 700000) { toast("El audio es muy largo (máx. ~3 min)"); return refresh(); }
+    if (blob.size > 2600000) { toast("El audio es muy largo (máx. ~3 min)"); return refresh(); }
     const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
     // 1) se guarda solo en el panel del coach  2) se abre WhatsApp para mandarlo sí o sí
-    await db.set(`${P()}/audios/${S.session.id}`, { data, secs: Math.round((Date.now() - t0) / 1000), at: Date.now(), routine: S.session.routineName, date: S.session.date }, false);
+    await saveAudio(`${P()}/audios`, S.session.id, data, { secs: Math.round((Date.now() - t0) / 1000), at: Date.now(), routine: S.session.routineName, date: S.session.date });
     S.session.audio = true; save();
     lastAudio = { id: S.session.id, blob };
     toast("Audio guardado ✓ Ahora toca “Enviar audio por WhatsApp”"); refresh();
@@ -457,7 +466,7 @@ function audioFile(blob, name) {
 }
 act("audioShare", async () => {
   let blob = lastAudio?.id === S.session.id ? lastAudio.blob : null;
-  if (!blob) { const a = await db.get(`${P()}/audios/${S.session.id}`); if (!a?.data) return; blob = await (await fetch(a.data)).blob(); lastAudio = { id: S.session.id, blob }; }
+  if (!blob) { const a = await loadAudio(`${P()}/audios`, S.session.id); if (!a?.data) return; blob = await (await fetch(a.data)).blob(); lastAudio = { id: S.session.id, blob }; }
   const file = audioFile(blob, `Audio ${S.session.routineName} ${S.session.date}`);
   try { if (navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], text: `🎙️ ${S.session.routineName} · ${fmtDate(S.session.date, true)}` }); }
   catch (e) { if (e.name === "AbortError") return; }
@@ -485,7 +494,7 @@ async function sessionImage(s) {
     st.forEach(([l, v], k) => { const x = P + k * (cw + 10); g.fillStyle = "#17171b"; g.beginPath(); g.roundRect(x, y - 40, cw, 86, 18); g.fill(); g.fillStyle = "#fff"; g.font = F(800, 34); g.fillText(v, x + 20, y + 4); g.fillStyle = "#8b8b93"; g.font = F(600, 20); g.fillText(l.toUpperCase(), x + 20, y + 32); });
     y += 90; }
   exs.forEach((e, k) => {
-    const col = exColor(s.exercises.indexOf(e)), sets = e.sets.map((x, j) => [x, j]).filter(([x]) => x.w !== "" || x.r !== "");
+    const col = e.extra ? "#3b82f6" : exColor(exNum(s.exercises, s.exercises.indexOf(e)) - 1), sets = e.sets.map((x, j) => [x, j]).filter(([x]) => x.w !== "" || x.r !== "");
     const h = 64 + sets.length * 46;
     g.fillStyle = "#141418"; g.beginPath(); g.roundRect(P, y, W - P * 2, h, 22); g.fill();
     g.fillStyle = col; g.beginPath(); g.roundRect(P, y, 10, h, [22, 0, 0, 22]); g.fill();

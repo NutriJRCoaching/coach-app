@@ -69,7 +69,7 @@ function planChecks(c, x, plans, add) {
     // 4) El peso cambió desde que se calcularon las metas
     const kg0 = +P.calc?.kg;
     if (kg0 && kgNow && Math.abs(kgNow - kg0) >= Math.max(2, kg0 * 0.03)) { const d = Math.round((kgNow - kg0) * 10) / 10;
-      add("y", `${tag}: su peso ${d > 0 ? "subió" : "bajó"} ${Math.abs(d).toString().replace(".", ",")} kg desde que calculaste las metas (${kg0} → ${Math.round(kgNow * 10) / 10} kg): revisa sus requerimientos`, "plan"); }
+      add("i", `${tag}: su peso ${d > 0 ? "subió" : "bajó"} ${Math.abs(d).toString().replace(".", ",")} kg desde que calculaste las metas (${kg0} → ${Math.round(kgNow * 10) / 10} kg)`, "plan"); } // dato, no pendiente (pedido de Joaquín)
   }
 }
 export function alertsFor(c, x) {
@@ -169,8 +169,9 @@ export function alertsFor(c, x) {
     if (active) {
       // Proporcional a lo que va de su semana: avisa si ya le faltan 2 o más días sin registrar comida, o menos de 3 de cada 7 pesajes
       const F = regSoFar(c, w, x.days, hasFood, today), W = regSoFar(c, w, x.days, (d) => d.weight, today);
-      if (eats(c) && F.n - F.k >= 2) add("y", `Registró comida ${F.k} de ${F.n} días de esta semana`, "comida");
-      if (W.n >= 3 && W.k < Math.ceil((W.n * 3) / 7)) add("y", `Se pesó ${W.k} de ${W.n} días de esta semana`, "resumen");
+      // Son datos de adherencia (el coach no puede "arreglarlos"): van en gris, no en amarillo
+      if (eats(c) && F.n - F.k >= 2) add("i", `Registró comida ${F.k} de ${F.n} días de esta semana`, "comida");
+      if (W.n >= 3 && W.k < Math.ceil((W.n * 3) / 7)) add("i", `Se pesó ${W.k} de ${W.n} días de esta semana`, "resumen");
     }
   }
   const order = { r: 0, y: 1, i: 2 };

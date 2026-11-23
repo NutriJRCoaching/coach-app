@@ -13,10 +13,12 @@ import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCo
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
-import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, PHASE_PCT, phaseAt, hasPlans, CHECKIN, CHECKIN_OLD } from "./data.js";
+import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, exProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, PHASE_PCT, phaseAt, hasPlans, CHECKIN, CHECKIN_OLD } from "./data.js";
 import { weeksTable } from "./client.js";
 import { GROUPS } from "./foods.js";
 import { menusEditor } from "./menus.js";
+import { undoSource, track, forget } from "./undo.js";
+import { afterActs } from "./ui.js";
 import { loadCtx, alertsFor, levelOf, SERVICES, SERVICE_GROUPS, emailKey, checkinDayTxt } from "./alerts.js";
 
 // Pendientes de todos los clientes (se recalculan como máximo cada 30 s o al guardar algo)
@@ -212,7 +214,9 @@ async function trainingView(c, w) {
 async function sessionsView(c, w) {
   const all = await getSessions(c.id);
   const list = all.filter((s) => s.weekKey === w.key && s.status === "fin").sort((a, b) => a.startedAt - b.startedAt);
-  const [exnotes, audios] = await Promise.all([db.list(`clients/${c.id}/exnotes`), db.list(`clients/${c.id}/audios`)]);
+  const [exnotes, audios0] = await Promise.all([db.list(`clients/${c.id}/exnotes`), db.list(`clients/${c.id}/audios`)]);
+  // audios en partes (alta calidad): se arma cada uno con sus partes, que vienen en la misma lista
+  const audios = audios0.filter((a) => !String(a.id).includes("~p")).map((a) => (a.parts > 1 ? { ...a, data: a.data + [...Array(a.parts - 1)].map((_, k) => audios0.find((x) => x.id === `${a.id}~p${k + 2}`)?.data ?? "\u0000").join("") } : a)).map((a) => (a.data?.includes("\u0000") ? { ...a, data: "" } : a));
   if (!list.length) return `<p class="muted">Sin entrenamientos registrados esta semana.</p>`;
   const routines = await getRoutines(c.id);
   return list.map((s) => {
@@ -293,7 +297,7 @@ async function routinesView(c) {
 act("rvSame", async (el) => { await db.set("clients/" + CW.cid, { rutReview: { week: el.dataset.w, same: true, at: Date.now() } }); resetAlerts(); toast("Listo: la rutina sigue igual"); refresh(); });
 act("rvUndo", async (el) => { await db.set("clients/" + CW.cid, { rutReview: null }); for (const r of await getRoutines(CW.cid)) if (r.review?.week === el.dataset.w) await db.set(`clients/${CW.cid}/routines/${r.id}`, { review: null }); resetAlerts(); refresh(); });
 // Una rutina sin cambios para la semana que viene; si ya están todas revisadas, la semana queda revisada
-async function reviewDone(w) { const c = await getClient(CW.cid), rv = reviewWindow(c, await getRoutines(CW.cid), await getSessions(CW.cid)); if (rv?.list?.every((x) => x.done)) await db.set("clients/" + CW.cid, { rutReview: { week: w, same: rv.list.every((x) => x.same), at: Date.now() } }); resetAlerts(); }
+async function reviewDone(w, cid = CW.cid) { const c = await getClient(cid), rv = reviewWindow(c, await getRoutines(cid), await getSessions(cid)); if (rv?.list?.every((x) => x.done)) await db.set("clients/" + cid, { rutReview: { week: w, same: rv.list.every((x) => x.same), at: Date.now() } }); resetAlerts(); }
 act("rSameOne", async (el) => { await db.set(`clients/${CW.cid}/routines/${el.dataset.id}`, { review: { week: el.dataset.w, same: true, at: Date.now() } }); await reviewDone(el.dataset.w); toast("Sin cambios para la próxima semana ✓"); refresh(); });
 // Días fijos (schedule) o rotación (c.rotation: el cliente alterna las rutinas sin días fijos)
 const ROT_DEF = { perWeek: 3, days: [1, 3, 5], minRest: 1 };
@@ -326,7 +330,7 @@ act("rotDay", async (el) => { const c = await getClient(CW.cid), s = new Set((c.
 act("schedSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { schedule: { ...(c.schedule || {}), [el.dataset.d]: el.value || null } }); toast("Calendario guardado"); });
 act("cardioSet", async (el) => { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), [el.dataset.k]: el.type === "number" ? num(el.value) : el.value } }); toast("Guardado"); });
 act("cardioDay", async (el) => { const c = await getClient(CW.cid); const s = new Set(c.cardio?.days || []); el.checked ? s.add(+el.dataset.d) : s.delete(+el.dataset.d); await db.set("clients/" + CW.cid, { cardio: { ...(c.cardio || {}), days: [...s] } }); });
-act("rEdit", async (el) => { if (RE?.r && RE.r.id !== el.dataset.id && (exDiff(RE.r.exercises, RE.orig) || (RE.r.note || "") !== (RE.origNote || "")) && !(await confirmBox(`Tienes cambios sin guardar en ${RE.r.name}. ¿Salir sin guardarlos?`))) return; const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: JSON.parse(JSON.stringify({ id: el.dataset.id, ...r })), orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
+act("rEdit", async (el) => { const r = await db.get(`clients/${CW.cid}/routines/${el.dataset.id}`); RE = { cid: CW.cid, r: JSON.parse(JSON.stringify({ id: el.dataset.id, ...r })), orig: JSON.stringify(r.exercises || []), origNote: r.note || "" }; refresh(); });
 // Importar rutinas (ima-rutinas.json armado desde la planilla del cliente): reemplaza sus rutinas actuales
 const nkx = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 act("rImport", async (el) => {
@@ -336,6 +340,7 @@ act("rImport", async (el) => {
   if (data.client && nkx(data.client).split(" ")[0] !== nkx(c.name).split(" ")[0] && !(await confirmBox(`Este archivo es de ${data.client} y estás en la ficha de ${c.name}. ¿Importarlo igual?`))) return;
   if (!(await confirmBox(`Se reemplazan las ${old.length} rutinas actuales de ${c.name} (${old.map((r) => r.name).join(", ") || "ninguna"}) por: ${data.routines.map((r) => r.name).join(", ")}. Los entrenamientos ya registrados no se tocan.`))) return;
   const lib = (await db.get("library/exercises"))?.items || []; let libNew = 0;
+  forget("rutina"); // que el guardado automático no vuelva a crear una rutina recién borrada
   for (const r of old) await db.del(`clients/${CW.cid}/routines/${r.id}`);
   const sched = {}, ids = [];
   for (const r of data.routines) {
@@ -365,7 +370,7 @@ function blockGrid(c, r, sessions, rv) {
   const repsTxt = (e) => (e.sets || []).map((x) => x.reps ?? "").join(", "), rirTxt = (e) => [...new Set((e.sets || []).map((x) => x.rir ?? ""))].join(", ");
   const dirty = exDiff(r.exercises, RE.orig) || (r.note || "") !== (RE.origNote || "") || r.isNew;
   const st = rv?.list?.find((x) => x.r.id === r.id);
-  return `<div class="card blk" data-rdirty><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><span class="row gap"><span id="rDirty" class="badge y" ${dirty ? "" : "hidden"}>Cambios sin guardar</span>${st && !st.done ? `<button class="btn" data-a="rSameOne" data-id="${r.id}" data-w="${rv.next.key}" title="La semana ${revN} esta rutina queda igual">Sin cambios para la semana ${revN}</button>` : st?.done ? `<span class="badge g">${st.same ? "Semana " + revN + ": sin cambios" : "Semana " + revN + ": con ajustes"} ✓</span>` : ""}<button class="btn primary" data-a="rSave">Guardar cambios</button></span></div>
+  return `<div class="card blk" data-rdirty><div class="row between"><div class="card-t">${esc(r.name)} · semana a semana</div><span class="row gap"><span class="muted small" title="Cada cambio se guarda solo. Si te equivocas usa ↶ Deshacer (Ctrl+Z)">Se guarda solo</span>${st && !st.done ? `<button class="btn" data-a="rSameOne" data-id="${r.id}" data-w="${rv.next.key}" title="La semana ${revN} esta rutina queda igual">Sin cambios para la semana ${revN}</button>` : st?.done ? `<span class="badge g">${st.same ? "Semana " + revN + ": sin cambios" : "Semana " + revN + ": con ajustes"} ✓</span>` : ""}</span></div>
   <label>Comentario general de la rutina (lo ve al empezarla)<textarea rows="2" data-a-change="rNote" placeholder="Ej: Esta semana sube un poco el peso en los multiarticulares y cuida la bajada en todo.">${esc(r.note || "")}</textarea></label>
   <div class="scroll-x"><table class="tbl blk-t"><tr><th rowspan="2">Ejercicio</th>${weeks.map((wk) => `<th class="wkh">Semana ${+wk.slice(1)}</th>`).join("")}<th rowspan="2" class="vs1h">vs 1ª vez</th><th class="nxh" colspan="3">Semana ${nextN} · lo que va a hacer</th></tr>
   <tr>${weeks.map(() => `<th class="sub">indicado · hecho (kg×reps)</th>`).join("")}<th class="sub nx">Series</th><th class="sub nx">Cada serie: reps · RIR · kg sugerido</th><th class="sub nx">Comentario del ejercicio</th></tr>
@@ -388,7 +393,7 @@ act("gReps", (el) => { const e = RE.r.exercises[+el.dataset.k], v = el.value.spl
 act("gRir", (el) => { const e = RE.r.exercises[+el.dataset.k], v = el.value.split(",").map((x) => x.trim()); if (!v.length) return; (e.sets || []).forEach((x, j) => { const t = v[Math.min(j, v.length - 1)]; x.rir = t === "" ? "" : t.toUpperCase() === "F" ? "F" : +t; }); refresh(); });
 function routineEditor(r, lib) {
   const T = ["Excéntrica", "Pausa abajo", "Concéntrica", "Pausa arriba"];
-  return `<div class="card" data-rdirty><p class="muted small">Lo fijo de cada ejercicio (no cambia semana a semana): nombre y orden, video, tips de ejecución, tempo, descanso y reemplazos. Las series, reps, RIR, kg sugerido y comentarios de cada semana van en la tabla de arriba.</p><div class="row gap"><input class="h-in" value="${esc(r.name)}" data-a-change="rName" placeholder="Nombre de la rutina"><button class="btn primary" data-a="rSave">Guardar cambios</button><button class="btn ghost" data-a="rDup">Duplicar</button><button class="btn danger" data-a="rDel">Eliminar</button></div>
+  return `<div class="card" data-rdirty><p class="muted small">Lo fijo de cada ejercicio (no cambia semana a semana): nombre y orden, video, tips de ejecución, tempo, descanso y reemplazos. Las series, reps, RIR, kg sugerido y comentarios de cada semana van en la tabla de arriba.</p><div class="row gap"><input class="h-in" value="${esc(r.name)}" data-a-change="rName" placeholder="Nombre de la rutina"><button class="btn ghost" data-a="rDup">Duplicar</button><button class="btn danger" data-a="rDel">Eliminar</button></div>
   ${r.exercises.map((e, k) => { const tp = String(e.tempo || "").split("-"); return `<div class="exed"><div class="row gap"><b class="exn">${k + 1}</b><input class="grow exname" list="exlib" value="${esc(e.name)}" data-a-change="exF" data-k="${k}" data-f="name" placeholder="Ejercicio (escribe y elige de la biblioteca)">
     <button class="icon-btn" data-a="exMove" data-k="${k}" data-n="-1" title="Subir">↑</button><button class="icon-btn" data-a="exMove" data-k="${k}" data-n="1" title="Bajar">↓</button><button class="icon-btn" data-a="exDel" data-k="${k}" title="Quitar">✕</button></div>
     <div class="exgrid"><div><label>Descanso sugerido (s)<input type="number" value="${e.rest || ""}" data-a-change="exF" data-k="${k}" data-f="rest" placeholder="180"></label>
@@ -446,10 +451,16 @@ function setChanges(a, b) {
   }
   return out;
 }
-act("rSave", async () => {
-  const c = await getClient(CW.cid), rv0 = reviewWindow(c, await getRoutines(CW.cid), await getSessions(CW.cid)), w = rv0?.open ? rv0.next : weekInfo(c, ymd());
-  const old = JSON.parse(RE.orig), r = RE.r, list = [];
-  const fmtS = (s) => (s || []).map((x) => x.reps + (x.rir !== "" ? "@" + x.rir : "") + (x.w ? "·" + x.w : "")).join(", ");
+// Guardar la rutina en edición. silent = guardado automático (sin re-dibujar ni avisar).
+// Los cambios que ve el cliente se calculan contra cómo estaba la rutina ANTES de los cambios de esa semana (changes.base),
+// así el guardado automático no apila pasos intermedios ("8 → 9", "9 → 10"): queda "8 → 10". Si deshaces todo, no queda aviso.
+async function saveRoutine(R, silent) {
+  const cid = R.cid, r = R.r;
+  const c = await getClient(cid), rv0 = reviewWindow(c, await getRoutines(cid), await getSessions(cid)), w = rv0?.open ? rv0.next : weekInfo(c, ymd());
+  const sameWk = r.changes?.week === w.key, hasBase = sameWk && r.changes.base != null;
+  const old = JSON.parse(hasBase ? r.changes.base : R.orig), oldNote = hasBase ? r.changes.baseNote || "" : R.origNote || "";
+  const pre = hasBase ? r.changes.pre || [] : sameWk ? r.changes.list || [] : []; // avisos guardados con la versión anterior (sin base)
+  const list = [], fmtS = (s) => (s || []).map((x) => x.reps + (x.rir !== "" ? "@" + x.rir : "") + (x.w ? "·" + x.w : "")).join(", ");
   if (!r.isNew) {
     r.exercises.forEach((e, k) => {
       const o = old.find((x) => x.id === e.id); e.changed = false;
@@ -464,17 +475,30 @@ act("rSave", async () => {
     });
     old.filter((o) => !r.exercises.find((e) => e.id === o.id)).forEach((o) => list.push(`Se quitó: ${o.name}`));
   }
-  const prevCh = r.changes?.week === w.key ? r.changes.list : [];
-  if ((RE.origNote || "") !== (r.note || "") && r.note) list.push(`Comentario de la rutina: ${r.note}`);
+  if (oldNote !== (r.note || "") && r.note) list.push(`Comentario de la rutina: ${r.note}`);
+  const all = [...pre, ...list];
   const data = { name: r.name, exercises: r.exercises, note: r.note || "", order: r.order ?? 0, updatedAt: Date.now() };
-  if (list.length) data.changes = { week: w.key, list: [...prevCh, ...list], at: Date.now() };
-  await db.set(`clients/${CW.cid}/routines/${r.id}`, data);
-  if (rv0?.open) { await db.set(`clients/${CW.cid}/routines/${r.id}`, { review: { week: rv0.next.key, same: !list.length, at: Date.now() } }); await reviewDone(rv0.next.key); }
-  RE.orig = JSON.stringify(r.exercises); RE.origNote = r.note || ""; r.isNew = false;
-  toast(list.length ? `Guardado · ${list.length} cambio(s) marcados para el cliente` : "Guardado"); refresh();
+  if (all.length) data.changes = { week: w.key, list: all, pre, base: JSON.stringify(old), baseNote: oldNote, at: Date.now() };
+  else if (sameWk) data.changes = null; // deshiciste todo: el cliente no ve aviso de modificaciones
+  await db.set(`clients/${cid}/routines/${r.id}`, data);
+  if (data.changes !== undefined) r.changes = data.changes;
+  if (rv0?.open) { await db.set(`clients/${cid}/routines/${r.id}`, { review: { week: rv0.next.key, same: !all.length, at: Date.now() } }); await reviewDone(rv0.next.key, cid); }
+  R.orig = JSON.stringify(r.exercises); R.origNote = r.note || ""; r.isNew = false;
+  if (!silent) { toast(all.length ? `Guardado · ${all.length} cambio(s) marcados para el cliente` : "Guardado"); refresh(); }
+  else resetAlerts();
+}
+act("rSave", () => saveRoutine(RE, false));
+// Guardado automático y Deshacer (undo.js): la rutina que está abierta en Entrenamiento
+undoSource("rutina", {
+  ctx: () => (RE?.r && document.querySelector("[data-rdirty]") ? RE : null),
+  key: (R) => `${R.cid}|${R.r.id}`,
+  snap: (R) => ({ name: R.r.name, note: R.r.note || "", exercises: R.r.exercises }),
+  apply: (R, x) => { R.r.name = x.name; R.r.note = x.note; R.r.exercises = JSON.parse(JSON.stringify(x.exercises)); refresh(); },
+  save: (R) => saveRoutine(R, true)
 });
+afterActs.push(() => track());
 act("rDup", async () => { const id = uid(); await db.set(`clients/${CW.cid}/routines/${id}`, { name: RE.r.name + " (copia)", exercises: RE.r.exercises.map((e) => ({ ...e, id: uid(), changed: false })) }); toast("Duplicada"); refresh(); });
-act("rDel", async () => { if (!(await confirmBox("¿Eliminar la rutina " + RE.r.name + "? Los entrenamientos ya registrados se mantienen."))) return; await db.del(`clients/${CW.cid}/routines/${RE.r.id}`); RE = null; refresh(); });
+act("rDel", async () => { if (!(await confirmBox("¿Eliminar la rutina " + RE.r.name + "? Los entrenamientos ya registrados se mantienen."))) return; forget("rutina"); await db.del(`clients/${CW.cid}/routines/${RE.r.id}`); RE = null; refresh(); });
 
 // ---------- Alimentación de la semana
 async function foodView(c0, w) {
@@ -591,12 +615,12 @@ async function preanalysis(c0, w) {
   const plan = weekPlan(c, routines, sessions, w.first);
   const wk = sessions.filter((x) => x.status === "fin" && x.weekKey === w.key);
   let up = 0, comp = 0; const gains = [];
-  for (const x of wk) { const pv = prevSession(sessions, x); for (const e of x.exercises) e.sets.forEach((y, j) => { const pg = setProgress(y, refSet(pv, e.exId, j)); if (pg && pg.k !== "new") { comp++; if (pg.k === "up") { up++; gains.push(e.name); } } }); }
+  for (const x of wk) { const pv = prevSession(sessions, x); for (const e of x.exercises) { const pg = exProgress(e, pv); if (pg && pg.k !== "new") { comp++; if (pg.k === "up") { up++; gains.push(e.name); } } } }
   const good = [], work = [], answer = [], skip = [];
   const wA = A(D, (d) => weightCorr(d)), wP = A(P, (d) => weightCorr(d)), kcal = T("kcal"), prot = T("prot"), steps = A(D, (d) => d.steps), sl = A(D, (d) => sleepHours(d.sleep)), water = A(D, (d) => sum(d.water || [], (y) => y.ml));
   // entrenamiento
   if (plan.total) (plan.doneCount >= plan.total ? good : work).push(`Entrenamientos: <b>${plan.doneCount} de ${plan.total}</b>`);
-  if (comp) (up / comp >= 0.3 ? good : skip).push(`Progresó en <b>${up} de ${comp}</b> series vs la semana pasada${gains.length ? ` (${[...new Set(gains)].slice(0, 3).map(esc).join(", ")})` : ""}`);
+  if (comp) (up / comp >= 0.3 ? good : skip).push(`Progresó en <b>${up} de ${comp}</b> ejercicios vs la semana pasada${gains.length ? ` (${[...new Set(gains)].slice(0, 3).map(esc).join(", ")})` : ""}`);
   if (wk.some((x) => x.survey?.articular === "si") || /Moderado|Alto/.test(ci?.articular || "")) work.push(`Molestia articular: ${esc(ci?.articularDet || wk.find((x) => x.survey?.articularDet)?.survey?.articularDet || "revisar")}`);
   if (wk.some((x) => x.exercises.some((e) => e.tech === "peor" || e.sets.some((y) => y.tech === "peor")))) work.push("Técnica peor en algún ejercicio: revisa sus videos");
   // nutrición y hábitos

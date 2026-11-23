@@ -60,8 +60,11 @@ export async function getOffCL() {
   return (offCache = OFF_CL.map(([code, name, brand, kcal, cho, fat, prot, sq]) => ({ id: "cl-" + code, code, name, brand, kcal, cho, fat, prot, portion: null, medida: sq ? "1 porción (etiqueta)" : "", medidaG: sq || null, src: "offcl", fuente: "Open Food Facts (etiqueta)" })));
 }
 // ¿Los datos tienen sentido? Calorías vs macros y proteína razonable para el grupo
+// Alimento sin datos: todo en 0 por 100 g (típico de un producto de Open Food Facts sin tabla nutricional). zeroOk = de verdad es 0 (agua, bebida zero)
+export const foodEmpty = (f) => !!f && !(+f.kcal) && !(+f.cho) && !(+f.fat) && !(+f.prot) && !f.zeroOk;
 export function foodCheck(f) {
   const k = +f.kcal || 0, calc = 4 * (+f.cho || 0) + 4 * (+f.prot || 0) + 9 * (+f.fat || 0), out = [];
+  if (foodEmpty(f)) out.push("todos los valores están en 0 por 100 g: probablemente el producto quedó guardado sin su tabla nutricional");
   if (k > 40 && Math.abs(calc - k) / k > 0.2) out.push(`las calorías (${Math.round(k)}) no cuadran con los macros (≈${Math.round(calc)} kcal)`);
   const lim = { "Cereales": 14, "Frutas": 4, "Verduras generales": 6, "Verduras libre consumo": 5, "Azúcar": 2 }[f.cat];
   if (lim && +f.prot > lim) out.push(`${Math.round(f.prot * 10) / 10} g de proteína por 100 g es mucho para ${f.cat.toLowerCase()}`);
@@ -228,20 +231,42 @@ function suggestSides(ex, j) {
   return { a: worst, last: true, text: "Próxima semana (mismo peso en ambos lados)", items: per.map((x, k) => (x ? `Serie ${k + 1}: ${words[x.a]}` : null)).filter(Boolean), why: per.find((x) => x?.why)?.why || "" };
 }
 
-// ¿Hubo progreso en esta serie vs la misma serie de la semana pasada? (siempre que la técnica no empeore)
+// Reps "efectivas" = reps hechas + RIR (las que te quedaban en reserva). 7 reps RIR 1 = 8; 7 reps RIR 7 = 14; al fallo = las reps hechas.
+// Es la forma justa de comparar dos series (lados izq/der, o semana vs semana). Sin RIR anotado se usan las reps tal cual.
 const rirN = (v) => (v === "F" ? -1 : v === "" || v == null ? null : +v);
+export const repsEff = (x) => { const r = +x.r, a = rirN(x.rir); return a == null ? r : r + Math.max(0, a); };
+const effTxt = (x) => { const a = rirN(x.rir); return a == null || a <= 0 ? `${x.r}` : `${x.r}+${a}`; };
+// ¿Hubo progreso en esta serie vs la misma serie de la semana pasada? (siempre que la técnica no empeore)
 export function setProgress(x, ref) {
   if (x.w === "" || x.r === "") return null;
   if (!ref || ref.w === "" || ref.r === "") return { k: "new", t: "Primera vez" };
   if (x.tech === "peor") return { k: "bad", t: "Técnica peor" };
-  const dw = Math.round((x.w - ref.w) * 10) / 10, dr = x.r - ref.r, a = rirN(x.rir), b = rirN(ref.rir);
-  if (dw > 0) return { k: "up", t: `Subió ${dw} kg${dr < 0 ? ` (${dr} reps)` : ""}` };
-  if (dw < 0) return { k: dr > 0 ? "same" : "down", t: `Bajó ${-dw} kg${dr > 0 ? ` (+${dr} reps)` : ""}` };
-  if (dr > 0) return { k: "up", t: `+${dr} rep${dr > 1 ? "s" : ""} mismo peso` };
-  if (dr < 0) return { k: "down", t: `${dr} rep${dr < -1 ? "s" : ""} mismo peso` };
-  if (a != null && b != null && a > b) return { k: "up", t: `Mismas reps con más reserva (RIR ${b}→${a})` };
-  if (a != null && b != null && a < b) return { k: "down", t: `Mismas reps, menos reserva (RIR ${b}→${a})` };
+  const dw = Math.round((x.w - ref.w) * 10) / 10, both = rirN(x.rir) != null && rirN(ref.rir) != null;
+  const dr = both ? repsEff(x) - repsEff(ref) : x.r - ref.r, u = both ? " (con RIR)" : "", det = both ? ` · ${effTxt(ref)} → ${effTxt(x)}` : "";
+  if (dw > 0) return { k: "up", t: `Subió ${dw} kg${dr < 0 ? ` (${dr} reps${u})` : ""}` };
+  if (dw < 0) return { k: dr > 0 ? "same" : "down", t: `Bajó ${-dw} kg${dr > 0 ? ` (+${dr} reps${u})` : ""}` };
+  if (dr > 0) return { k: "up", t: `+${dr} rep${dr > 1 ? "s" : ""}${u} mismo peso${det}` };
+  if (dr < 0) return { k: "down", t: `${dr} rep${dr < -1 ? "s" : ""}${u} mismo peso${det}` };
   return { k: "same", t: "Mantuvo" };
+}
+// Veredicto de un ejercicio completo (no serie por serie) vs la semana pasada:
+// "up" = alguna serie progresó y ninguna retrocedió · "down" = alguna retrocedió y ninguna progresó · "mix" = unas sí y otras no
+// "bad" = alguna serie con técnica peor · "same" = todo igual · "new" = no hay con qué comparar
+export function exProgress(e, prevS) {
+  const pgs = e.sets.map((x, j) => setProgress(x, refSet(prevS, e.exId, j))).filter(Boolean);
+  const cmp = pgs.filter((p) => p.k !== "new"); if (!pgs.length) return null; if (!cmp.length) return { k: "new", t: "Primera vez" };
+  const n = (k) => cmp.filter((p) => p.k === k).length, up = n("up"), down = n("down");
+  if (n("bad")) return { k: "bad", t: "Técnica peor en alguna serie" };
+  if (up && !down) return { k: "up", t: "Progresó" };
+  if (down && !up) return { k: "down", t: "Bajó" };
+  if (up && down) return { k: "mix", t: `Mixto: ${up} serie${up > 1 ? "s" : ""} mejor, ${down} peor` };
+  return { k: "same", t: "Se mantuvo" };
+}
+// Resumen de la sesión por ejercicio
+export function sessionProgress(s, prevS) {
+  const v = s.exercises.map((e) => ({ e, p: exProgress(e, prevS) })).filter((x) => x.p && x.p.k !== "new");
+  const c = (k) => v.filter((x) => x.p.k === k);
+  return { comp: v.length, up: c("up"), same: c("same"), down: c("down"), mix: c("mix"), bad: c("bad") };
 }
 
 export const MEASURE_ZONES = [

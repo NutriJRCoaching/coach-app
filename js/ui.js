@@ -3,6 +3,7 @@ import { esc } from "./util.js";
 
 const actions = {};
 export const act = (name, fn) => (actions[name] = fn);
+export const afterActs = []; // funciones que corren después de cada acción (ej. guardado automático y deshacer del panel)
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
@@ -12,7 +13,7 @@ export function bindActions(doc) { for (const type of ["click", "change", "input
     const el = e.target.closest(`[data-a${type === "click" ? "" : "-" + type}]`);
     if (!el) return;
     const name = el.dataset[type === "click" ? "a" : "a" + type[0].toUpperCase() + type.slice(1)];
-    if (actions[name]) { if (type === "click" && el.tagName === "A" && !el.href) e.preventDefault(); actions[name](el, e); }
+    if (actions[name]) { if (type === "click" && el.tagName === "A" && !el.href) e.preventDefault(); let r; try { r = actions[name](el, e); } finally { Promise.resolve(r).finally(() => afterActs.forEach((f) => f(name))); } }
   });
 } }
 bindActions(document);

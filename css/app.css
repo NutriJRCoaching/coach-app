@@ -619,3 +619,10 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; col
 .tgm-in { display: flex; align-items: center; gap: 6px; } .tgm-in input { width: 90px; font-weight: 800; text-align: center; } .tgm-in small { color: var(--muted); }
 .tgm.kc input { font-size: 16px; } .tg-comp { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; }
 @media (max-width: 899px) { .tg-bal { grid-template-columns: 1fr 1fr; } }
+/* Panel: Deshacer / Rehacer y estado del guardado automático (undo.js) */
+#undobar { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 14px; background: var(--surf); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+#undobar[hidden] { display: none; }
+#undobar button { font: inherit; font-weight: 700; font-size: 13px; padding: 7px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg, #111); color: inherit; cursor: pointer; }
+#undobar button:disabled { opacity: .35; cursor: default; }
+#undobar .ust { font-size: 12px; font-weight: 600; padding: 0 4px; min-width: 82px; } #undobar .ust.ok { color: var(--g); } #undobar .ust.busy { color: var(--muted); } #undobar .ust.err { color: var(--r); }
+body.rec-on #undobar { display: none; }

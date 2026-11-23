@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { diffDays } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, gtxt, regSoFar, hasFood, getFoodBase, getOffCL, foodCheck, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, gtxt, regSoFar, hasFood, getFoodBase, getOffCL, foodCheck, foodEmpty, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg, payState } from "./data.js";
@@ -333,7 +333,7 @@ async function showResults(custom) {
   const box = $("#fres"); if (!box) return;
   const q = norm(FS.q.trim());
   const base = await getFoodBase();
-  const shared = (await db.list("barcodes").catch(() => [])).map((f) => ({ ...f, id: "bc-" + f.id, src: "bc" }));
+  const shared = (await db.list("barcodes").catch(() => [])).filter((f) => !foodEmpty(f)).map((f) => ({ ...f, id: "bc-" + f.id, src: "bc" }));
   const mineList = (custom || await db.list(P() + "/foods")).filter((f) => f.type !== "receta"), codes = new Set(mineList.map((f) => f.code).filter(Boolean));
   const off = q ? await getOffCL() : [], seenCodes = new Set([...codes, ...shared.map((f) => f.code)]);
   const pool = [...mineList, ...shared.filter((f) => !codes.has(f.code)), ...base, ...off.filter((f) => !seenCodes.has(f.code))];
@@ -639,30 +639,51 @@ async function rescueScanned() {
 // Base compartida de códigos de barras: lo que escanea cualquiera queda guardado para todos
 const BC = (code) => "barcodes/" + String(code).replace(/[^0-9A-Za-z]/g, "");
 async function saveBarcode(f) {
-  if (!f?.code) return;
-  const food = { name: f.name, brand: f.brand || "", code: String(f.code), portion: f.portion || null, kcal: +f.kcal || 0, cho: +f.cho || 0, fat: +f.fat || 0, prot: +f.prot || 0, by: S.cid, at: Date.now() };
+  if (!f?.code || foodEmpty(f) || f.incomplete) return; // nunca guardar en la base un producto sin datos (antes quedaba en 0 para siempre)
+  const food = { name: f.name, brand: f.brand || "", code: String(f.code), portion: f.portion || null, kcal: +f.kcal || 0, cho: +f.cho || 0, fat: +f.fat || 0, prot: +f.prot || 0, ...(f.zeroOk ? { zeroOk: true } : {}), by: S.cid, at: Date.now() };
   db.set(BC(f.code), food);
   const mine = (await db.list(P() + "/foods")).find((x) => x.code === String(f.code));
   if (!mine) db.set(`${P()}/foods/bc-${food.code}`, { ...food, type: "alimento", src: "custom" });
+  else if (foodEmpty(mine)) db.set(`${P()}/foods/${mine.id}`, { ...mine, kcal: food.kcal, cho: food.cho, fat: food.fat, prot: food.prot }); // repara uno tuyo que había quedado en 0
+}
+// Abre "Crear → Producto con etiqueta" con el código (y el nombre/marca si se conocen)
+async function createFromCode(code, f, msg) {
+  toast(msg); FS.tab = "crear"; FS.sel = null; $("#ftabs").innerHTML = ftabsHtml(); await renderFoodTab();
+  const set = (id, v) => { const el = $("#" + id); if (el && v) el.value = v; };
+  set("nCode", code); set("nN", f?.name && f.name !== "Producto" ? f.name : ""); set("nB", f?.brand);
 }
 async function lookupCode(code) {
+  code = String(code).trim();
+  // Lo guardado (tuyo o de la base compartida) se usa solo si tiene datos; si quedó en 0 se vuelve a buscar
   const mine = (await db.list(P() + "/foods")).find((f) => f.code === code);
-  if (mine) return pickFood(mine);
+  if (mine && !foodEmpty(mine)) return pickFood(mine);
   const shared = await db.get(BC(code));
-  if (shared) { saveBarcode(shared); toast("Encontrado en la base de IMA ✓"); return pickFood({ ...shared, id: "bc-" + code, src: "bc" }); }
-  const cl = (await getOffCL()).find((f) => f.code === String(code));
+  if (shared && !foodEmpty(shared)) { saveBarcode(shared); toast("Encontrado en la base de IMA ✓"); return pickFood({ ...shared, id: "bc-" + code, src: "bc" }); }
+  const cl = (await getOffCL()).find((f) => f.code === code);
   if (cl) { saveBarcode(cl); toast("Encontrado ✓"); return pickFood({ ...cl, src: "off" }); }
-  if (!navigator.onLine) return toast("Sin conexión: no se puede buscar el código");
+  const known = mine || shared;
+  if (!navigator.onLine) return known ? createFromCode(code, known, "Este producto está guardado sin datos. Copia la tabla del envase (o vuelve a escanear con señal).") : toast("Sin conexión: no se puede buscar el código");
   try {
-    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,nutriments,serving_quantity`).then((r) => r.json());
-    if (r.status !== 1) { toast("Producto no encontrado. Puedes crearlo."); FS.tab = "crear"; FS.sel = null; $("#ftabs").innerHTML = ftabsHtml(); await renderFoodTab(); $("#nCode").value = code; return; }
-    const f = offToFood(r.product, code); saveBarcode(f); toast("Guardado en la base de alimentos ✓"); pickFood(f);
-  } catch { toast("No se pudo consultar Open Food Facts"); }
+    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_es,brands,nutriments,serving_quantity`).then((r) => r.json());
+    if (r.status !== 1) return createFromCode(code, known, "Este código no está en ninguna base de datos. Créalo copiando la tabla del envase: quedará guardado para la próxima vez.");
+    const f = offToFood(r.product, code);
+    if (f.incomplete) return createFromCode(code, f, `Encontré “${f.name}”, pero sin tabla nutricional. Cópiala del envase: quedará guardado para la próxima vez.`);
+    saveBarcode(f); toast("Guardado en la base de alimentos ✓"); pickFood(f);
+  } catch { known ? createFromCode(code, known, "No se pudo consultar Open Food Facts. Copia la tabla del envase.") : toast("No se pudo consultar Open Food Facts"); }
 }
+// Open Food Facts → alimento por 100 g. Antes, si el producto no traía "energy-kcal_100g" (solo kJ, solo por porción o sin tabla),
+// quedaba todo en 0 y se guardaba así en la base compartida. Ahora: kJ → kcal, por porción → por 100 g, y sin datos = incompleto.
 function offToFood(p, code) {
-  const n = p.nutriments || {};
-  return { id: "off-" + (code || uid()), src: "off", name: p.product_name || "Producto", brand: p.brands || "", code, portion: +p.serving_quantity || null, medida: +p.serving_quantity ? "1 porción (etiqueta)" : "", medidaG: +p.serving_quantity || null,
-    kcal: +n["energy-kcal_100g"] || 0, cho: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0, prot: +n.proteins_100g || 0 };
+  const n = p.nutriments || {}, q = +p.serving_quantity || 0;
+  const v = (k) => { const a = n[k + "_100g"]; if (a !== undefined && a !== "" && !isNaN(+a)) return +a; const sv = n[k + "_serving"]; return sv !== undefined && sv !== "" && q ? (+sv * 100) / q : null; };
+  const cho = v("carbohydrates"), fat = v("fat"), prot = v("proteins");
+  let kcal = v("energy-kcal"); if (kcal == null) { const kj = v("energy-kj") ?? v("energy"); if (kj != null) kcal = kj / 4.184; }
+  if (kcal == null && cho != null && fat != null && prot != null) kcal = 4 * cho + 4 * prot + 9 * fat;
+  const ok = kcal != null && cho != null && fat != null && prot != null, rd = (x) => Math.round((x || 0) * 10) / 10;
+  const f = { id: "off-" + (code || uid()), src: "off", name: p.product_name_es || p.product_name || "Producto", brand: p.brands || "", code, portion: q || null, medida: q ? "1 porción (etiqueta)" : "", medidaG: q || null,
+    kcal: Math.round(kcal || 0), cho: rd(cho), fat: rd(fat), prot: rd(prot) };
+  if (!ok) f.incomplete = true; else if (!f.kcal && !f.cho && !f.fat && !f.prot) f.zeroOk = true; // de verdad 0 (agua, bebida zero)
+  return f;
 }
 act("offSearch", async () => {
   if (!navigator.onLine) return toast("Necesitas conexión");
@@ -670,7 +691,7 @@ act("offSearch", async () => {
   $("#fres").innerHTML = `<p class="muted small pad">Buscando…</p>`;
   try {
     const r = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&json=1&page_size=25&fields=code,product_name,brands,nutriments,serving_quantity&countries_tags_es=chile`).then((r) => r.json());
-    FS.results = (r.products || []).filter((p) => p.product_name).map((p) => offToFood(p, p.code));
+    FS.results = (r.products || []).filter((p) => p.product_name).map((p) => offToFood(p, p.code)).filter((f) => !f.incomplete); // sin tabla nutricional no se muestran
     $("#fres").innerHTML = FS.results.map(resRow).join("") || `<p class="muted small pad">Sin resultados.</p>`;
   } catch { $("#fres").innerHTML = `<p class="muted small pad">No se pudo buscar.</p>`; }
 });
