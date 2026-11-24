@@ -125,24 +125,28 @@ export function trainSoFar(plan, today = ymd()) {
 }
 export const hasFood = (d) => Object.values(d?.meals || {}).some((m) => m.length);
 export const ratioCls = (k, n) => (!n ? "" : k / n >= 0.7 ? "g" : k / n >= 0.4 ? "y" : "r");
+// Calendario de una semana: el especial de esa semana (client.weekSched[S0N], ej. una semana con menos tiempo) o el de siempre
+export const schedFor = (c, wkey) => c?.weekSched?.[wkey] || c?.schedule || {};
 export function weekPlan(client, routines, sessions, date = ymd()) {
   const w = weekInfo(client, date);
   const today = ymd();
   if (isRotation(client)) return w.last < appStart(client) ? { week: w, slots: w.days.map((d) => ({ date: d, rest: true })), planned: [], total: 0, doneCount: 0, rotation: true, missing: 0 } : rotationPlan(client, routines, sessions, w, today);
-  const sched = w.last < appStart(client) ? {} : client.schedule || {}; // semanas antes de partir: sin entrenamientos
+  const special = !!client.weekSched?.[w.key];
+  const sched = w.last < appStart(client) ? {} : schedFor(client, w.key); // semanas antes de partir: sin entrenamientos
   const done = sessions.filter((s) => s.weekKey === w.key && s.status === "fin");
   const used = new Set();
   const slots = w.days.map((d) => {
     const rid = d < appStart(client) ? null : sched[new Date(d + "T12:00").getDay()]; // días antes de que parta en la app: nada
     if (!rid) return { date: d, rest: true };
     const r = routines.find((x) => x.id === rid);
-    const s = done.find((x) => x.routineId === rid && !used.has(x.id));
+    // En una semana especial, si ese día hizo otra de sus rutinas (las de siempre siguen disponibles), también cuenta
+    const s = done.find((x) => x.routineId === rid && !used.has(x.id)) || (special ? done.find((x) => x.date === d && !used.has(x.id)) : null);
     if (s) used.add(s.id);
     const status = s ? "hecho" : d === today ? "hoy" : d < today ? "atrasado" : "proximo";
     return { date: d, rid, name: r?.name || "Rutina", status, session: s };
   });
   const planned = slots.filter((s) => !s.rest);
-  return { week: w, slots, planned, total: planned.length, doneCount: planned.filter((s) => s.status === "hecho").length };
+  return { week: w, slots, planned, total: planned.length, doneCount: planned.filter((s) => s.status === "hecho").length, special };
 }
 
 // Sesión de la semana anterior (misma rutina) para comparar

@@ -8,6 +8,7 @@ import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours
 import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, gtxt, regSoFar, hasFood, getFoodBase, getOffCL, foodCheck, foodEmpty, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
+import { schedFor } from "./data.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg, payState } from "./data.js";
 import { has, loadMatrix } from "./features.js";
 import { GROUPS } from "./foods.js";
@@ -53,7 +54,7 @@ function dayTag(dow, d) {
     const sl = S.wplan?.slots?.find((x) => x.date === d);
     return sl && !sl.rest ? `<i class="dtag ${sl.status === "hecho" ? "" : "sug"}">${esc(short(sl.name))}</i>` : `<i class="dtag rest"></i>`;
   }
-  const rid = (S.client?.schedule || {})[dow];
+  const rid = schedFor(S.client, S.wplan?.week?.key || weekInfo(S.client, d || ymd()).key)[dow];
   if (!rid) return `<i class="dtag rest">Desc.</i>`;
   return `<i class="dtag">${esc(short(S.rtNames?.[rid] || ""))}</i>`;
 }

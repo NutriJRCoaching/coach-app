@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.39.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.39.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -418,6 +418,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - `ima-rutinas-rene.json` (fuera del repo, entregado en el chat del 22-nov): 4 rutinas con días fijos (Tren Inferior A lun, Tren Superior A mar, Tren Inferior B jue, Tren Superior B vie), 30 ejercicios, series/reps de su última semana de la planilla, sin pesos sugeridos, tips de "Programa y Tips" (typos corregidos: Leg Extension, Dip Machine Hammer Strength). En su planilla el RIR está como RPE: @10 = RIR 0, @9 = RIR 1, @8 = RIR 2 (RDL). Las casillas de reps vacías de la última semana quedaron en 8, 6 (decisión de Joaquín: "ante la duda, 8, 6"): Leg Extension B, Prensa HS, Abductores B, Dip Machine, Jalón B. Aductores B: 1 serie de 8, RIR 0. El leg curl es "Leg Curl Unilateral Acostado" (la app le pide Izq/Der).
 - Zona horaria: la app del cliente usa la hora de su celular y los recordatorios usan su zona (`settings/reminders.tz`); el panel del coach calcula "hoy" con la hora de Chile (Alemania va 4 h adelante: de noche en Chile el panel puede ir un día atrás respecto de René). Idea si molesta: `client.tz` y calcular el hoy de cada cliente en el panel.
 - Partida: "Empezar de cero" con semana 1 desde el lunes 23-nov (semanas lun–dom), check-in sábado, Mantención. Está en Alemania (la app usa la hora de su celular).
+
+## v1.39.1 (23-nov) — Calendario solo para una semana
+- `client.weekSched = { S0N: {0..6: routineId|null} }` + `schedFor(c, weekKey)` en data.js: si esa semana tiene calendario propio se usa ese; si no, el de siempre (`schedule`). Lo usan `weekPlan` (devuelve `special`) y la franja de días del cliente (`dayTag`).
+- En una semana especial, si ese día el cliente hizo OTRA de sus rutinas (siguen todas en "Todas tus rutinas"), cuenta como hecho.
+- Panel → Entrenamiento → Configuración (días fijos): "＋ Calendario distinto solo esta semana" / "＋ Solo la semana N+1" (parte copiando el de siempre), selects por día (`wsSet`) y "Quitar" (`wsDel`, deja `null`). La revisión semanal y "Falta el calendario" siguen mirando el calendario de siempre.
+- Uso: Vicente, semana 1 (23–29 nov) con menos tiempo: rutina "Fullbody (semana con menos tiempo)" mar/jue/dom; sus rutinas oficiales siguen siendo Inferior/Superior desde la semana 2.
 
 ## Vicente (23-nov) — paso a la app desde cero
 - Planilla: "Coaching - Vicente Núñez" (leída con el navegador integrado vía gviz CSV: Registro Entrenamiento + Programa y Tips).
