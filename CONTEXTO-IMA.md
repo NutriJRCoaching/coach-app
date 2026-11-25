@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.40.3**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.41.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -445,6 +445,10 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - v1.40.2: campana: "Le toca pagar el …" y "Hoy le toca pagar" pasan a gris (dato); solo el pago vencido queda en rojo. Calculadora: fecha de nacimiento y estatura NO se prellenan con la ficha (son aproximadas): las llena el cliente; sexo y peso sí.
 
 - v1.40.3: arreglo urgente — la 1.40.2 no cargaba: un comentario `//` agregado a mitad de línea comentó el resto del código (alerts.js y client.js). **Antes de publicar, revisar SIEMPRE con `node --input-type=module --check < archivo`** (el `node --check archivo.js` a secas no detecta estos errores) y cargar los módulos en el demo.
+
+## v1.41.0 (24-nov) — Grabar en cualquier momento
+- Botón "🎥 Grabar video" en la cabecera de la ficha de cada cliente y "🎥 Grabar" en la barra amarilla de "Ver como cliente" (para grabar mostrándole la app). Usa el mismo grabador (`startRecording` sin guion). Al terminar (`freeRecSheet`): título, "Subir a mi Drive y mandárselo a X" (`frSend` → `clients/{id}/videos/{id}` {title, url, secs, at, seen}), "Solo subir y copiar el link" (`frLink`), descargar o descartar.
+- Cliente: tarjeta "🎥 Tu coach te mandó un video" en el inicio mientras no lo vea (al abrirlo se marca `seen`, salvo en la vista previa del coach) y Más → "Videos de tu coach" (`#videos`).
 
 ## Gabriel (24-nov) — paso a la app desde cero (primer cliente de solo entrenamiento)
 - "Empezar de cero": semana 1 desde lun 23-nov (semanas lun–dom), usa la app desde mié 25-nov (no tenía registros).

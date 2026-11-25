@@ -43,7 +43,7 @@ export async function clientView() {
   if (["inicio", "comida", "agua", "peso", "sueno", undefined, ""].includes(r)) S.rtNames = Object.fromEntries((await getRoutines(S.cid)).map((x) => [x.id, x.name]));
   const views = { inicio: home, comida: food, agua: waterView, entreno: trainView, sesion: () => sessionView(a), encuesta: () => surveyView(a), resumen: () => summaryView(a),
     progreso: progress, timeline: timelineView, peso: weightView, sueno: sleepView, fotos: photosView, medidas: measuresView,
-    mas: more, plan: planView, calc: calcView, compras: () => shoppingView(head), checkin: checkinView, guias: guidesView, equipo: equipView, info: infoView, ajustes: settingsView };
+    mas: more, plan: planView, calc: calcView, videos: videosView, compras: () => shoppingView(head), checkin: checkinView, guias: guidesView, equipo: equipView, info: infoView, ajustes: settingsView };
   return (views[r] || home)();
 }
 
@@ -101,6 +101,7 @@ async function home() {
   ${date === today && today < appStart(c) ? `<div class="card startcard"><div class="card-t">${I.info}Tu plan parte ${diffDays(appStart(c), today) === 1 ? "mañana" : "el " + fmtDate(appStart(c), true)}</div><p class="small">Ese día empieza tu semana 1. Mientras, puedes recorrer la app: revisa <a href="#plan">Mi plan</a>, tus rutinas en <a href="#entreno">Entreno</a> y ajusta tus recordatorios en Más → Ajustes.</p></div>` : ""}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
+  ${date === today ? await coachVideosCard() : ""}
   ${date === today && has("macro_guide") ? calcHomeCard(c) : ""}
   ${ps === "hoy" ? `<div class="card paycard">${payMsg(c, pay)}</div>` : ""}
   ${ps === "vencido" ? `<div class="card paycard late">${payMsg(c, pay, true)}</div>` : ""}
@@ -857,7 +858,7 @@ async function more() {
   return `${head("Más")}<div class="list">
   ${has("macro_guide") ? `<a href="#calc"><span>Mi calculadora de macros</span>${I.chev}</a>` : has("plan_menus") || has("plan_pdf") || has("plan_pauta") ? `<a href="#plan"><span>Mi plan de alimentación</span>${I.chev}</a>` : ""}${has("checkin") ? `<a href="#checkin"><span>Check-in semanal</span>${I.chev}</a>` : ""}${has("guides") ? `<a href="#guias"><span>Guías</span>${I.chev}</a>` : ""}${has("equipment") ? `<a href="#equipo"><span>Mi equipamiento</span>${I.chev}</a>` : ""}
   <a href="#info"><span>Información personal</span>${I.chev}</a><a href="#ajustes"><span>Ajustes</span>${I.chev}</a><a data-a="obOpen"><span>Bienvenida a IMA<small>Cómo funciona la app</small></span>${I.chev}</a>
-  ${S.role === "coach" ? `<a data-a="asCoach"><span><b>Volver al panel de coach</b></span>${I.chev}</a>` : ""}<a data-a="logout"><span class="red">Cerrar sesión</span></a></div>
+  ${S.role === "coach" ? `<a data-a="asCoach"><span><b>Volver al panel de coach</b></span>${I.chev}</a>` : ""}${(await coachVideos()).length ? `<a href="#videos"><span>Videos de tu coach</span>${I.chev}</a>` : ""}<a data-a="logout"><span class="red">Cerrar sesión</span></a></div>
   <p class="muted small center">${navigator.onLine ? "Conectado · todo sincronizado" : "Sin conexión · tus datos se guardan y se suben al volver la señal"}${DEMO ? " · MODO DEMO" : ""}</p>`;
 }
 async function planView() {
@@ -871,6 +872,22 @@ async function planView() {
   ${has("plan_pauta") && !(S.client.menus || []).length ? legHtml(S.client) : ""}`;
 }
 
+// ---------- Videos que te manda tu coach (fuera de la retro semanal): aparecen en el inicio hasta que los ves; todos quedan en Más
+const coachVideos = async () => (await db.list(`${P()}/videos`).catch(() => [])).sort((a, b) => (b.at || 0) - (a.at || 0));
+async function coachVideosCard() {
+  const v = (await coachVideos()).filter((x) => !x.seen); if (!v.length) return "";
+  return v.map((x) => `<a class="card fbmini" data-a="cvOpen" data-id="${esc(x.id)}"><div class="card-t">🎥 Tu coach te mandó un video</div><div class="small"><b>${esc(x.title || "Video de tu coach")}</b>${x.secs ? ` · ${Math.floor(x.secs / 60)}:${String(x.secs % 60).padStart(2, "0")}` : ""} · toca para verlo</div></a>`).join("");
+}
+async function videosView() {
+  const v = await coachVideos();
+  return `${head("Videos de tu coach", "mas")}<div class="list">${v.map((x) => `<a data-a="cvOpen" data-id="${esc(x.id)}"><span>${esc(x.title || "Video de tu coach")}<small>${fmtDate(ymd(new Date(x.at)))}${x.seen ? "" : " · nuevo"}</small></span>${I.chev}</a>`).join("") || `<p class="muted pad">Aún no tienes videos.</p>`}</div>`;
+}
+act("cvOpen", async (el) => {
+  const x = (await coachVideos()).find((y) => y.id === el.dataset.id); if (!x) return;
+  const e = embedUrl(x.url);
+  sheet(x.title || "Video de tu coach", `${e ? `<div class="video"><iframe src="${e}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>` : ""}<a class="btn block mt" target="_blank" href="${esc(x.url)}">Abrir en Drive</a>`, { wide: true });
+  if (!x.seen && !S.preview) { await db.set(`${P()}/videos/${x.id}`, { seen: true, seenAt: Date.now() }); }
+});
 // ---------- Calculadora de macros (solo entrenamiento): la maneja el cliente y sus metas salen de aquí
 // Guarda en clients/{id}/settings/calc: datos, nivel de actividad, objetivo, g/kg de proteína y grasa, y el resultado.
 let CALC = null;

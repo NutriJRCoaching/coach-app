@@ -197,7 +197,7 @@ async function render() {
     } else {
       root.className = "client";
       const main = await clientView();
-      root.innerHTML = `<div id="net" class="net" hidden></div>${S.preview ? `<div class="pvbar"><span>Viendo como <b>${esc(S.preview.name)}</b> · lo que toques se guarda en su cuenta</span><button class="btn tiny" data-a="asCoach">Volver al panel</button></div>` : ""}<main class="cmain">${main}<p class="ver">${esc(CONFIG.appName)} · v${CONFIG.appVersion}</p></main>${clientTabs()}`;
+      root.innerHTML = `<div id="net" class="net" hidden></div>${S.preview ? `<div class="pvbar"><span>Viendo como <b>${esc(S.preview.name)}</b> · lo que toques se guarda en su cuenta</span><span class="row gap"><button class="btn tiny" data-a="recFree" title="Graba la pantalla mostrándole la app (con tu cara) y mándaselo">🎥 Grabar</button><button class="btn tiny" data-a="asCoach">Volver al panel</button></span></div>` : ""}<main class="cmain">${main}<p class="ver">${esc(CONFIG.appName)} · v${CONFIG.appVersion}</p></main>${clientTabs()}`;
     }
     if (!sameRoute) root.querySelector(".cmain, .cpanel")?.classList.add("enter");
     root.dataset.route = location.hash;

@@ -141,7 +141,7 @@ async function clientPanel(cid, tab, AA) {
   const views = { resumen: tlView, etapas: stagesView, entrenos: trainingView, rutinas: trainingView, comida: foodView, plan: async (c) => { const cc = await planCtx(c); S._coachClient = cc; return menusEditor(cc); }, progreso: progView, checkins: checkinsView, feedback: feedbackView, datos: dataView };
   const weekNav = ["resumen", "entrenos", "comida", "feedback"].includes(tab);
   return `<div class="row between"><h1>${esc(c.name)} <small class="muted">· ${c.service ? esc(SERVICES[c.service]) : "Asesoría sin definir"}${c.startDate ? (appStart(c) > ymd() ? ` · empieza el ${fmtDate(appStart(c))}` : ` · Semana ${now.n}`) : ""}${c.service === "entrenamiento" ? "" : ` · <span style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</span>`}</small></h1>
-  <button class="btn small" data-a="previewClient" data-id="${cid}">Ver como cliente</button></div>
+  <span class="row gap">${recSupported() ? `<button class="btn small" data-a="recFree" data-cid="${cid}" title="Graba un video cuando quieras (pantalla + tu cara) y mándaselo a este cliente">🎥 Grabar video</button>` : ""}<button class="btn small" data-a="previewClient" data-id="${cid}">Ver como cliente</button></span></div>
   ${A.length || info.length ? `<div class="alertbar">${A.map((a) => chip(a, cid)).join("")}${info.map((a) => chip(a, cid)).join("")}</div>` : `<div class="alertbar"><span class="badge g">Todo al día ✓</span></div>`}
   <div class="row between">
   ${weekNav ? `<div class="row gap"><button class="btn small" data-a="cwShift" data-n="-1">‹</button><b>Semana ${w.n}</b> <span class="muted small">${fmtDate(w.first)} – ${fmtDate(w.last)}</span><button class="btn small" data-a="cwShift" data-n="1" ${w.n >= now.n ? "disabled" : ""}>›</button></div>` : "<span></span>"}</div>
@@ -735,6 +735,40 @@ act("recStart", async (el) => {
   const cid = CW.cid, week = el.dataset.w;
   await startRecording({ guideHtml: document.querySelector(".pre")?.outerHTML || "", onDone: ({ blob, secs, transcript, cues, marks }) => { if (LASTREC?.url) URL.revokeObjectURL(LASTREC.url); LASTREC = { cid, week, blob, secs, transcript, cues, marks, url: URL.createObjectURL(blob) }; refresh(); toast("Grabación lista ✓"); } });
 });
+// ---------- Grabar en cualquier momento (no solo la retro semanal): ej. un video de bienvenida mostrando la app con "Ver como cliente".
+// Al terminar: subir a Drive y mandárselo al cliente (clients/{id}/videos: le aparece en el inicio hasta que lo vea y queda en Más → Videos de tu coach),
+// o solo copiar el link, o descargarlo.
+let FREEREC = null;
+act("recFree", async (el) => {
+  const cid = el.dataset.cid || S.preview?.cid || CW?.cid || null;
+  await startRecording({ guideHtml: "", onDone: ({ blob, secs }) => { if (FREEREC?.url) URL.revokeObjectURL(FREEREC.url); FREEREC = { cid, blob, secs, url: URL.createObjectURL(blob) }; freeRecSheet(); } });
+});
+async function freeRecSheet() {
+  const F = FREEREC; if (!F) return; const c = F.cid ? await getClient(F.cid) : null, first = (c?.name || "").split(" ")[0];
+  sheet("Tu grabación", `<video class="setvid" src="${F.url}" controls playsinline style="width:100%;border-radius:12px"></video>
+    <p class="small muted">Duración ${Math.floor(F.secs / 60)}:${String(F.secs % 60).padStart(2, "0")} · ${(F.blob.size / 1048576).toFixed(1)} MB</p>
+    ${c ? `<label>Título que verá ${esc(first)}<input id="frT" value="Video de tu coach"></label>` : ""}
+    ${driveReady() ? `${c ? `<button class="btn primary big" data-a="frSend">Subir a mi Drive y mandárselo a ${esc(first)}</button>` : ""}<button class="btn block" data-a="frLink">Solo subir a mi Drive y copiar el link</button>` : `<p class="small"><span class="badge y">Falta conectar Google Drive</span> Descárgalo y súbelo tú.</p>`}
+    <button class="btn block" data-a="frDown">Descargar video</button><button class="btn ghost block red" data-a="frDiscard">Descartar</button><div id="frP" class="small muted center"></div>`, { wide: true });
+}
+async function frUpload(name) {
+  const p = $("#frP"); $$('[data-a^="fr"]').forEach((b) => (b.disabled = true));
+  try { return await uploadToDrive(FREEREC.blob, name, (x) => { if (p) p.textContent = `Subiendo… ${Math.round(x * 100)} %`; }); }
+  catch (e) { toast("No se pudo subir: " + e.message); $$('[data-a^="fr"]').forEach((b) => (b.disabled = false)); if (p) p.textContent = ""; return null; }
+}
+act("frSend", async () => {
+  const c = await getClient(FREEREC.cid), title = ($("#frT")?.value || "Video de tu coach").trim();
+  const url = await frUpload(`${title} · ${c.name} · ${ymd()}.webm`); if (!url) return;
+  await db.set(`clients/${FREEREC.cid}/videos/${uid()}`, { title, url, secs: FREEREC.secs, at: Date.now(), seen: false });
+  closeSheet(); toast(`Listo: se lo mandaste a ${c.name.split(" ")[0]} ✓ (le aparece en su inicio)`, 4000); URL.revokeObjectURL(FREEREC.url); FREEREC = null;
+});
+act("frLink", async () => {
+  const url = await frUpload(`Video ${ymd()}.webm`); if (!url) return;
+  try { await navigator.clipboard.writeText(url); } catch {}
+  const p = $("#frP"); if (p) p.innerHTML = `Subido ✓ · link copiado:<br><a target="_blank" href="${esc(url)}">${esc(url)}</a>`;
+});
+act("frDown", () => { const a = document.createElement("a"); a.href = FREEREC.url; a.download = `Video ${ymd()}.webm`; a.click(); });
+act("frDiscard", async () => { if (!(await confirmBox("¿Descartar esta grabación?"))) return; URL.revokeObjectURL(FREEREC.url); FREEREC = null; closeSheet(); });
 act("recDownload", () => { if (!LASTREC) return; const a = document.createElement("a"); a.href = LASTREC.url; a.download = `Retro ${new Date().toISOString().slice(0, 10)}.webm`; a.click(); });
 act("recDiscard", async () => { if (!(await confirmBox("¿Descartar esta grabación?"))) return; URL.revokeObjectURL(LASTREC.url); LASTREC = null; refresh(); });
 act("recUpload", async (el) => {
