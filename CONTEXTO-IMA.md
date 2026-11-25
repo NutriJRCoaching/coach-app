@@ -440,6 +440,11 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Rutinas importadas (JSON armado en el navegador, no se guardó en el repo): Tren Inferior A (mar), Tren Superior A (jue), Tren Inferior B (vie), Tren Superior B (dom); 29 ejercicios con las series/reps de su semana 8. Decisión de Joaquín: **todo RIR 1 salvo las pantorrillas (RIR 0)**; nombres del Registro (no los de Programa y Tips): "Leg Extension Bilateral" (con los tips de Leg Extension), "Extensión de Tríceps DB" y "Pantorrilla Unilateral en Smith" quedan sin tips. Con 3 series y reps "8, 6" la 3ª repite la última (8, 6, 6). Sin pesos sugeridos. Unilaterales (Izq/Der por el nombre): Pantorrilla Unilateral en Smith, Extensión de Tríceps Unilateral Polea, Remo Foco Dorsal Unilateral en Polea. En su planilla los RIR hechos están como RPE (9 = RIR 1, 10 = RIR 0).
 - Ya tenía el plan de Mantención (4 alternativas, metas 2617 kcal · C 350 · L 76 · P 133, nota "todas llevan 20 g de chía"). Pendiente de Joaquín: darle acceso (Datos y objetivos), armar el día con legumbres como opción propia y revisar los avisos del plan (Alternativa 4: lípidos −9; porciones distintas a la pauta en Alt. 1–3).
 
+## Gabriel (24-nov) — paso a la app desde cero (primer cliente de solo entrenamiento)
+- "Empezar de cero": semana 1 desde lun 23-nov (semanas lun–dom), usa la app desde mié 25-nov (no tenía registros).
+- Rotación Fullbody A → Fullbody B, día por medio (`everyOther`), objetivo mínimo 2 por semana (puede hacer más: salen como "Opcional"). Pasos 7.000. Metas de kcal/macros: las calcula él en su calculadora.
+- Pendiente de Joaquín: su correo (no tiene) para darle acceso, y su día de check-in.
+
 PENDIENTE:
 1. Joaquín: en la ficha de Marian, "Empezar de cero" (semana 1 desde dom 22-nov, usa la app desde lun 23-nov, Mantención) si aún no se hizo, revisar que Día de check-in = domingo, e importar `ima-rutinas-marian.json` en Entrenamiento (queda en rotación sola).
 2. Verificar en su celular la primera semana (Próximo / Sugerido, check-in del domingo 29 = semana 1).
