@@ -4,6 +4,7 @@ import { db } from "./db.js";
 import { S } from "./state.js";
 import { act, toast, sheet, closeSheet, $, $$ } from "./ui.js";
 import { esc, embedUrl, LS } from "./util.js";
+import { CONFIG } from "./config.js";
 
 const SPEEDS = [1, 1.25, 1.5, 2];
 const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`;
@@ -15,14 +16,25 @@ function vtt(cues) {
   }).join("\n\n");
 }
 // Archivo de video directo (Firebase Storage u otro) → reproductor propio. Drive/YouTube → su reproductor.
-const isFile = (u) => /firebasestorage|\.webm|\.mp4|^blob:/i.test(u || "");
+const isFile = (u) => /firebasestorage|googleapis\.com\/drive|\.webm|\.mp4|^blob:/i.test(u || "");
+// Videos de Drive con el reproductor propio (velocidad 1x–2x): si hay CONFIG.driveKey (clave de API solo para Google Drive,
+// restringida a nutrijrcoaching.github.io) se leen directo; el archivo debe estar compartido "cualquiera con el enlace" (las subidas de la app lo están).
+export const driveFileId = (u) => (String(u || "").match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{20,})/) || [])[1] || null;
+export const directSrc = (u) => { const id = CONFIG.driveKey && driveFileId(u); return id ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${CONFIG.driveKey}` : u; };
+// Mini reproductor con velocidad (para los videos que manda el coach fuera de la retro)
+export function speedPlayer(u) {
+  const src = directSrc(u), sp = +LS.get("fbSpeed") || 1;
+  if (!isFile(src)) { const e = embedUrl(u); return e ? `<div class="video"><iframe src="${e}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>` : ""; }
+  return `<div class="fbplayer"><video id="fbVid" src="${esc(src)}" controls playsinline preload="metadata" onloadedmetadata="this.playbackRate=${sp}"></video>
+    <div class="fbctl"><span class="muted small">Velocidad</span>${SPEEDS.map((x) => `<button class="chip ${x === sp ? "on" : ""}" data-a="fbSpeed" data-v="${x}">${String(x).replace(".", ",")}x</button>`).join("")}</div></div>`;
+}
 let P = null; // { fb, path, max, saved }
 
 export async function openFeedbackPlayer(fb) {
   const path = `clients/${S.cid}/fbreplies/${fb.week}`;
   const prev = (await db.get(path)) || {};
   P = { fb, path, max: prev.viewed || 0, saved: prev.viewed || 0, prev };
-  const u = fb.videoUrl, emb = !isFile(u) && embedUrl(u);
+  const u = directSrc(fb.videoUrl), emb = !isFile(u) && embedUrl(fb.videoUrl);
   const sp = +LS.get("fbSpeed") || 1;
   let video = "";
   if (isFile(u)) {

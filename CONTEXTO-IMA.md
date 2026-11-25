@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.41.5**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.42.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -449,6 +449,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.41.0 (24-nov) — Grabar en cualquier momento
 - Botón "🎥 Grabar video" en la cabecera de la ficha de cada cliente y "🎥 Grabar" en la barra amarilla de "Ver como cliente" (para grabar mostrándole la app). Usa el mismo grabador (`startRecording` sin guion). Al terminar (`freeRecSheet`): título, "Subir a mi Drive y mandárselo a X" (`frSend` → `clients/{id}/videos/{id}` {title, url, secs, at, seen}), "Solo subir y copiar el link" (`frLink`), descargar o descartar.
 - Cliente: tarjeta "🎥 Tu coach te mandó un video" en el inicio mientras no lo vea (al abrirlo se marca `seen`, salvo en la vista previa del coach) y Más → "Videos de tu coach" (`#videos`).
+- v1.42.0: velocidad 1x–2x también en videos de Drive (retro semanal y videos del coach): `CONFIG.driveKey` (clave de API restringida a Google Drive API y a https://nutrijrcoaching.github.io/*) → `directSrc` en player.js lee el archivo por la API (`files/{id}?alt=media`) con el reproductor propio (`speedPlayer`). La clave de Firebase NO sirve (está restringida a APIs de Firebase: 403). Sin driveKey sigue el iframe de Drive. Pendiente: que Joaquín cree la clave.
 - v1.41.5: aviso al celular cuando el coach le manda un video (scripts/reminders.mjs): videos con `seen == false` y sin `notified` → push "🎥 Tu coach te mandó un video" + título, entre 8:00 y 22:00 hora del cliente, aunque no tenga los recordatorios activados (basta con los avisos con la app cerrada); marca `notified`. Llega cuando corre el reloj de GitHub (≈ cada hora).
 - v1.41.4: botón "⬆ Mandar un video" en la cabecera de la ficha (archivo del computador → mismo flujo que Grabar: título, subir a Drive y mandárselo). La subida siempre parte con un clic ("Subir…"), porque si parte al elegir el archivo Chrome bloquea la ventana de permiso de Drive y quedaba colgado sin aviso (pasaba con "Subir un video que ya tengo" de la retro; ahora pide un segundo clic). `getToken` con `error_callback`: avisa si la ventana se bloquea o se cierra.
 - v1.41.3: Retroalimentación → "🎥 Videos que le mandaste": título, fecha, "Visto el … ✓" / "Aún no lo ve", abrir y quitar (`vidDelSent`; el archivo queda en Drive).

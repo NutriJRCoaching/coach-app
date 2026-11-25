@@ -884,8 +884,8 @@ async function videosView() {
 }
 act("cvOpen", async (el) => {
   const x = (await coachVideos()).find((y) => y.id === el.dataset.id); if (!x) return;
-  const e = embedUrl(x.url);
-  sheet(x.title || "Video de tu coach", `${e ? `<div class="video"><iframe src="${e}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>` : ""}<a class="btn block mt" target="_blank" href="${esc(x.url)}">Abrir en Drive</a>`, { wide: true });
+  const { speedPlayer } = await import("./player.js"); // con CONFIG.driveKey se ve con el reproductor propio (velocidad 1x–2x)
+  sheet(x.title || "Video de tu coach", `${speedPlayer(x.url)}<a class="btn block mt" target="_blank" href="${esc(x.url)}">Abrir en Drive</a>`, { wide: true });
   if (!x.seen && !S.preview) { await db.set(`${P()}/videos/${x.id}`, { seen: true, seenAt: Date.now() }); }
 });
 // ---------- Calculadora de macros (solo entrenamiento): la maneja el cliente y sus metas salen de aquí
