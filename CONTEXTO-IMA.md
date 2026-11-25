@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.41.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.41.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -449,6 +449,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.41.0 (24-nov) — Grabar en cualquier momento
 - Botón "🎥 Grabar video" en la cabecera de la ficha de cada cliente y "🎥 Grabar" en la barra amarilla de "Ver como cliente" (para grabar mostrándole la app). Usa el mismo grabador (`startRecording` sin guion). Al terminar (`freeRecSheet`): título, "Subir a mi Drive y mandárselo a X" (`frSend` → `clients/{id}/videos/{id}` {title, url, secs, at, seen}), "Solo subir y copiar el link" (`frLink`), descargar o descartar.
 - Cliente: tarjeta "🎥 Tu coach te mandó un video" en el inicio mientras no lo vea (al abrirlo se marca `seen`, salvo en la vista previa del coach) y Más → "Videos de tu coach" (`#videos`).
+- v1.41.1: burbuja de la cámara sin borde rojo (en pantalla y en el video compuesto). Audio del grabador: Opus 96 kbps (antes 64), mono, sin cancelación de eco (no hay llamada), con supresión de ruido y ganancia automática.
 
 ## Gabriel (24-nov) — paso a la app desde cero (primer cliente de solo entrenamiento)
 - "Empezar de cero": semana 1 desde lun 23-nov (semanas lun–dom), usa la app desde mié 25-nov (no tenía registros).

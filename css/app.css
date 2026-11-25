@@ -488,7 +488,7 @@ code { background: var(--surf2); padding: 1px 5px; border-radius: 5px; }
 .recbar .rb { background: transparent; border: 0; color: #fff; font: inherit; padding: 5px 8px; border-radius: 8px; cursor: pointer; } .recbar .rb:hover, .recbar .rb.on { background: #333; }
 .recbar .rb.sw i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #666; vertical-align: middle; } .recbar .rb.stop { background: #d1262f; font-weight: 700; } .recbar .rsep { width: 1px; height: 20px; background: #444; }
 .recbub { position: fixed; z-index: 290; width: var(--bs, 200px); height: var(--bs, 200px); cursor: grab; touch-action: none; }
-.recbub .bc { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; border: 4px solid #d1262f; box-shadow: 0 8px 28px rgba(0,0,0,.5); background: #000; }
+.recbub .bc { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; box-shadow: 0 8px 28px rgba(0,0,0,.5); background: #000; } /* sin borde rojo (pedido de Joaquín) */
 .recbub video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; } .recbub.nomirror video { transform: none; }
 .recbub .rz { position: absolute; right: 4%; bottom: 4%; width: 22px; height: 22px; border-radius: 50%; background: #d1262f; border: 2px solid #fff; cursor: nwse-resize; opacity: 0; transition: opacity .15s; } .recbub:hover .rz { opacity: 1; }
 .recdraw { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 280; pointer-events: none; } .recdraw.on { pointer-events: auto; cursor: crosshair; }

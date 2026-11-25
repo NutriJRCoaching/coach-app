@@ -28,7 +28,7 @@ export async function startRecording({ onDone, guideHtml }) {
   document.body.classList.add("rec-on"); // oculta los otros clientes, tus pendientes y el preanálisis de la página
   stageUI(guideHtml);
   let screen, cam;
-  try { cam = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 480, facingMode: "user" }, audio: { echoCancellation: true, noiseSuppression: true } }); }
+  try { cam = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 480, facingMode: "user" }, audio: { channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true } }); }
   catch { endUI(); return toast("Necesito permiso para la cámara y el micrófono"); }
   bubble(cam); // tu cara aparece altiro, antes de elegir qué compartir
   try {
@@ -56,13 +56,12 @@ export async function startRecording({ onDone, guideHtml }) {
       if (R?.camOff) return;
       const cw = vc.videoWidth || 480, ch = vc.videoHeight || 480, s2 = Math.min(cw, ch);
       g.save(); g.beginPath(); g.arc(X + D / 2, Y + D / 2, D / 2, 0, Math.PI * 2); g.clip(); if (R?.mirror !== false) { g.translate(X + D, Y); g.scale(-1, 1); } else g.translate(X, Y); g.drawImage(vc, (cw - s2) / 2, (ch - s2) / 2, s2, s2, 0, 0, D, D); g.restore();
-      g.beginPath(); g.arc(X + D / 2, Y + D / 2, D / 2, 0, Math.PI * 2); g.lineWidth = 5; g.strokeStyle = "#d1262f"; g.stroke();
     });
     videoTrack = cv.captureStream(30).getVideoTracks()[0];
   }
   const out = new MediaStream([videoTrack, ...cam.getAudioTracks()]);
   const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
-  const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 64_000 });
+  const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 96_000 });
   const chunks = []; rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   R = { rec, chunks, t0: Date.now(), paused: 0, pausedAt: 0, transcript: "", interim: "", cues: [], marks: [], uStart: null, mirror: LS.get("bubMirror") !== "0", onDone, cam, color: "#ef4444", stopAll: () => { stopTick(); screen.getTracks().forEach((t) => t.stop()); cam.getTracks().forEach((t) => t.stop()); } };
   vt.onended = () => stopRecording(); // si toca "Dejar de compartir" en Chrome
