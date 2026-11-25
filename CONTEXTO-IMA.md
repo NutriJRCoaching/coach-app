@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.40.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.40.2**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -441,6 +441,8 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - Ya tenía el plan de Mantención (4 alternativas, metas 2617 kcal · C 350 · L 76 · P 133, nota "todas llevan 20 g de chía"). Pendiente de Joaquín: darle acceso (Datos y objetivos), armar el día con legumbres como opción propia y revisar los avisos del plan (Alternativa 4: lípidos −9; porciones distintas a la pauta en Alt. 1–3).
 
 - v1.40.1: panel del coach para solo entrenamiento sin nada de plan ni etapas: sin pestañas Etapas ni Plan alimentación, sin etapa en la cabecera, Timeline semanal con el calendario sin etapas, tabla de semanas con "Objetivo" (de su calculadora) en vez de "Etapa" (también en el Timeline del cliente), y en Datos sin selector de etapa, link al PDF ni pauta ("Indicaciones de alimentación" las ve en su calculadora). Campana: gris "Aún no calcula sus macros".
+
+- v1.40.2: campana: "Le toca pagar el …" y "Hoy le toca pagar" pasan a gris (dato); solo el pago vencido queda en rojo. Calculadora: fecha de nacimiento y estatura NO se prellenan con la ficha (son aproximadas): las llena el cliente; sexo y peso sí.
 
 ## Gabriel (24-nov) — paso a la app desde cero (primer cliente de solo entrenamiento)
 - "Empezar de cero": semana 1 desde lun 23-nov (semanas lun–dom), usa la app desde mié 25-nov (no tenía registros).
