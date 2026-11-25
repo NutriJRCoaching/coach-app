@@ -141,7 +141,7 @@ async function clientPanel(cid, tab, AA) {
   const views = { resumen: tlView, etapas: stagesView, entrenos: trainingView, rutinas: trainingView, comida: foodView, plan: async (c) => { const cc = await planCtx(c); S._coachClient = cc; return menusEditor(cc); }, progreso: progView, checkins: checkinsView, feedback: feedbackView, datos: dataView };
   const weekNav = ["resumen", "entrenos", "comida", "feedback"].includes(tab);
   return `<div class="row between"><h1>${esc(c.name)} <small class="muted">· ${c.service ? esc(SERVICES[c.service]) : "Asesoría sin definir"}${c.startDate ? (appStart(c) > ymd() ? ` · empieza el ${fmtDate(appStart(c))}` : ` · Semana ${now.n}`) : ""}${c.service === "entrenamiento" ? "" : ` · <span style="color:${phaseColor(applyStage(c).phase)}">${esc(applyStage(c).phase || "")}</span>`}</small></h1>
-  <span class="row gap">${recSupported() ? `<button class="btn small" data-a="recFree" data-cid="${cid}" title="Graba un video cuando quieras (pantalla + tu cara) y mándaselo a este cliente">🎥 Grabar video</button>` : ""}<button class="btn small" data-a="previewClient" data-id="${cid}">Ver como cliente</button></span></div>
+  <span class="row gap">${recSupported() ? `<button class="btn small" data-a="recFree" data-cid="${cid}" title="Graba un video cuando quieras (pantalla + tu cara) y mándaselo a este cliente">🎥 Grabar video</button>` : ""}<label class="btn small" title="Mándale un video que ya tienes en el computador (ej. uno que grabaste y descargaste)">⬆ Mandar un video<input type="file" accept="video/*" hidden data-a-change="frFile" data-cid="${cid}"></label><button class="btn small" data-a="previewClient" data-id="${cid}">Ver como cliente</button></span></div>
   ${A.length || info.length ? `<div class="alertbar">${A.map((a) => chip(a, cid)).join("")}${info.map((a) => chip(a, cid)).join("")}</div>` : `<div class="alertbar"><span class="badge g">Todo al día ✓</span></div>`}
   <div class="row between">
   ${weekNav ? `<div class="row gap"><button class="btn small" data-a="cwShift" data-n="-1">‹</button><b>Semana ${w.n}</b> <span class="muted small">${fmtDate(w.first)} – ${fmtDate(w.last)}</span><button class="btn small" data-a="cwShift" data-n="1" ${w.n >= now.n ? "disabled" : ""}>›</button></div>` : "<span></span>"}</div>
@@ -745,6 +745,13 @@ act("recFree", async (el) => {
   const cid = el.dataset.cid || S.preview?.cid || CW?.cid || null;
   await startRecording({ guideHtml: "", onDone: ({ blob, secs }) => { if (FREEREC?.url) URL.revokeObjectURL(FREEREC.url); FREEREC = { cid, blob, secs, url: URL.createObjectURL(blob) }; freeRecSheet(); } });
 });
+// Un video que ya tiene (archivo): mismo flujo; la subida parte con el clic en "Subir…" (si parte sola, Chrome bloquea la ventana de permiso de Drive)
+act("frFile", async (el) => {
+  const f = el.files?.[0]; el.value = ""; if (!f) return;
+  const url = URL.createObjectURL(f), secs = await new Promise((res) => { const v = document.createElement("video"); v.preload = "metadata"; v.onloadedmetadata = () => res(Math.round(isFinite(v.duration) ? v.duration : 0)); v.onerror = () => res(0); v.src = url; });
+  if (FREEREC?.url) URL.revokeObjectURL(FREEREC.url);
+  FREEREC = { cid: el.dataset.cid || CW?.cid || null, blob: f, secs, url, name: f.name }; freeRecSheet();
+});
 async function freeRecSheet() {
   const F = FREEREC; if (!F) return; const c = F.cid ? await getClient(F.cid) : null, first = (c?.name || "").split(" ")[0];
   sheet("Tu grabación", `<video class="setvid" src="${F.url}" controls playsinline style="width:100%;border-radius:12px"></video>
@@ -760,7 +767,7 @@ async function frUpload(name) {
 }
 act("frSend", async () => {
   const c = await getClient(FREEREC.cid), title = ($("#frT")?.value || "Video de tu coach").trim();
-  const url = await frUpload(`${title} · ${c.name} · ${ymd()}.webm`); if (!url) return;
+  const ext = (FREEREC.name || "").match(/\.\w+$/)?.[0] || ".webm", url = await frUpload(`${title} · ${c.name} · ${ymd()}${ext}`); if (!url) return;
   await db.set(`clients/${FREEREC.cid}/videos/${uid()}`, { title, url, secs: FREEREC.secs, at: Date.now(), seen: false });
   closeSheet(); toast(`Listo: se lo mandaste a ${c.name.split(" ")[0]} ✓ (le aparece en su inicio). Lo ves en Retroalimentación → Videos que le mandaste`, 5000); URL.revokeObjectURL(FREEREC.url); FREEREC = null; refresh();
 });
@@ -782,14 +789,18 @@ act("recUpload", async (el) => {
   } catch (e) { toast("No se pudo subir: " + e.message); el.disabled = false; }
 });
 act("vidFile", async (el) => {
-  const f = el.files?.[0]; if (!f) return;
+  const f = el.files?.[0]; el.value = ""; if (!f) return;
   if (!driveReady()) return toast("Falta conectar Google Drive");
+  VIDF = f; const out = $("#upF"); if (out) out.innerHTML = `${esc(f.name)} · ${(f.size / 1048576).toFixed(1)} MB <button class="btn tiny primary" data-a="vidFileGo">Subir a mi Drive</button>`;
+});
+let VIDF = null;
+act("vidFileGo", async () => { // con clic directo, para que Chrome no bloquee la ventana de permiso de Drive
+  const f = VIDF; if (!f) return;
   const c = await getClient(CW.cid), out = $("#upF");
   try {
     const link = await uploadToDrive(f, `Retro ${c.name} · ${f.name}`, (p) => { if (out) out.textContent = `Subiendo… ${Math.round(p * 100)} %`; });
-    $("#fbV").value = link; if (out) out.textContent = "Subido ✓ · el link quedó puesto abajo"; toast("Video subido ✓ · revisa y publica");
+    $("#fbV").value = link; if (out) out.textContent = "Subido ✓ · el link quedó puesto abajo"; toast("Video subido ✓ · revisa y publica"); VIDF = null;
   } catch (e) { toast("No se pudo subir: " + e.message); if (out) out.textContent = ""; }
-  el.value = "";
 });
 act("trPoints", () => {
   const t = ($("#fbTr")?.value || "").trim(); if (!t) return;

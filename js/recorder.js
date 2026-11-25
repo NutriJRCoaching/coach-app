@@ -206,7 +206,10 @@ async function getToken() {
   if (token && Date.now() < tokenExp - 60000) return token;
   await gis();
   return new Promise((res, rej) => {
-    tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CONFIG.googleClientId, scope: "https://www.googleapis.com/auth/drive.file", callback: (r) => { if (r.error) return rej(r); token = r.access_token; tokenExp = Date.now() + r.expires_in * 1000; res(token); } });
+    tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CONFIG.googleClientId, scope: "https://www.googleapis.com/auth/drive.file",
+      // si Chrome bloquea la ventana de permiso o la cierras, avisa en vez de quedarse esperando
+      error_callback: (e) => rej(new Error(e?.type === "popup_failed_to_open" ? "Chrome bloqueó la ventana de permiso de Google Drive: permite ventanas emergentes para esta página (ícono a la derecha de la barra de direcciones) y vuelve a apretar Subir" : e?.type === "popup_closed" ? "Se cerró la ventana de permiso de Google Drive antes de terminar" : "Google Drive no dio permiso")),
+      callback: (r) => { if (r.error) return rej(r); token = r.access_token; tokenExp = Date.now() + r.expires_in * 1000; res(token); } });
     tokenClient.requestAccessToken({ prompt: token ? "" : "consent" });
   });
 }
