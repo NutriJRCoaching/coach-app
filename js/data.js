@@ -31,7 +31,23 @@ export const getClient = async (cid) => (await db.get(C(cid))) || {};
 export const svc = (c) => c?.service || "completa";
 export const feat = (c) => { const s = svc(c); return { plan: s !== "entrenamiento", macroGuide: s === "entrenamiento", coachTrain: s !== "nutricion", selfTrain: s === "nutricion" }; };
 // Guía de macros por kg de peso (solo entrenamiento). ranges = { prot: [1.6, 2.2], fat: [0.8, 1], cho: [3, 5] }
-export const DEFAULT_RANGES = { prot: [1.6, 2.2], fat: [0.7, 1], cho: [3, 5] };
+export const DEFAULT_RANGES = { prot: [1.6, 2.0], fat: [0.8, 1.2], cho: [3, 5] };
+// ---------- Calculadora de requerimientos del cliente (solo entrenamiento): la maneja él (clients/{id}/settings/calc)
+export const ACT_LEVELS = [[1.2, "Sedentario", "Trabajo sentado y menos de 5.000 pasos al día"], [1.375, "Ligero", "5.000–7.500 pasos o entrenas 1–3 días"], [1.55, "Moderado", "7.500–10.000 pasos y entrenas 3–5 días"], [1.725, "Alto", "Más de 10.000 pasos y entrenas 5–6 días"], [1.9, "Muy alto", "Trabajo físico pesado y entrenas casi todos los días"]];
+// Objetivos que puede elegir solo (nada más agresivo que esto sin el coach)
+export const SELF_GOALS = [["mant", "Mantención", 0, "Mantener tu peso y mejorar tu composición con el entrenamiento"], ["defL", "Déficit ligero", -10, "Bajar grasa de a poco (≈ 0,25–0,5 % de tu peso por semana)"], ["defM", "Déficit moderado", -20, "Bajar grasa más rápido (≈ 0,5–1 % de tu peso por semana)"], ["supL", "Superávit ligero", 10, "Ganar músculo con poca grasa (≈ 0,25–0,5 % de tu peso por semana)"]];
+export const ageFrom = (b) => { if (!b) return null; const d = new Date(b + "T12:00"), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n < new Date(n.getFullYear(), d.getMonth(), d.getDate())) a--; return a; };
+// x = { sex, birth, height, kg, act, goal, protKg, fatKg } → mantención (Mifflin-St Jeor × actividad), calorías del objetivo y macros (CHO = el resto)
+export function selfCalc(x) {
+  const age = ageFrom(x.birth), kg = +x.kg, h = +x.height, act = +x.act || 1.375;
+  const miss = [!x.sex && "sexo", !age && "fecha de nacimiento", !h && "estatura", !kg && "peso"].filter(Boolean);
+  if (miss.length) return { miss };
+  const bmr = 10 * kg + 6.25 * h - 5 * age + (x.sex === "F" ? -161 : 5), maint = Math.round((bmr * act) / 10) * 10;
+  const G = SELF_GOALS.find((g) => g[0] === x.goal) || SELF_GOALS[0], kcal = Math.round((maint * (1 + G[2] / 100)) / 10) * 10;
+  const prot = Math.round(kg * +x.protKg), fat = Math.round(kg * +x.fatKg), cho = Math.max(0, Math.round((kcal - prot * 4 - fat * 9) / 4));
+  const pc = (v) => Math.round((v / kcal) * 100);
+  return { age, bmr: Math.round(bmr), maint, kcal, prot, fat, cho, choKg: Math.round((cho / kg) * 10) / 10, pct: { prot: pc(prot * 4), fat: pc(fat * 9), cho: pc(cho * 4) }, goal: G, byGoal: SELF_GOALS.map((g) => [g[0], Math.round((maint * (1 + g[2] / 100)) / 10) * 10]) };
+}
 export function macroGuide(c, kg) {
   const R = { ...DEFAULT_RANGES, ...(c.ranges || {}) }, w = +kg || +c.weightStart || null;
   if (!w) return null;
@@ -93,7 +109,10 @@ function rotationPlan(client, routines, sessions, w, today) {
   let prev = lastDate, ri = order.indexOf(next);
   const ok = (d) => d >= start && d <= w.last && !byDate[d] && (!prev || diffDays(d, prev) >= gap);
   const cand = w.days.filter((d) => d >= start);
-  for (let i = 0; i < cand.length && pick.length < left; i++) {
+  // "Día por medio" (R.everyOther): sin días fijos; cada entreno sugerido al primer día que cumple el descanso, y una vez
+  // cumplido el objetivo de la semana (perWeek = mínimo) siguen sugerencias OPCIONALES día por medio (extra: true)
+  if (R.everyOther) for (const d of cand) { if (!ok(d)) continue; pick.push({ d, rid: order[ri % order.length], sug: true, extra: pick.length >= left }); ri++; prev = d; }
+  else for (let i = 0; i < cand.length && pick.length < left; i++) {
     const d = cand[i]; if (!ok(d)) continue;
     const isSug = sug.includes(new Date(d + "T12:00").getDay());
     // ¿Alcanzan los días que quedan si no entrena este día? (cada entreno necesita "gap" días)
@@ -101,12 +120,12 @@ function rotationPlan(client, routines, sessions, w, today) {
     const fitsLater = (restDays >= 1 ? Math.floor((restDays - 1) / gap) + 1 : 0) >= need;
     if (isSug || !fitsLater || (d === today && !sug.length)) { pick.push({ d, rid: order[ri % order.length], sug: isSug }); ri++; prev = d; }
   }
-  const missing = w.last < from ? 0 : Math.max(0, left - pick.length);
+  const missing = w.last < from ? 0 : Math.max(0, left - pick.filter((x) => !x.extra).length);
   const pmap = Object.fromEntries(pick.map((x) => [x.d, x]));
   const slots = w.days.map((d) => {
     if (byDate[d]) { const s = byDate[d][0]; return { date: d, rid: s.routineId, name: s.routineName || nameOf(s.routineId), status: "hecho", session: s }; }
     const p = pmap[d]; if (!p) return { date: d, rest: true, freeToday: d === today && left > 0 && ok(d) };
-    return { date: d, rid: p.rid, name: nameOf(p.rid), status: d === today ? "hoy" : "proximo", sug: p.sug, rot: true };
+    return { date: d, rid: p.rid, name: nameOf(p.rid), status: d === today ? "hoy" : "proximo", sug: p.sug, rot: true, ...(p.extra ? { extra: true } : {}) };
   });
   const planned = slots.filter((s) => !s.rest);
   return { week: w, slots, planned, doneCount: done.length, rotation: true, perWeek: per, missing, next: { rid: next, name: nameOf(next) }, total: per };
@@ -120,7 +139,7 @@ export function regSoFar(c, w, dayMap, test, today = ymd()) {
 }
 // Entrenamientos que ya correspondían: los del plan menos los que todavía quedan por delante (hoy incluido si no lo ha hecho)
 export function trainSoFar(plan, today = ymd()) {
-  const ahead = (plan.slots || []).filter((s) => !s.rest && s.status !== "hecho" && s.date >= today).length;
+  const ahead = (plan.slots || []).filter((s) => !s.rest && !s.extra && s.status !== "hecho" && s.date >= today).length; // los opcionales no cuentan
   return { done: plan.doneCount || 0, due: Math.max(plan.doneCount || 0, (plan.total || 0) - ahead), total: plan.total || 0 };
 }
 export const hasFood = (d) => Object.values(d?.meals || {}).some((m) => m.length);
@@ -303,7 +322,13 @@ export function stageAt(c, date) {
 // La app muestra el plan de la etapa marcada en el Timeline para esa semana. Si esa etapa no tiene plan, queda el plan general (c.menus…).
 export const phaseAt = (c, date = ymd()) => stageAt(c, date)?.phase || c.phase || null;
 export const hasPlans = (c) => !!c.plans && Object.keys(c.plans).length > 0;
+// Solo entrenamiento: las metas salen de la calculadora del cliente (c.selfCalc = settings/calc, se adjunta al cargar)
 export function applyStage(c, date = ymd()) {
+  const o = applyStage0(c, date), sc = c?.service === "entrenamiento" ? c.selfCalc : null;
+  if (sc && +sc.kcal) { for (const k of ["kcal", "cho", "fat", "prot"]) o[k] = +sc[k]; o.selfGoal = sc.goalName || ""; }
+  return o;
+}
+function applyStage0(c, date = ymd()) {
   const s = stageAt(c, date), ph = s?.phase || c.phase || null, P = ph ? c.plans?.[ph] : null;
   let o = { ...c, phase: ph || c.phase };
   if (P) { o = { ...o, menus: P.menus || [], pauta: P.pauta || {}, pautaLeg: P.pautaLeg || {}, planPhase: ph }; for (const k of ["kcal", "cho", "fat", "prot"]) if (+P.targets?.[k]) o[k] = +P.targets[k]; }
@@ -413,6 +438,8 @@ export const CHECKIN = [
   ] }
 ];
 // Preguntas de versiones anteriores: se siguen mostrando en el panel si un check-in antiguo las tiene
+// Preguntas que solo tienen sentido con un plan de alimentación (solo entrenamiento no tiene plan: registra y compara con sus macros)
+export const PLAN_Q = new Set(["adhPlan", "nutDificil", "nutFacil", "nutMejorar", "fueraPlan"]);
 export const CHECKIN_OLD = { cintura: "Circunferencia de cintura (cm)", momentoDificil: "¿Qué comida o momento del día te costó más?", todos: "¿Hiciste todos los entrenamientos?", progCarga: "¿Hubo progreso de carga/repeticiones?", progTec: "¿Hubo progreso de técnica?", comEnt: "Comentarios de entrenamiento", motivNut: "Motivación para tomar buenas decisiones alimentarias", contribuyen: "¿Las decisiones que tomaste contribuyen a tus objetivos?", comNut: "Comentarios de nutrición", comFreq: "Comentarios de consumo", comRec: "Comentarios de recuperación", dificil: "¿Algo que se te haya dificultado más?", mejorar: "¿Algo que desees mejorar para la semana que viene?", expResp: "Tiempo de respuesta", expServ: "Servicio en general" };
 
 

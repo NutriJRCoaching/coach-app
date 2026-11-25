@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.39.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.40.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -424,6 +424,15 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - En una semana especial, si ese día el cliente hizo OTRA de sus rutinas (siguen todas en "Todas tus rutinas"), cuenta como hecho.
 - Panel → Entrenamiento → Configuración (días fijos): "＋ Calendario distinto solo esta semana" / "＋ Solo la semana N+1" (parte copiando el de siempre), selects por día (`wsSet`) y "Quitar" (`wsDel`, deja `null`). La revisión semanal y "Falta el calendario" siguen mirando el calendario de siempre.
 - Uso: Vicente, semana 1 (23–29 nov) con menos tiempo: rutina "Fullbody (semana con menos tiempo)" mar/jue/dom; sus rutinas oficiales siguen siendo Inferior/Superior desde la semana 2.
+
+## v1.40.0 (24-nov) — Solo entrenamiento revisado con Gabriel
+- **Calculadora de macros del cliente** (`#calc`, "Mi calculadora de macros" en Más; reemplaza "Mi guía de macros"; tarjeta "Calcula tus calorías y macros" en el inicio mientras no la use, y aviso si su peso cambió ≥ 2 kg desde el cálculo). Datos (sexo, nacimiento, estatura, peso = último pesaje, actividad `ACT_LEVELS`) → mantención Mifflin-St Jeor × actividad → objetivo `SELF_GOALS`: Mantención 0 %, Déficit ligero −10 %, Déficit moderado −20 %, Superávit ligero +10 % (nada más agresivo sin el coach) → proteína y grasa en g/kg con flechas de 0,1 dentro de los rangos del coach (`c.ranges`, por defecto P 1,6–2,0 · G 0,8–1,2; `DEFAULT_RANGES`), CHO = el resto, con % de kcal y barra; consejo de priorizar carbohidratos. Se guarda en `clients/{id}/settings/calc` (el cliente no puede escribir su ficha). `selfCalc(x)` en data.js.
+- **Metas**: `applyStage` (ahora envuelve a `applyStage0`) usa `c.selfCalc` en solo entrenamiento: kcal/CHO/grasa/proteína de su cálculo mandan sobre las de la ficha y las etapas. `selfCalc` se adjunta en clientView (cliente), clientPanel (coach) y loadCtx (alertas). Pasos y agua los sigue fijando el coach.
+- Panel → Datos (solo entrenamiento): resumen de su cálculo y rangos sugeridos de proteína y grasa (se quitó el de CHO).
+- **Digestión** en el inicio también para solo entrenamiento (`home_digest` por defecto en los 3 servicios; si en Biblioteca → Servicios estaba desmarcado, manda la casilla).
+- **Rotación "día por medio"** (`rotation.everyOther`, casilla en Configuración; fija minRest 1): sin días fijos; cada entreno sugerido al primer día que respeta el descanso; `perWeek` = objetivo mínimo; cumplido el objetivo siguen sugerencias **opcionales** (`slot.extra`, badge "Opcional", no cuentan para adherencia ni `missing`).
+- **Timeline del cliente** (solo entrenamiento): sin calendario nutricional ni etapa; tarjeta "Tu objetivo" con lo de su calculadora.
+- **Check-in**: sin plan de alimentación se ocultan `PLAN_Q` (adhPlan, nutDificil, nutFacil, nutMejorar, fueraPlan); se mantiene la tendencia de consumo, hambre, saciedad y antojos.
 
 ## Vicente (23-nov) — paso a la app desde cero
 - Planilla: "Coaching - Vicente Núñez" (leída con el navegador integrado vía gviz CSV: Registro Entrenamiento + Programa y Tips).

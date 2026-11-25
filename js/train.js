@@ -33,13 +33,13 @@ export async function trainView() {
   const day = (d) => { const dt = parseYmd(d); return `<span class="sd2"><b>${D3[dt.getDay()]}</b>${dt.getDate()}</span>`; };
   return `${head("Entrenamiento")}
   <div class="card"><div class="row between"><div><div class="card-t" style="margin:0">Semana ${plan.week.n}</div><div class="muted small">${fmtDate(plan.week.first)} – ${fmtDate(plan.week.last)}</div></div><div class="big">${plan.doneCount}<small>/${plan.total}</small></div></div>
-  <div class="progress"><i style="width:${plan.total ? (plan.doneCount / plan.total) * 100 : 0}%"></i></div></div>
+  <div class="progress"><i style="width:${plan.total ? Math.min(100, (plan.doneCount / plan.total) * 100) : 0}%"></i></div></div>
   ${cur ? `<div class="card row between" style="border-color:var(--acc)"><span><small class="muted">Sesión en curso${cur.date !== today ? " · desde el " + fmtDate(cur.date) : ""}</small><br><b>${esc(cur.routineName)}</b></span><span class="row gap"><button class="btn tiny ghost" data-a="discardById" data-id="${cur.id}">Descartar</button><a class="btn primary small" href="#sesion/${cur.id}">Continuar</a></span></div>` : ""}
   ${changed.length ? `<div class="card mod"><b>Esta semana hubo modificaciones en tu rutina</b><ul>${changed.flatMap((r) => (r.changes.list || []).map((x) => `<li><b>${esc(r.name)}:</b> ${esc(x)}</li>`)).join("")}</ul></div>` : ""}
   ${plan.rotation ? rotCard(plan, today) : ""}
   <div class="slots">${plan.slots.map((s) => s.rest
     ? `<div class="slot rest ${s.date === today ? "today" : ""}">${day(s.date)}<span class="rest-t">${s.date === today ? "Hoy · " : ""}Descanso${s.freeToday ? " <small>(puedes entrenar si quieres)</small>" : ""}</span>${s.freeToday && plan.next ? `<button class="btn tiny" data-a="startRoutine" data-r="${plan.next.rid}">Empezar</button>` : ""}</div>`
-    : `<div class="slot ${s.status}">${day(s.date)}<span class="grow"><b>${esc(s.name)}</b><span class="badge ${s.status}${s.rot && s.status === "proximo" ? " sugd" : ""}">${s.rot && s.status === "proximo" ? (s.sug ? "Sugerido" : "Para completar") : STATUS[s.status]}</span></span>
+    : `<div class="slot ${s.status}">${day(s.date)}<span class="grow"><b>${esc(s.name)}</b><span class="badge ${s.status}${s.rot && s.status === "proximo" ? " sugd" : ""}">${s.extra && s.status !== "hecho" ? "Opcional" : s.rot && s.status === "proximo" ? (s.sug ? "Sugerido" : "Para completar") : STATUS[s.status]}</span></span>
       ${s.status === "hecho" ? `<a class="btn tiny" href="#resumen/${s.session.id}">Ver</a>` : `<span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${s.rid}">Ver</button><button class="btn tiny ${s.status === "hoy" || s.status === "atrasado" ? "primary" : ""}" data-a="startRoutine" data-r="${s.rid}">Empezar</button></span>`}</div>`).join("")}</div>
   ${has("train_self")
     ? `<div class="card"><div class="card-t">Mis rutinas</div><p class="muted small">Tu asesoría es de nutrición: tú diseñas tus rutinas con los ejercicios de la biblioteca y sus tips. Elige qué días toca cada una y registra tus entrenamientos aquí.</p>
@@ -50,13 +50,13 @@ export async function trainView() {
 // Rotación (ej. Fullbody A/B sin días fijos): qué le toca la próxima vez y la regla de descanso
 function rotCard(plan, today) {
   const R = S.client.rotation || {}, gap = +R.minRest || 1, left = plan.total - plan.doneCount;
-  const sugDays = (R.days || []).map(Number).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => D3[d]).join(", ");
+  const sugDays = R.everyOther ? "" : (R.days || []).map(Number).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => D3[d]).join(", ");
   const nextSlot = plan.slots.find((x) => !x.rest && (x.status === "hoy" || x.status === "proximo"));
   const canToday = plan.slots.some((x) => x.date === today && (x.status === "hoy" || x.freeToday));
   return `<div class="card rotnext"><div class="row between"><div><small class="muted">${left > 0 ? "Próximo entrenamiento" : "Semana completa ✓ · el próximo"}</small><div class="big2">${esc(plan.next?.name || "")}</div>
-    <small class="muted">${left > 0 ? (nextSlot ? (nextSlot.date === today ? "Te toca hoy" : `Sugerido: ${fmtDate(nextSlot.date, true)}`) : "") : "La próxima semana sigues con esta"}</small></div>
+    <small class="muted">${left > 0 ? (nextSlot ? (nextSlot.date === today ? "Te toca hoy" : `Sugerido: ${fmtDate(nextSlot.date, true)}`) : "") : nextSlot ? `Ya cumpliste tu objetivo. Si quieres entrenar más: ${nextSlot.date === today ? "hoy" : fmtDate(nextSlot.date, true)} (opcional)` : "La próxima semana sigues con esta"}</small></div>
     ${canToday && plan.next && !plan.slots.some((x) => x.date === today && x.status === "hecho") ? `<button class="btn primary small" data-a="startRoutine" data-r="${plan.next.rid}">Empezar</button>` : ""}</div>
-    <p class="small muted mt">Alternas tus rutinas en orden: te toca la contraria de la última que hiciste. ${plan.total} por semana${sugDays ? `, idealmente ${sugDays}` : ""}, con al menos ${gap} día${gap > 1 ? "s" : ""} de descanso entre entrenamientos. Si te saltas un día, los que quedan se corren solos.</p>
+    <p class="small muted mt">${R.everyOther ? `Alternas tus rutinas en orden: te toca la contraria de la última que hiciste. Tu objetivo es entrenar <b>al menos ${plan.total} veces por semana</b>, idealmente día por medio. Puedes hacer más: los días marcados “Opcional” también sirven. Si te saltas un día, la sugerencia se corre sola.` : `Alternas tus rutinas en orden: te toca la contraria de la última que hiciste. ${plan.total} por semana${sugDays ? `, idealmente ${sugDays}` : ""}, con al menos ${gap} día${gap > 1 ? "s" : ""} de descanso entre entrenamientos. Si te saltas un día, los que quedan se corren solos.`}</p>
     ${plan.missing ? `<p class="small red">Te ${plan.missing > 1 ? "faltan" : "falta"} ${plan.missing} entrenamiento${plan.missing > 1 ? "s" : ""} y ya no alcanzan los días con descanso entremedio. Habla con tu coach.</p>` : ""}</div>`;
 }
 // ---------- Solo nutrición: el cliente arma sus propias rutinas

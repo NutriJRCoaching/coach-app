@@ -13,7 +13,7 @@ export const FEATURES = [
   ["Inicio", "home_sleep", "Sueño", "Hora de acostarse, despertar y calidad", T],
   ["Inicio", "home_weight", "Peso corporal", "Pesaje en ayunas y tendencia", T],
   ["Inicio", "home_cardio", "Cardio", "Sesiones de cardio de la semana", T],
-  ["Inicio", "home_digest", "Digestión", "Deposiciones y molestias", N],
+  ["Inicio", "home_digest", "Digestión", "Deposiciones y molestias", T],
   ["Inicio", "home_train", "Entrenamiento del día", "Qué rutina toca hoy", T],
   ["Inicio", "feedback", "Retroalimentación del coach", "Respuesta al check-in con puntos clave y video", T],
   ["Alimentación", "food_log", "Registro de comidas", "Buscador, código de barras, voz, fotos de comida", T],

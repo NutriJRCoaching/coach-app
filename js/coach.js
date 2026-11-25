@@ -129,6 +129,7 @@ act("copyInv", () => { navigator.clipboard.writeText($("#inv").innerText); toast
 // ================================================================ PANEL DE UN CLIENTE
 async function clientPanel(cid, tab, AA) {
   const c = { id: cid, ...(await getClient(cid)) };
+  if (c.service === "entrenamiento") c.selfCalc = await db.get(`clients/${cid}/settings/calc`).catch(() => null); // sus metas salen de su calculadora
   if (tab === "entrenos") db.set("clients/" + cid, { seen: { ...(c.seen || {}), entrenos: Date.now() } });
   // Adelanta en segundo plano lo que usan las otras pestañas, así cambiar de pestaña es instantáneo
   if (PF !== cid) { PF = cid; ["routines", "sessions", "days", "checkins", "feedbacks", "measures", "exnotes"].forEach((x) => db.list(`clients/${cid}/${x}`).catch(() => {})); db.get("library/exercises").catch(() => {}); }
@@ -320,9 +321,10 @@ function schedCfg(c, routines, sessions, sched) {
     <div><div class="small muted">Orden de la rotación</div><ol class="rot-order">${order.map((id, i) => `<li><b>${i + 1}. ${nm(id)}</b><span class="row gap"><button class="btn tiny ghost" data-a="rotMove" data-i="${i}" data-d="-1" ${i ? "" : "disabled"}>▲</button><button class="btn tiny ghost" data-a="rotMove" data-i="${i}" data-d="1" ${i < order.length - 1 ? "" : "disabled"}>▼</button><button class="btn tiny ghost" data-a="rotDel" data-i="${i}" title="Sacar de la rotación">✕</button></span></li>`).join("")}</ol>
       ${rest.length ? `<select data-a-change="rotAdd"><option value="">＋ Agregar rutina…</option>${rest.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select>` : ""}
       ${nx ? `<p class="small">Próximo entrenamiento: <b>${nm(nx.rid)}</b>${nx.lastDate ? ` <span class="muted">(el último fue el ${fmtDate(nx.lastDate)})</span>` : ` <span class="muted">(aún no entrena: parte con la primera)</span>`}</p>` : `<p class="small muted">Agrega al menos una rutina.</p>`}</div>
-    <div class="rot-nums"><label>Entrenamientos por semana<input type="number" min="1" max="7" value="${R.perWeek}" data-a-change="rotSet" data-k="perWeek"></label>
+    <div class="rot-nums"><label>${R.everyOther ? "Objetivo mínimo por semana (puede hacer más)" : "Entrenamientos por semana"}<input type="number" min="1" max="7" value="${R.perWeek}" data-a-change="rotSet" data-k="perWeek"></label>
       <label>Días de descanso mínimo entre entrenos<input type="number" min="0" max="3" value="${R.minRest}" data-a-change="rotSet" data-k="minRest"></label></div>
-    <div class="small">Días sugeridos: ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="ck"><input type="checkbox" ${R.days.map(Number).includes(d) ? "checked" : ""} data-a-change="rotDay" data-d="${d}">${DAYS[d].slice(0, 3)}</label>`).join("")}
+    <label class="chk"><input type="checkbox" ${R.everyOther ? "checked" : ""} data-a-change="rotEO"> Sugerir día por medio, sin días fijos (al cumplir el objetivo siguen sugerencias opcionales)</label>
+    <div class="small" ${R.everyOther ? "hidden" : ""}>Días sugeridos: ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="ck"><input type="checkbox" ${R.days.map(Number).includes(d) ? "checked" : ""} data-a-change="rotDay" data-d="${d}">${DAYS[d].slice(0, 3)}</label>`).join("")}
       <p class="muted small">Si se salta un día sugerido, la app le corre los que quedan (respetando el descanso) y le avisa si ya no alcanzan los días de la semana.</p></div></div>`;
 }
 async function rotSave(patch) { const c = await getClient(CW.cid); await db.set("clients/" + CW.cid, { rotation: { ...ROT_DEF, ...(c.rotation || {}), ...patch } }); resetAlerts(); refresh(); }
@@ -332,6 +334,7 @@ act("tMode", async (el) => {
   else { await rotSave({ on: false }); toast("Días fijos: elige qué rutina toca cada día"); }
 });
 act("rotMove", async (el) => { const c = await getClient(CW.cid), o = [...(c.rotation?.order || [])], i = +el.dataset.i, j = i + +el.dataset.d; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; await rotSave({ order: o }); });
+act("rotEO", async (el) => { await rotSave({ everyOther: el.checked, ...(el.checked ? { minRest: 1 } : {}) }); toast(el.checked ? "Día por medio: sin días fijos" : "Vuelven los días sugeridos"); });
 act("rotDel", async (el) => { const c = await getClient(CW.cid), o = [...(c.rotation?.order || [])]; o.splice(+el.dataset.i, 1); await rotSave({ order: o }); });
 act("rotAdd", async (el) => { if (!el.value) return; const c = await getClient(CW.cid); await rotSave({ order: [...(c.rotation?.order || []), el.value] }); });
 act("rotSet", async (el) => { const k = el.dataset.k, v = Math.max(k === "perWeek" ? 1 : 0, Math.min(k === "perWeek" ? 7 : 3, +el.value || 0)); await rotSave({ [k]: v }); toast("Guardado"); });
@@ -799,8 +802,10 @@ async function dataView(c) {
   <p class="muted small">Agua: si la dejas en blanco es <b>automática</b> (40 ml por kg del último peso registrado): hoy sería <b id="wSug">—</b>.</p>
   <div class="card-t mt">Plan de alimentación</div><label>Link al PDF del plan (respaldo en Drive; el plan se arma en “Plan alimentación”)<input name="planUrl" value="${esc(c.plan?.pdfUrl || "")}"></label>
   <label>Indicaciones del plan (las ve el cliente abajo de su plan; déjalo vacío para no mostrar nada)<textarea name="planNotes" rows="2">${esc(c.plan?.notes || "")}</textarea></label>
-  ${c.service === "entrenamiento" ? `<div class="card-t mt">Guía de macros (solo entrenamiento · el cliente ve rangos en vez de un plan)</div><p class="muted small">Gramos por kg de peso. Si dejas en blanco calorías y macros de arriba, su meta diaria es el punto medio de estos rangos.</p>
-  <div class="grid3">${[["prot", "Proteína"], ["cho", "Carbohidratos"], ["fat", "Grasas"]].map(([k, l]) => { const v = c.ranges?.[k] || DEFAULT_RANGES[k]; return `<label>${l} (g/kg)<span class="row gap"><input type="number" step="0.1" data-rng="${k}" data-i="0" value="${v[0]}"><span>a</span><input type="number" step="0.1" data-rng="${k}" data-i="1" value="${v[1]}"></span></label>`; }).join("")}</div>` : ""}
+  ${c.service === "entrenamiento" ? `<div class="card-t mt">Calculadora de macros del cliente (solo entrenamiento)</div>
+  ${c.selfCalc?.kcal ? `<p class="small">Su cálculo (${fmtDate(ymd(new Date(c.selfCalc.at)))}, ${String(c.selfCalc.kg).replace(".", ",")} kg): <b>${esc(c.selfCalc.goalName || "")}</b> · mantención ${c.selfCalc.maint} kcal → <b>${c.selfCalc.kcal} kcal</b> · P ${c.selfCalc.prot} g (${String(c.selfCalc.protKg).replace(".", ",")} g/kg) · G ${c.selfCalc.fat} g (${String(c.selfCalc.fatKg).replace(".", ",")} g/kg) · C ${c.selfCalc.cho} g. <b>Estas son sus metas</b> (mandan sobre calorías y macros de arriba).</p>` : `<p class="small muted">Aún no usa su calculadora: mientras, su meta es la de arriba o el punto medio de los rangos.</p>`}
+  <p class="muted small">Rangos sugeridos que puede mover con las flechas (g por kg de peso). Los carbohidratos son el resto.</p>
+  <div class="grid3">${[["prot", "Proteína"], ["fat", "Grasas"]].map(([k, l]) => { const v = c.ranges?.[k] || DEFAULT_RANGES[k]; return `<label>${l} (g/kg)<span class="row gap"><input type="number" step="0.1" data-rng="${k}" data-i="0" value="${v[0]}"><span>a</span><input type="number" step="0.1" data-rng="${k}" data-i="1" value="${v[1]}"></span></label>`; }).join("")}</div>` : ""}
   <details><summary class="card-t">Pauta por porciones (la ve el cliente en su plan · día normal / día con legumbres)</summary><p class="muted small">Si llenas la del día con legumbres, el cliente la ve en “Mi plan” como “Día con legumbres” (o la usa la opción del plan marcada como día con legumbres).</p>
   <table class="tbl"><tr><th>Grupo</th><th>Día normal</th><th>Día con legumbres</th></tr>${Object.entries(GROUPS).filter(([, g]) => g[4]).map(([g]) => `<tr><td>${g}</td><td><input type="number" step="0.25" data-pauta="${esc(g)}" value="${c.pauta?.[g] ?? ""}" style="width:90px"></td><td><input type="number" step="0.25" data-pauta-leg="${esc(g)}" value="${c.pautaLeg?.[g] ?? ""}" style="width:90px"></td></tr>`).join("")}</table></details>
   <div class="card-t mt">Fechas de interés (una por línea: AAAA-MM-DD Texto)</div><textarea name="dates" rows="3">${esc((c.dates || []).map((d) => d.date + " " + d.label).join("\n"))}</textarea>

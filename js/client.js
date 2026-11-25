@@ -5,10 +5,10 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, bar, lineChart, chips, confirmBox, promptBox, notify, $, $$ } from "./ui.js";
 import { diffDays } from "./util.js";
 import { esc, ymd, addDays, fmtDate, weekInfo, dayTotals, itemMacros, sleepHours, sleepColor, r0, r1, num, avg, sum, uid, hm, compressImage, trend, D1, D3, MONTHS, embedUrl, parseYmd, pad, LS } from "./util.js";
-import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, gtxt, regSoFar, hasFood, getFoodBase, getOffCL, foodCheck, foodEmpty, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
+import { mealList, getDay, setDay, getDays, getRoutines, getSessions, weekPlan, appStart, isRotation, ciWeek, gtxt, regSoFar, hasFood, getFoodBase, getOffCL, foodCheck, foodEmpty, PLAN_Q, MEASURE_ZONES, PHOTO_TYPES, applyStage, stageAt, stagesBar, phaseColor, monthCal, CHECKIN } from "./data.js";
 import { trainView, sessionView, surveyView, summaryView, restBar } from "./train.js";
 import { I } from "./icons.js";
-import { schedFor } from "./data.js";
+import { schedFor, selfCalc, SELF_GOALS, ACT_LEVELS, DEFAULT_RANGES } from "./data.js";
 import { macroGuide, adjTxt, judge, weightCorr, waterAuto, payMsg, payState } from "./data.js";
 import { has, loadMatrix } from "./features.js";
 import { GROUPS } from "./foods.js";
@@ -28,11 +28,14 @@ export function clientTabs() {
 
 export async function clientView() {
   const [r, a] = S.route;
+  // Solo entrenamiento: sus metas salen de su calculadora (settings/calc), que maneja él
+  if (S.raw && (S.raw.service || "") === "entrenamiento") S.raw.selfCalc = await db.get(`${P()}/settings/calc`).catch(() => null);
   S.client = applyStage(S.raw || {}, S.date); // objetivos de la etapa vigente
   await loadMatrix();
   // Agua automática: 40 ml por kg del último peso (si el coach no fijó una meta a mano)
   if (!S.raw?.water && !(S.client.stage?.water)) { const dd = await getDays(addDays(ymd(), -30), ymd()); const kg = Object.keys(dd).sort().map((k) => weightCorr(dd[k])).filter(Boolean).pop() || S.raw?.weightStart; if (kg) S.client.water = waterAuto(kg); }
   S.feat = { macroGuide: has("macro_guide"), selfTrain: has("train_self") };
+  if (S.feat.macroGuide && ["inicio", "", undefined, "calc", "plan"].includes(r)) S.client.lastKg = await lastKg(); // aviso "tu peso cambió desde tu cálculo"
   // Solo entrenamiento: si el coach no fijó metas exactas, las metas del día son el punto medio de su guía de macros
   if (S.feat.macroGuide && !S.client.kcal) { const g = macroGuide(S.client, S.client.weightStart); if (g) Object.assign(S.client, { prot: Math.round((g.prot[0] + g.prot[1]) / 2), fat: Math.round((g.fat[0] + g.fat[1]) / 2), cho: Math.round((g.cho[0] + g.cho[1]) / 2), kcal: Math.round((g.kcal[0] + g.kcal[1]) / 2) }); }
   // Solo nutrición: el calendario sale de los días que el cliente le puso a cada rutina suya
@@ -40,7 +43,7 @@ export async function clientView() {
   if (["inicio", "comida", "agua", "peso", "sueno", undefined, ""].includes(r)) S.rtNames = Object.fromEntries((await getRoutines(S.cid)).map((x) => [x.id, x.name]));
   const views = { inicio: home, comida: food, agua: waterView, entreno: trainView, sesion: () => sessionView(a), encuesta: () => surveyView(a), resumen: () => summaryView(a),
     progreso: progress, timeline: timelineView, peso: weightView, sueno: sleepView, fotos: photosView, medidas: measuresView,
-    mas: more, plan: planView, compras: () => shoppingView(head), checkin: checkinView, guias: guidesView, equipo: equipView, info: infoView, ajustes: settingsView };
+    mas: more, plan: planView, calc: calcView, compras: () => shoppingView(head), checkin: checkinView, guias: guidesView, equipo: equipView, info: infoView, ajustes: settingsView };
   return (views[r] || home)();
 }
 
@@ -98,6 +101,7 @@ async function home() {
   ${date === today && today < appStart(c) ? `<div class="card startcard"><div class="card-t">${I.info}Tu plan parte ${diffDays(appStart(c), today) === 1 ? "mañana" : "el " + fmtDate(appStart(c), true)}</div><p class="small">Ese día empieza tu semana 1. Mientras, puedes recorrer la app: revisa <a href="#plan">Mi plan</a>, tus rutinas en <a href="#entreno">Entreno</a> y ajusta tus recordatorios en Más → Ajustes.</p></div>` : ""}
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
+  ${date === today && has("macro_guide") ? calcHomeCard(c) : ""}
   ${ps === "hoy" ? `<div class="card paycard">${payMsg(c, pay)}</div>` : ""}
   ${ps === "vencido" ? `<div class="card paycard late">${payMsg(c, pay, true)}</div>` : ""}
   ${date === today && has("feedback") && freshFb(c) ? `<a class="card fbmini" href="#progreso"><div class="card-t">${I.info}Tu coach respondió tu check-in · Semana ${+freshFb(c).week.slice(1)}</div><div class="small muted">${freshFb(c).videoUrl ? "Tienes un video nuevo · toca para verlo" : "Toca para ver tu retroalimentación"}</div></a>` : ""}
@@ -851,13 +855,13 @@ act("measureSave", async () => {
 // ================================================================ MÁS
 async function more() {
   return `${head("Más")}<div class="list">
-  ${has("macro_guide") ? `<a href="#plan"><span>Mi guía de macros</span>${I.chev}</a>` : has("plan_menus") || has("plan_pdf") || has("plan_pauta") ? `<a href="#plan"><span>Mi plan de alimentación</span>${I.chev}</a>` : ""}${has("checkin") ? `<a href="#checkin"><span>Check-in semanal</span>${I.chev}</a>` : ""}${has("guides") ? `<a href="#guias"><span>Guías</span>${I.chev}</a>` : ""}${has("equipment") ? `<a href="#equipo"><span>Mi equipamiento</span>${I.chev}</a>` : ""}
+  ${has("macro_guide") ? `<a href="#calc"><span>Mi calculadora de macros</span>${I.chev}</a>` : has("plan_menus") || has("plan_pdf") || has("plan_pauta") ? `<a href="#plan"><span>Mi plan de alimentación</span>${I.chev}</a>` : ""}${has("checkin") ? `<a href="#checkin"><span>Check-in semanal</span>${I.chev}</a>` : ""}${has("guides") ? `<a href="#guias"><span>Guías</span>${I.chev}</a>` : ""}${has("equipment") ? `<a href="#equipo"><span>Mi equipamiento</span>${I.chev}</a>` : ""}
   <a href="#info"><span>Información personal</span>${I.chev}</a><a href="#ajustes"><span>Ajustes</span>${I.chev}</a><a data-a="obOpen"><span>Bienvenida a IMA<small>Cómo funciona la app</small></span>${I.chev}</a>
   ${S.role === "coach" ? `<a data-a="asCoach"><span><b>Volver al panel de coach</b></span>${I.chev}</a>` : ""}<a data-a="logout"><span class="red">Cerrar sesión</span></a></div>
   <p class="muted small center">${navigator.onLine ? "Conectado · todo sincronizado" : "Sin conexión · tus datos se guardan y se suben al volver la señal"}${DEMO ? " · MODO DEMO" : ""}</p>`;
 }
 async function planView() {
-  if (has("macro_guide")) return macroGuideView();
+  if (has("macro_guide")) return calcView();
   const p = has("plan_pdf") ? S.client.plan || {} : {}, opts = has("plan_menus") ? menusHtml(S.client) : "";
   const st = S.client.stage, aj = adjTxt(st?.adj);
   return `${head("Mi plan de alimentación", "mas")}${aj ? `<div class="card fbmini"><div class="card-t">Etapa: ${esc(st.phase)} · semanas ${st.from}–${st.to}</div><div class="small">Tu plan ya viene ajustado para esta etapa: <b>${esc(aj)}</b> porciones al día. Los gramos de abajo ya incluyen el cambio.</div>${st.note ? `<div class="muted small mt">${esc(st.note)}</div>` : ""}</div>` : ""}${opts}
@@ -867,6 +871,62 @@ async function planView() {
   ${has("plan_pauta") && !(S.client.menus || []).length ? legHtml(S.client) : ""}`;
 }
 
+// ---------- Calculadora de macros (solo entrenamiento): la maneja el cliente y sus metas salen de aquí
+// Guarda en clients/{id}/settings/calc: datos, nivel de actividad, objetivo, g/kg de proteína y grasa, y el resultado.
+let CALC = null;
+const lastKg = async () => { const dd = await getDays(addDays(ymd(), -45), ymd()); return Object.keys(dd).sort().map((k) => weightCorr(dd[k])).filter(Boolean).pop() || null; };
+const calcRanges = (c) => ({ prot: (c.ranges?.prot || DEFAULT_RANGES.prot).map(Number), fat: (c.ranges?.fat || DEFAULT_RANGES.fat).map(Number) });
+function calcHomeCard(c) {
+  const sc = c.selfCalc;
+  if (!sc?.kcal) return `<a class="card calccta" href="#calc"><div class="card-t">${I.fire}Calcula tus calorías y macros</div><p class="small">Tu asesoría no tiene plan de alimentación cerrado: con tus datos (peso, estatura, edad y actividad) calculas tus requerimientos, eliges tu objetivo y repartes tus macros. Tus metas del día salen de ahí.</p><span class="btn primary small">Empezar</span></a>`;
+  const kg = c.lastKg, d = kg && sc.kg ? Math.round((kg - sc.kg) * 10) / 10 : 0;
+  return Math.abs(d) >= 2 ? `<a class="card fbmini" href="#calc"><div class="card-t">${I.info}Tu peso cambió ${d > 0 ? "+" : ""}${String(d).replace(".", ",")} kg desde tu cálculo</div><div class="small muted">Toca para recalcular tus macros con tu peso actual.</div></a>` : "";
+}
+async function calcView() {
+  const c = S.client, sv = c.selfCalc || {}, R = calcRanges(c), kg = (await lastKg()) || +sv.kg || +c.weightStart || "";
+  if (!CALC || CALC.cid !== S.cid) CALC = { cid: S.cid, sex: sv.sex || c.sex || "", birth: sv.birth || c.birth || "", height: sv.height || c.height || "", kg: kg || "", act: sv.act || 1.375, goal: sv.goal || "mant", protKg: +sv.protKg || R.prot[0], fatKg: +sv.fatKg || R.fat[0] };
+  if (kg && !CALC.touchedKg) CALC.kg = kg;
+  return `${head("Mi calculadora de macros", "inicio")}
+  <div class="card"><p class="small">Tu asesoría es de <b>entrenamiento</b>: no tienes un plan de alimentación cerrado. Aquí calculas cuánto comer según tus datos y tu objetivo, y repartes tus macros dentro de los rangos que te sugiere tu coach. Lo que guardes pasa a ser tu meta diaria en el inicio y en Comida.</p></div>
+  <div id="calcBox">${calcHtml()}</div>
+  ${c.plan?.notes ? `<div class="card"><div class="card-t">Indicaciones de tu coach</div><div class="pre">${esc(c.plan.notes)}</div></div>` : ""}`;
+}
+function calcHtml() {
+  const x = CALC, c = S.client, R = calcRanges(c), r = selfCalc(x), sv = c.selfCalc, f1 = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+  const step = (k, rg) => `<span class="cstep"><button class="btn tiny" data-a="calcStep" data-k="${k}" data-n="-1" ${x[k] <= rg[0] + 1e-9 ? "disabled" : ""}>◀</button><b>${f1(x[k])}</b><small>g/kg</small><button class="btn tiny" data-a="calcStep" data-k="${k}" data-n="1" ${x[k] >= rg[1] - 1e-9 ? "disabled" : ""}>▶</button></span>`;
+  const dirty = !sv || ["sex", "birth", "height", "act", "goal", "protKg", "fatKg"].some((k) => String(sv[k] ?? "") !== String(x[k] ?? "")) || Math.abs((+sv.kg || 0) - (+x.kg || 0)) >= 0.1;
+  return `<div class="card"><div class="card-t">1 · Tus datos</div><div class="grid2">
+    <label>Sexo<select data-a-change="calcF" data-k="sex"><option value="">—</option><option value="M" ${x.sex === "M" ? "selected" : ""}>Hombre</option><option value="F" ${x.sex === "F" ? "selected" : ""}>Mujer</option></select></label>
+    <label>Fecha de nacimiento${r.age ? ` · ${r.age} años` : ""}<input type="date" value="${esc(x.birth)}" data-a-change="calcF" data-k="birth"></label>
+    <label>Estatura (cm)<input type="number" inputmode="decimal" value="${esc(x.height)}" data-a-change="calcF" data-k="height"></label>
+    <label>Peso (kg)<input type="number" inputmode="decimal" step="0.1" value="${esc(x.kg)}" data-a-change="calcF" data-k="kg"><small class="muted">Se llena con tu último pesaje</small></label></div>
+    <label>Nivel de actividad<select data-a-change="calcF" data-k="act">${ACT_LEVELS.map(([v, l, d]) => `<option value="${v}" ${+x.act === v ? "selected" : ""}>${l} · ${d}</option>`).join("")}</select></label></div>
+  ${r.miss ? `<div class="card"><p class="muted">Para calcular falta: <b>${r.miss.join(", ")}</b>.</p></div>` : `
+  <div class="card"><div class="card-t">2 · Tu objetivo</div><p class="muted small">Tu mantención (lo que gastas en un día normal) es de <b>${r.maint.toLocaleString("es-CL")} kcal</b>. Elige qué quieres hacer:</p>
+    <div class="cgoals">${SELF_GOALS.map(([k, l, pct, d]) => `<button class="cgoal ${x.goal === k ? "on" : ""}" data-a="calcGoal" data-k="${k}"><b>${l}</b><span>${pct ? (pct > 0 ? "+" : "−") + Math.abs(pct) + " %" : "0 %"} · ${r.byGoal.find((g) => g[0] === k)[1].toLocaleString("es-CL")} kcal</span><small>${d}</small></button>`).join("")}</div>
+    <p class="muted small">Para algo más agresivo que esto, conversémoslo antes.</p></div>
+  <div class="card"><div class="card-t">3 · Tus macros · ${r.kcal.toLocaleString("es-CL")} kcal</div>
+    <div class="cmac"><span class="cl" style="color:var(--g)">Proteína</span>${step("protKg", R.prot)}<span class="cv"><b>${r.prot} g</b><small>${r.pct.prot} % kcal</small></span></div>
+    <p class="muted small">Sugerido: ${f1(R.prot[0])} a ${f1(R.prot[1])} g por kg de peso</p>
+    <div class="cmac"><span class="cl" style="color:var(--b)">Grasas</span>${step("fatKg", R.fat)}<span class="cv"><b>${r.fat} g</b><small>${r.pct.fat} % kcal</small></span></div>
+    <p class="muted small">Sugerido: ${f1(R.fat[0])} a ${f1(R.fat[1])} g por kg de peso</p>
+    <div class="cmac"><span class="cl" style="color:var(--y)">Carbohidratos</span><span class="cstep"><b>${f1(r.choKg)}</b><small>g/kg</small></span><span class="cv"><b>${r.cho} g</b><small>${r.pct.cho} % kcal</small></span></div>
+    <p class="muted small">El resto de las calorías. <b>Prioriza la mayor cantidad posible de carbohidratos</b>: son tu combustible para entrenar. Por eso conviene dejar proteína y grasas cerca del mínimo sugerido.</p>
+    <div class="cbar"><i style="width:${r.pct.prot}%;background:var(--g)"></i><i style="width:${r.pct.fat}%;background:var(--b)"></i><i style="width:${Math.max(0, 100 - r.pct.prot - r.pct.fat)}%;background:var(--y)"></i></div>
+    ${r.cho < (+x.kg || 0) * 2 ? `<p class="small red">Te quedan pocos carbohidratos (${f1(r.choKg)} g/kg): baja la proteína o las grasas.</p>` : ""}
+    <button class="btn primary big mt" data-a="calcSave" ${dirty ? "" : "disabled"}>${sv ? (dirty ? "Guardar como mis metas" : "Guardado ✓ · son tus metas actuales") : "Guardar como mis metas"}</button>
+    ${sv?.at ? `<p class="muted small center">Último cálculo: ${fmtDate(ymd(new Date(sv.at)))} con ${f1(+sv.kg)} kg</p>` : ""}</div>`}`;
+}
+const calcDraw = () => { const b = $("#calcBox"); if (b) b.innerHTML = calcHtml(); };
+act("calcF", (el) => { const k = el.dataset.k; CALC[k] = ["height", "kg", "act"].includes(k) ? (el.value === "" ? "" : num(el.value)) : el.value; if (k === "kg") CALC.touchedKg = true; calcDraw(); });
+act("calcGoal", (el) => { CALC.goal = el.dataset.k; calcDraw(); });
+act("calcStep", (el) => { const k = el.dataset.k, R = calcRanges(S.client)[k === "protKg" ? "prot" : "fat"]; CALC[k] = Math.round(Math.min(R[1], Math.max(R[0], CALC[k] + 0.1 * +el.dataset.n)) * 10) / 10; calcDraw(); });
+act("calcSave", async () => {
+  const x = CALC, r = selfCalc(x); if (r.miss) return toast("Faltan datos");
+  const data = { sex: x.sex, birth: x.birth, height: +x.height, kg: +x.kg, act: +x.act, goal: x.goal, goalName: r.goal[1], protKg: x.protKg, fatKg: x.fatKg, maint: r.maint, kcal: r.kcal, prot: r.prot, fat: r.fat, cho: r.cho, at: Date.now() };
+  await db.set(`${P()}/settings/calc`, data); S.raw.selfCalc = data; CALC.touchedKg = false;
+  toast("Listo: estas son tus metas diarias ✓"); refresh();
+});
 // Solo entrenamiento: sin plan de alimentación, con una guía de macros en rangos según su peso
 async function macroGuideView() {
   const days = await getDays(addDays(ymd(), -30), ymd()), kg = Object.keys(days).sort().map((k) => days[k].weight).filter(Boolean).pop() || S.client.weightStart;
@@ -880,7 +940,7 @@ async function macroGuideView() {
 }
 
 // ---------- Check-in semanal (igual al de la planilla)
-let CI = {};
+let CI = {}, hasPlan = true;
 // Resumen del sueño de la semana (de los registros diarios): horas promedio, calidad y cafeína después de las 12
 function sleepSum(days) {
   const v = Object.values(days), hs = v.map((d) => sleepHours(d.sleep)).filter((x) => x != null), qs = v.map((d) => d.sleep?.quality).filter(Boolean), cf = v.filter((d) => d.cafPM === true || d.cafPM === 1).length, cfn = v.filter((d) => d.cafPM != null).length;
@@ -918,13 +978,14 @@ async function checkinView() {
   <p class="muted small center">${fmtDate(d0)} – ${fmtDate(w.last)}${saved.at ? " · enviado ✓ (puedes actualizarlo)" : ""}</p>
   ${prevFoco ? `<div class="ci-sec ci-open"><h3>Tu foco de la semana pasada</h3><div class="note"><b>${esc(prevFoco)}</b></div>
     ${q(["accion", "¿Cómo te fue?", ["Lo logré", "A medias", "No lo logré"]])}${q(["accionDet", "¿Qué te ayudó o qué te lo impidió?", "text"])}</div>` : ""}
-  ${CHECKIN.map((sec) => `<div class="ci-sec ${sec.open ? "ci-open" : ""}"><h3>${esc(sec.t)}</h3>
+  ${(() => { hasPlan = has("plan_menus") || has("plan_pdf") || has("plan_pauta"); return ""; })()}${CHECKIN.map((sec) => `<div class="ci-sec ${sec.open ? "ci-open" : ""}"><h3>${esc(sec.t)}</h3>
     ${sec.open ? `<p class="muted small">Tómate un par de minutos en estas: son las que más me sirven para ajustar tu plan.</p>` : ""}
     ${sec.t === "Entrenamiento" && tp.total ? `<div class="ci-q"><div>Entrenamientos de la semana</div><b>${tp.doneCount} de ${tp.total}</b></div>` : ""}
     ${sec.t === "Nutrición" ? `<div class="ci-q"><div>¿Cuántos días registraste tu alimentación en la app?</div><b>${regDays} de ${nDays}</b></div>` : ""}
     ${sec.t === "Digestión" && dep != null ? `<div class="note">Según tus registros diarios: ${r1(dep)} deposiciones por día en promedio.</div>` : ""}
     ${sec.sleep ? sleepSum(days) : ""}
-    ${sec.q.map(q).join("")}
+    ${sec.q.filter((x) => hasPlan || !PLAN_Q.has(x[0])).map(q).join("")}
+    ${sec.t === "Nutrición" && !hasPlan ? `<p class="muted small">Tu asesoría no tiene plan de alimentación: lo que registras en la app se compara con los macros de tu calculadora.</p>` : ""}
     ${sec.t === "Nutrición" && S.client.sex === "F" ? q(["ciclo", "¿Estás en tu ciclo menstrual?", ["Sí", "No"]]) : ""}</div>`).join("")}
   <div class="pad-x"><button class="btn primary big" data-a="ciSave">${saved.at ? "Actualizar" : "Enviar"} check-in</button></div>`;
 }
@@ -1180,9 +1241,10 @@ async function timelineView() {
   const next = st.find((s) => +s.from > cur.n), curStage = stageAt(raw, today);
   const dates = (raw.dates || []).filter((d) => d.date >= today);
   return `${head("Timeline", "progreso")}
-  <div class="card"><div class="card-t">Calendario nutricional</div>${monthCal(raw, { month: TLM.m || today.slice(0, 7), nav: "tlMonth" })}
+  ${has("macro_guide") ? (() => { const sc = raw.selfCalc; return `<a class="card" href="#calc"><div class="card-t">Tu objetivo</div>${sc?.kcal ? `<b>${esc(sc.goalName || "")}</b> · ${(+sc.kcal).toLocaleString("es-CL")} kcal · P ${sc.prot} · G ${sc.fat} · C ${sc.cho} g<div class="muted small">Lo eliges tú en tu calculadora de macros · toca para ajustarlo</div>` : `<span class="muted small">Aún no calculas tus macros: toca para hacerlo.</span>`}</a>`; })()
+  : `<div class="card"><div class="card-t">Calendario nutricional</div>${monthCal(raw, { month: TLM.m || today.slice(0, 7), nav: "tlMonth" })}
   ${curStage ? `<div class="note"><b style="color:${phaseColor(curStage.phase)}">${esc(curStage.phase)}</b> · semanas ${curStage.from} a ${curStage.to}${curStage.note ? ` · ${esc(curStage.note)}` : ""}</div>` : ""}
-  ${next ? `<div class="small muted">Próxima etapa: <b style="color:${phaseColor(next.phase)}">${esc(next.phase)}</b> desde la semana ${next.from}</div>` : ""}</div>
+  ${next ? `<div class="small muted">Próxima etapa: <b style="color:${phaseColor(next.phase)}">${esc(next.phase)}</b> desde la semana ${next.from}</div>` : ""}</div>`}
   <div class="card" style="padding:8px">${weeksTable(raw, days, routines, sessions, today)}</div>
   ${dates.length ? `<div class="card"><div class="card-t">Fechas de interés</div>${dates.map((d) => `<div class="li"><b>${fmtDate(d.date)}</b> · ${esc(d.label)}</div>`).join("")}</div>` : ""}`;
 }

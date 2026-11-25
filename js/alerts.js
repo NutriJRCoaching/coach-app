@@ -15,6 +15,7 @@ export const emailKey = (e) => String(e || "").trim().toLowerCase();
 // Carga lo necesario para revisar a un cliente
 export async function loadCtx(c) {
   const today = ymd();
+  if (c.service === "entrenamiento" && c.selfCalc === undefined) c.selfCalc = await db.get(`clients/${c.id}/settings/calc`).catch(() => null);
   const [routines, sessions, days, checkins, feedbacks, fbreplies, access, onb] = await Promise.all([
     getRoutines(c.id), getSessions(c.id), getDays([addDays(today, -6), c.startDate ? weekInfo(c, today).first : today].sort()[0], today, c.id),
     db.list(`clients/${c.id}/checkins`), db.list(`clients/${c.id}/feedbacks`), db.list(`clients/${c.id}/fbreplies`),
