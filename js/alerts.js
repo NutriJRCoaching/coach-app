@@ -130,7 +130,7 @@ export function alertsFor(c, x) {
   }
   // Cumpleaños (aviso el día antes y el mismo día) y pagos
   if (c.birth) { const md = c.birth.slice(5), tm = addDays(today, 1).slice(5); if (md === today.slice(5)) add("y", "🎂 Hoy está de cumpleaños"); else if (md === tm) add("y", "🎂 Mañana está de cumpleaños"); }
-  if (c.payDate) { const ps = payState(c, today); if (ps === "vencido") add("r", `Pago vencido desde el ${fmtDate(c.payDate)}${c.payGrace ? ` (plazo hasta el ${fmtDate(c.payGrace)})` : ""}`); else if (ps === "hoy") add("i", "Hoy le toca pagar"); else if (ps === "pronto") add("i", `Le toca pagar el ${fmtDate(c.payDate)}`); // dato, no pendiente: solo el pago vencido pide que hagas algo else if (ps === "pospuesto") add("i", `Pago del ${fmtDate(c.payDate)} pospuesto hasta el ${fmtDate(c.payGrace)}`); }
+  if (c.payDate) { const ps = payState(c, today); if (ps === "vencido") add("r", `Pago vencido desde el ${fmtDate(c.payDate)}${c.payGrace ? ` (plazo hasta el ${fmtDate(c.payGrace)})` : ""}`); else if (ps === "hoy") add("i", "Hoy le toca pagar"); else if (ps === "pronto") add("i", `Le toca pagar el ${fmtDate(c.payDate)}`); else if (ps === "pospuesto") add("i", `Pago del ${fmtDate(c.payDate)} pospuesto hasta el ${fmtDate(c.payGrace)}`); } // pago próximo u hoy: dato (gris); solo el vencido pide que hagas algo
   // Pendientes anotados a mano ("!" al inicio = urgente)
   (c.todo || []).forEach((t) => { const u = t.startsWith("!"); add(u ? "r" : "y", u ? t.slice(1).trim() : t); });
 

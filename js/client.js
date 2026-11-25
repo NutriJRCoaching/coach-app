@@ -884,7 +884,7 @@ function calcHomeCard(c) {
 }
 async function calcView() {
   const c = S.client, sv = c.selfCalc || {}, R = calcRanges(c), kg = (await lastKg()) || +sv.kg || +c.weightStart || "";
-  if (!CALC || CALC.cid !== S.cid) CALC = { cid: S.cid, sex: sv.sex || c.sex || "", birth: sv.birth || "", height: sv.height || "", // nacimiento y estatura los llena él (los de la ficha son aproximados) kg: kg || "", act: sv.act || 1.375, goal: sv.goal || "mant", protKg: +sv.protKg || R.prot[0], fatKg: +sv.fatKg || R.fat[0] };
+  if (!CALC || CALC.cid !== S.cid) CALC = { cid: S.cid, sex: sv.sex || c.sex || "", birth: sv.birth || "", height: sv.height || "", kg: kg || "", act: sv.act || 1.375, goal: sv.goal || "mant", protKg: +sv.protKg || R.prot[0], fatKg: +sv.fatKg || R.fat[0] }; // nacimiento y estatura los llena él (los de la ficha son aproximados)
   if (kg && !CALC.touchedKg) CALC.kg = kg;
   return `${head("Mi calculadora de macros", "inicio")}
   <div class="card"><p class="small">Tu asesoría es de <b>entrenamiento</b>: no tienes un plan de alimentación cerrado. Aquí calculas cuánto comer según tus datos y tu objetivo, y repartes tus macros dentro de los rangos que te sugiere tu coach. Lo que guardes pasa a ser tu meta diaria en el inicio y en Comida.</p></div>
