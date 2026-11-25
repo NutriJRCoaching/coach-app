@@ -29,10 +29,10 @@ export const CONFIG = {
   // los videos de retroalimentación a tu Google Drive. Es público por diseño (no es una clave secreta).
   googleClientId: "568231927832-vdnq93d4q00s7cdoanvol6dk1i6lgp26.apps.googleusercontent.com",
   // Clave de API SOLO para Google Drive (restringida a nutrijrcoaching.github.io): permite ver los videos de Drive con el reproductor propio (velocidad 1x–2x). Vacía = reproductor de Drive.
-  driveKey: "",
+  driveKey: "AIzaSyC0gxQEuNGIOa6q-vw-qn4FzyewcSH1IfI",
   // Clave pública para avisos con la app cerrada (Firebase → Configuración → Cloud Messaging → Certificados web push)
   vapidKey: "BM_EJh8lKa6m4CNrG7l_Z7OIh8eGAr2MwJLrKfq0OrEVEGtAVNvedfJCGx4en_4zGRU-X8VI0s0jI0ORUyKsiJM",
-  appVersion: "1.43.0",
+  appVersion: "1.43.1",
 
   // Tiempos de comida
   meals: ["Comida 1", "Comida 2", "Comida 3", "Comida 4", "Comida 5"],
