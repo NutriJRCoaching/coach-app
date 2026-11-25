@@ -28,7 +28,7 @@ export async function startRecording({ onDone, guideHtml }) {
   document.body.classList.add("rec-on"); // oculta los otros clientes, tus pendientes y el preanálisis de la página
   stageUI(guideHtml);
   let screen, cam;
-  try { cam = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 480, facingMode: "user" }, audio: { channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true } }); }
+  try { cam = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 720 }, height: { ideal: 720 }, facingMode: "user" }, audio: { channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true } }); }
   catch { endUI(); return toast("Necesito permiso para la cámara y el micrófono"); }
   bubble(cam); // tu cara aparece altiro, antes de elegir qué compartir
   try {
@@ -40,14 +40,14 @@ export async function startRecording({ onDone, guideHtml }) {
     // Grabando esta pestaña: la burbuja y los dibujos son parte de la página, así que salen tal cual los ves.
     // Se recorta al escenario para que tus botones y el guion no aparezcan.
     try { if (window.CropTarget && vt.cropTo) await vt.cropTo(await CropTarget.fromElement($("#recstage"))); } catch (e) { console.warn("Sin recorte", e); }
-    try { await vt.applyConstraints({ height: { max: 720 }, frameRate: 30 }); } catch {}
+    try { await vt.applyConstraints({ height: { max: 1080 }, frameRate: 30 }); } catch {}
     videoTrack = vt;
   } else {
     // Grabando una ventana o la pantalla completa: se arma el video con la burbuja abajo a la izquierda
     const vs = Object.assign(document.createElement("video"), { muted: true, playsInline: true, srcObject: screen });
     const vc = Object.assign(document.createElement("video"), { muted: true, playsInline: true, srcObject: new MediaStream(cam.getVideoTracks()) });
     await Promise.all([vs.play(), vc.play()]);
-    const st = vt.getSettings(), sc = Math.min(1, 720 / (st.height || 1080));
+    const st = vt.getSettings(), sc = Math.min(1, 1080 / (st.height || 1080));
     const W = Math.round((st.width || 1920) * sc / 2) * 2, H = Math.round((st.height || 1080) * sc / 2) * 2;
     const cv = Object.assign(document.createElement("canvas"), { width: W, height: H }), g = cv.getContext("2d");
     const D = Math.round(H * 0.26), X = Math.round(W * 0.025), Y = H - D - Math.round(H * 0.04);
@@ -61,7 +61,8 @@ export async function startRecording({ onDone, guideHtml }) {
   }
   const out = new MediaStream([videoTrack, ...cam.getAudioTracks()]);
   const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
-  const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 96_000 });
+  const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 3_000_000, // 1080p nítido (antes 720p a 1,2 Mbps); ≈ 22 MB por minuto
+    audioBitsPerSecond: 96_000 });
   const chunks = []; rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   R = { rec, chunks, t0: Date.now(), paused: 0, pausedAt: 0, transcript: "", interim: "", cues: [], marks: [], uStart: null, mirror: LS.get("bubMirror") !== "0", onDone, cam, color: "#ef4444", stopAll: () => { stopTick(); screen.getTracks().forEach((t) => t.stop()); cam.getTracks().forEach((t) => t.stop()); } };
   vt.onended = () => stopRecording(); // si toca "Dejar de compartir" en Chrome
