@@ -27,7 +27,22 @@ async function run() {
     const cid = cdoc.id, c = cdoc.data();
     const [rs, ps] = await Promise.all([db.doc(`clients/${cid}/settings/reminders`).get(), db.doc(`clients/${cid}/settings/push`).get()]);
     const r = rs.data(), tokens = Object.values(ps.data()?.tokens || {});
-    if (!r?.on || !tokens.length) continue;
+    if (!tokens.length) continue;
+    // Videos que le mandó el coach y aún no ve: un aviso por video (aunque no tenga los recordatorios activados), entre 8:00 y 22:00
+    const vnow = localNow(r?.tz || "America/Santiago");
+    if (vnow.nm >= 8 * 60 && vnow.nm < 22 * 60) {
+      const vids = await db.collection(`clients/${cid}/videos`).where("seen", "==", false).get();
+      for (const v of vids.docs) {
+        if (v.data().notified) continue;
+        let ok = false;
+        for (const token of tokens) {
+          try { await fcm.send({ token, data: { title: "🎥 Tu coach te mandó un video", body: v.data().title || "Ábrelo en la app", url: "#inicio", tag: "vid-" + v.id }, webpush: { headers: { Urgency: "high", TTL: "86400" } } }); ok = true; sent++; }
+          catch (e) { console.log(cid, "video, token inválido:", e.code); }
+        }
+        if (ok) await v.ref.set({ notified: Date.now() }, { merge: true });
+      }
+    }
+    if (!r?.on) continue;
     const { date, nm, dow } = localNow(r.tz || "America/Santiago");
     const logRef = db.doc(`clients/${cid}/settings/pushlog`), log = (await logRef.get()).data() || {};
     const done = new Set(log.date === date ? log.sent || [] : []);
