@@ -149,6 +149,20 @@ export async function previewClient(cid) {
 act("previewClient", (el) => previewClient(el.dataset.id));
 act("asCoach", () => { const back = S.preview ? `coach/c/${S.preview.cid}/resumen` : "coach"; S.viewAs = null; S.preview = null; LS.set("viewAs", "coach"); location.hash = back; });
 
+// ---------------------------------------------------------- ÚLTIMA VEZ QUE ABRIÓ LA APP
+// Solo clientes reales (no el coach ni la vista previa). Se guarda al abrir y cada vez que vuelve a la app
+// (como máximo una vez cada 3 min). Sin señal queda en cola con la hora real y se sube al volver.
+let openCid = null;
+function markOpen(cid) {
+  openCid = cid;
+  if (S.role !== "client" || S.preview || DEMO) return;
+  const k = "openAt:" + cid, last = +(LS.get(k) || 0);
+  if (Date.now() - last < 3 * 60 * 1000) return;
+  LS.set(k, String(Date.now()));
+  db.set(`clients/${cid}/settings/presence`, { at: Date.now(), ver: CONFIG.appVersion, ua: /iPhone|iPad/.test(navigator.userAgent) ? "iPhone" : /Android/.test(navigator.userAgent) ? "Android" : "Otro" });
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && openCid && S.role === "client") markOpen(openCid); });
+
 // ---------------------------------------------------------- AUTH
 export async function onUser(u) {
   S.user = u;
@@ -174,6 +188,7 @@ export async function onUser(u) {
     S.cid = cid;
     S.raw = (await db.get("clients/" + cid)) || {}; S.client = S.raw;
     db.watch("clients/" + cid, (c) => { if (c && S.cid === cid) { S.raw = c; } });
+    markOpen(cid);
   }
   if (isCoach && LS.get("viewAs") === "client" && !location.hash.startsWith("#coach")) return enterClient();
   const coachHash = location.hash.startsWith("#coach");

@@ -16,13 +16,14 @@ export const emailKey = (e) => String(e || "").trim().toLowerCase();
 export async function loadCtx(c) {
   const today = ymd();
   if (c.service === "entrenamiento" && c.selfCalc === undefined) c.selfCalc = await db.get(`clients/${c.id}/settings/calc`).catch(() => null);
-  const [routines, sessions, days, checkins, feedbacks, fbreplies, access, onb] = await Promise.all([
+  const [routines, sessions, days, checkins, feedbacks, fbreplies, access, onb, presence] = await Promise.all([
     getRoutines(c.id), getSessions(c.id), getDays([addDays(today, -6), c.startDate ? weekInfo(c, today).first : today].sort()[0], today, c.id),
     db.list(`clients/${c.id}/checkins`), db.list(`clients/${c.id}/feedbacks`), db.list(`clients/${c.id}/fbreplies`),
     c.email ? db.get("access/" + emailKey(c.email)).catch(() => null) : null,
-    db.get(`clients/${c.id}/settings/onboarding`).catch(() => null)
+    db.get(`clients/${c.id}/settings/onboarding`).catch(() => null),
+    db.get(`clients/${c.id}/settings/presence`).catch(() => null)
   ]);
-  return { routines, sessions, days, checkins, feedbacks, fbreplies, access, onb };
+  return { routines, sessions, days, checkins, feedbacks, fbreplies, access, onb, presence };
 }
 
 // ---------- ¿Algo no calza en los planes de alimentación? (planes de la etapa actual y de las que vienen)

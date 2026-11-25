@@ -85,3 +85,16 @@ export function embedUrl(u) {
 }
 
 export const LS = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+
+// "Última vez que abrió la app": hoy 12:46 · ayer 20:10 · lun 23-nov 09:15 · 12-oct (si fue hace más de una semana)
+export function lastOpenTxt(at) {
+  if (!at) return "";
+  const d = new Date(at), hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`, k = diffDays(ymd(), ymd(d));
+  const mes = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"][d.getMonth()];
+  if (k <= 0) return `hoy ${hm}`;
+  if (k === 1) return `ayer ${hm}`;
+  if (k < 7) return `${["dom", "lun", "mar", "mié", "jue", "vie", "sáb"][d.getDay()]} ${d.getDate()}-${mes} ${hm}`;
+  return `${d.getDate()}-${mes} ${hm} (hace ${k} días)`;
+}
+// Color según cuántos días lleva sin abrirla: verde hoy/ayer, amarillo 2–3 días, rojo 4 o más
+export const lastOpenCls = (at) => { if (!at) return ""; const k = diffDays(ymd(), ymd(new Date(at))); return k <= 1 ? "g" : k <= 3 ? "y" : "r"; };

@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 23-nov-2026, versión **1.42.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 25-nov-2026, versión **1.43.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -466,3 +466,8 @@ PENDIENTE:
 2. Verificar en su celular la primera semana (Próximo / Sugerido, check-in del domingo 29 = semana 1).
 4. (Probablemente resuelto en v1.39.0: ya no existe el aviso; todo se guarda solo) "Cambios sin guardar" sigue apareciendo en las rutinas de Marian en la cuenta real aunque no se toque nada (también después de v1.37.6). No es grave (guardar sin cambios no marca nada al cliente). Para encontrarlo: abrir su ficha con el navegador integrado logueado y comparar `RE.orig` vs `RE.r.exercises` en la consola; sospechar del listener global de `change` en `[data-rdirty]` o de alguna re-renderización que modifica RE.r.
 3. Joaquín: llenar Biblioteca → Datos para transferir (sus datos los dio en el chat del 22-nov; no se guardan en este archivo).
+
+## Última vez que abrió la app (v1.43.0, 25-nov-2026)
+- Al abrir la app (y cada vez que vuelve a ella, máx. 1 vez cada 3 min) el cliente guarda `clients/{id}/settings/presence` = `{ at, ver, ua }` (hora en ms, versión de la app, iPhone/Android). Solo clientes reales: no el coach, ni "Mi registro", ni "Ver como cliente". Sin señal queda en cola con la hora real. No requiere cambiar las reglas (`settings` ya es escribible por el cliente).
+- `loadCtx` lo trae como `x.presence`. Panel: en la tabla de clientes, bajo "✓ con acceso", sale "📱 hoy 12:46 / ayer 20:10 / lun 23-nov 09:15 / 12-nov (hace 13 días)" en verde (hoy/ayer), amarillo (2–3 días) o rojo (4+). Pasando el mouse se ve celular y versión. También arriba de la ficha de cada cliente.
+- Helpers `lastOpenTxt` / `lastOpenCls` en util.js. Solo hay datos desde que cada cliente actualiza a la v1.43.

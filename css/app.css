@@ -636,3 +636,5 @@ body.rec-on #undobar { display: none; }
 .cstep { display: inline-flex; align-items: center; gap: 6px; } .cstep b { font-size: 18px; min-width: 34px; text-align: center; } .cstep small { color: var(--muted); }
 .cbar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; margin-top: 10px; background: var(--line); }
 .calccta { border-color: var(--acc); } .calccta .btn { margin-top: 6px; }
+/* Última vez que el cliente abrió la app (panel del coach) */
+.lastopen { color: var(--muted, #888); } .lastopen.g { color: var(--g); } .lastopen.y { color: var(--y); } .lastopen.r { color: var(--r); font-weight: 700; }
