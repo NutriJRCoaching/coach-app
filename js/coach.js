@@ -682,7 +682,9 @@ async function feedbackView(c, w) {
   const ciW = await db.get(`clients/${c.id}/checkins/${w.key}`), goals = c.feedback?.week === w.key ? c.weeklyGoals || [] : ciW?.foco ? [ciW.foco] : c.weeklyGoals || [];
   const L = LASTREC?.cid === c.id && LASTREC.week === w.key ? LASTREC : null;
   const reply = await db.get(`clients/${c.id}/fbreplies/${w.key}`);
-  const rec = replyCard(reply && { ...reply, id: w.key }) + `<div class="card recc"><div class="row between"><div class="card-t">🎥 Video de retroalimentación</div>${recSupported() ? `<button class="btn primary" data-a="recStart" data-w="${w.key}">● Grabar</button>` : ""}</div>
+  const vids = (await db.list(`clients/${c.id}/videos`).catch(() => [])).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const sent = vids.length ? `<div class="card"><div class="card-t">🎥 Videos que le mandaste</div>${vids.map((x) => `<div class="li row between"><span><b>${esc(x.title || "Video")}</b> <small class="muted">${fmtDate(ymd(new Date(x.at)))}${x.secs ? ` · ${Math.floor(x.secs / 60)}:${String(x.secs % 60).padStart(2, "0")}` : ""}</small></span><span class="row gap">${x.seen ? `<span class="badge g">Visto${x.seenAt ? " el " + fmtDate(ymd(new Date(x.seenAt))) : ""} ✓</span>` : `<span class="badge">Aún no lo ve</span>`}<a class="btn tiny ghost" target="_blank" href="${esc(x.url)}">Abrir</a><button class="btn tiny ghost red" data-a="vidDelSent" data-id="${esc(x.id)}">Quitar</button></span></div>`).join("")}</div>` : "";
+  const rec = sent + replyCard(reply && { ...reply, id: w.key }) + `<div class="card recc"><div class="row between"><div class="card-t">🎥 Video de retroalimentación</div>${recSupported() ? `<button class="btn primary" data-a="recStart" data-w="${w.key}">● Grabar</button>` : ""}</div>
   ${recSupported() ? `<p class="muted small">Al apretar Grabar se abre una ventanita flotante con los controles y tu preanálisis (no sale en el video). En la página solo queda este cliente: se ocultan la lista de clientes y tus pendientes. Tu cara aparece en una burbuja que puedes arrastrar; hay cuenta regresiva 3-2-1, pausa y lápiz para marcar. Al compartir elige <b>“Esta pestaña”</b>.</p>` : `<p class="muted small">Para grabar usa Chrome en el computador.</p>`}
   <label class="btn ghost small upfile">⬆ Subir un video que ya tengo<input type="file" accept="video/*" hidden data-a-change="vidFile"></label> <span id="upF" class="small muted"></span>
   ${L ? `<div class="recout"><video src="${L.url}" controls></video><div><p class="small">Duración <b>${Math.floor(L.secs / 60)}:${String(L.secs % 60).padStart(2, "0")}</b> · ${(L.blob.size / 1048576).toFixed(1)} MB</p>
@@ -760,13 +762,14 @@ act("frSend", async () => {
   const c = await getClient(FREEREC.cid), title = ($("#frT")?.value || "Video de tu coach").trim();
   const url = await frUpload(`${title} · ${c.name} · ${ymd()}.webm`); if (!url) return;
   await db.set(`clients/${FREEREC.cid}/videos/${uid()}`, { title, url, secs: FREEREC.secs, at: Date.now(), seen: false });
-  closeSheet(); toast(`Listo: se lo mandaste a ${c.name.split(" ")[0]} ✓ (le aparece en su inicio)`, 4000); URL.revokeObjectURL(FREEREC.url); FREEREC = null;
+  closeSheet(); toast(`Listo: se lo mandaste a ${c.name.split(" ")[0]} ✓ (le aparece en su inicio). Lo ves en Retroalimentación → Videos que le mandaste`, 5000); URL.revokeObjectURL(FREEREC.url); FREEREC = null; refresh();
 });
 act("frLink", async () => {
   const url = await frUpload(`Video ${ymd()}.webm`); if (!url) return;
   try { await navigator.clipboard.writeText(url); } catch {}
   const p = $("#frP"); if (p) p.innerHTML = `Subido ✓ · link copiado:<br><a target="_blank" href="${esc(url)}">${esc(url)}</a>`;
 });
+act("vidDelSent", async (el) => { if (!(await confirmBox("¿Quitar este video de su app? (el archivo sigue en tu Drive)"))) return; await db.del(`clients/${CW.cid}/videos/${el.dataset.id}`); refresh(); });
 act("frDown", () => { const a = document.createElement("a"); a.href = FREEREC.url; a.download = `Video ${ymd()}.webm`; a.click(); });
 act("frDiscard", async () => { if (!(await confirmBox("¿Descartar esta grabación?"))) return; URL.revokeObjectURL(FREEREC.url); FREEREC = null; closeSheet(); });
 act("recDownload", () => { if (!LASTREC) return; const a = document.createElement("a"); a.href = LASTREC.url; a.download = `Retro ${new Date().toISOString().slice(0, 10)}.webm`; a.click(); });
