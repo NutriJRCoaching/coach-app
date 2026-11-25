@@ -113,7 +113,7 @@ export function alertsFor(c, x) {
     }
     if (plans) planChecks(c, x, plans, add);
   }
-  if (c.service === "entrenamiento" && !c.ranges) add("i", "Guía de macros por defecto (1,6–2,2 g/kg de proteína)");
+  if (c.service === "entrenamiento" && c.selfCalc === null && c.startDate) add("i", "Aún no calcula sus macros en su calculadora");
   if (!c.steps) add("y", "Falta la meta de pasos");
   // Planificación (etapas / bloque)
   const w = c.startDate ? weekInfo(c, today) : null;

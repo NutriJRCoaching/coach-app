@@ -1204,6 +1204,7 @@ act("askNotif", async () => { await Notification.requestPermission(); refresh();
 
 // ================================================================ TIMELINE (como la hoja Timeline)
 export function weeksTable(raw, days, routines, sessions, today = ymd()) {
+  const noPh = raw.service === "entrenamiento"; // solo entrenamiento: sin etapas nutricionales (muestra el objetivo de su calculadora)
   const cur = weekInfo(raw, today);
   const rows = [];
   let prevAvg = null;
@@ -1224,8 +1225,8 @@ export function weeksTable(raw, days, routines, sessions, today = ymd()) {
   const cell = (v, goal, f = r0, k = "") => v == null || v === 0 ? `<td class="dim">—</td>` : `<td class="${judge(k, v, goal, curPh)}">${f(v)}</td>`;
   return `<div class="scroll-x wk-scroll"><table class="xl"><thead>
     <tr><th></th><th colspan="2">Coaching</th><th colspan="5">Nutrición (registro)</th><th colspan="5">Métricas diarias</th><th colspan="6">Metas</th></tr>
-    <tr><th>Sem.</th><th>Fecha</th><th>Etapa</th><th>Días reg.</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Sesiones</th><th>Pasos</th><th>Cardio</th><th>Peso prom.</th><th>Sueño</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Agua</th><th>Pasos</th></tr></thead>
-    <tbody>${rows.map((r) => { curPh = r.t.phase || ""; return `<tr class="${r.cur ? "cur" : ""}"><td>${r.n}</td><td>${fmtDate(r.w.first)}</td><td><span class="ph" style="background:${phaseColor(r.t.phase)}">${esc(r.t.phase || "—")}</span></td>
+    <tr><th>Sem.</th><th>Fecha</th><th>${noPh ? "Objetivo" : "Etapa"}</th><th>Días reg.</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Sesiones</th><th>Pasos</th><th>Cardio</th><th>Peso prom.</th><th>Sueño</th><th>Kcal</th><th>CHO</th><th>Lip</th><th>Prot</th><th>Agua</th><th>Pasos</th></tr></thead>
+    <tbody>${rows.map((r) => { curPh = r.t.phase || ""; return `<tr class="${r.cur ? "cur" : ""}"><td>${r.n}</td><td>${fmtDate(r.w.first)}</td><td>${noPh ? `<span class="muted small">${esc(r.t.selfGoal || "—")}</span>` : `<span class="ph" style="background:${phaseColor(r.t.phase)}">${esc(r.t.phase || "—")}</span>`}</td>
       <td>${r.reg}</td>${cell(r.kcal, r.t.kcal, r0, "kcal")}${cell(r.cho, r.t.cho, r0, "cho")}${cell(r.fat, r.t.fat, r0, "fat")}${cell(r.prot, r.t.prot, r0, "prot")}<td>${r.ses}</td>${cell(r.steps, r.t.steps, (v) => r0(v).toLocaleString("es-CL"), "steps")}<td>${r.cardio ? r.cardio + " min" : "—"}</td>
       <td>${r.weight ? r1(r.weight) + (r.dW != null ? ` <small class="muted">(${r.dW > 0 ? "+" : ""}${r1(r.dW)})</small>` : "") : "—"}</td><td style="color:${sleepColor(r.sleep)}">${r.sleep ? r1(r.sleep) + " h" : "—"}</td>
       <td class="muted">${r.t.kcal || "—"}</td><td class="muted">${r.t.cho || "—"}</td><td class="muted">${r.t.fat || "—"}</td><td class="muted">${r.t.prot || "—"}</td><td class="muted">${r.t.water ? r1(r.t.water / 1000) + " L" : "—"}</td><td class="muted">${(r.t.steps || 0).toLocaleString("es-CL")}</td></tr>`; }).join("")}</tbody></table></div>
