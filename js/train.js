@@ -435,10 +435,11 @@ act("svSkip", finish);
 // ================================================================ RESUMEN
 // Una serie en el comparador: "18 kg × 7 · RIR 1". Si se pasa ref, lo que cambió se pinta (verde mejor / rojo peor).
 function setCell(x, ref) {
-  const c = (d) => (!ref || !d ? "" : d > 0 ? "g" : "r");
-  const rn = (v) => (v === "F" ? 0 : v === "" || v == null ? null : +v);
-  const dw = ref && x.w !== "" && ref.w !== "" ? +x.w - +ref.w : 0, dr = ref && x.r !== "" && ref.r !== "" ? +x.r - +ref.r : 0;
-  const da = ref && rn(x.rir) != null && rn(ref.rir) != null ? rn(x.rir) - rn(ref.rir) : 0;
+  // verde = subió · azul = igual · rojo = bajó (pedido de Joaquín). Fallo cuenta como menos que RIR 0.
+  const c = (d) => (!ref || d == null ? "" : d > 0 ? "g" : d < 0 ? "r" : "b");
+  const rn = (v) => (v === "F" ? -1 : v === "" || v == null ? null : +v);
+  const dw = ref && x.w !== "" && ref.w !== "" ? Math.round((+x.w - +ref.w) * 10) / 10 : null, dr = ref && x.r !== "" && ref.r !== "" ? +x.r - +ref.r : null;
+  const da = ref && rn(x.rir) != null && rn(ref.rir) != null ? rn(x.rir) - rn(ref.rir) : null;
   return `<span class="scmp-v"><b class="${c(dw)}">${x.w || "–"} kg</b> × <b class="${c(dr)}">${x.r || "–"}</b>${x.rir !== "" && x.rir != null ? ` <span class="rir ${c(da)}">${x.rir === "F" ? "Fallo" : "RIR " + x.rir}</span>` : ""}</span>`;
 }
 export async function summaryView(id) {

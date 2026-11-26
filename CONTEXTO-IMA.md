@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.45.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.45.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -473,6 +473,9 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Veredicto** (`exProgress`): técnica peor en una serie y bien en otra → `mix` "Mixto · técnica peor en la serie N" + nota "Bien la serie 1; ajusta tu técnica para que la serie 2 también salga bien". Todas peor → "Técnica peor". Se quitó la nota de "técnica peor es normal" (Joaquín: perder técnica nunca es normal; sí es normal que la 2ª baje en reps tras progresar en la 1ª, y esa nota se mantiene). Se quitó la frase sobre la 2ª serie del resumen final.
 - **Fallo**: mismas reps y peso, al fallo vs RIR 0 = se mantuvo. Si el plan no pedía fallo: aviso "Tu plan no pedía llegar al fallo: la próxima vez deja al menos 1 rep en reserva" (sesión y resumen).
 - Las indicaciones semanales del coach por ejercicio (`weekNote`) el cliente las ve en la sesión arriba de "Lo que tienes que hacer hoy" ("Tu coach: …") y en "Ver rutina".
+
+## v1.45.1 (26-nov)
+- Resumen de la sesión: en la columna "Hoy" cada dato (kg, reps, RIR) va en verde si subió, **azul si se mantuvo** y rojo si bajó (`setCell`). Para el RIR, el fallo cuenta como menos que RIR 0 (pasar de fallo a RIR 0 = verde).
 
 ## Estado al 26-nov-2026
 - **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.

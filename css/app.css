@@ -661,3 +661,4 @@ body.rec-on #undobar { display: none; }
 .notebtn.on { border-style: solid; background: var(--b-s); color: var(--txt); font-weight: 500; }
 .sosbtn { display: flex; align-items: center; gap: 6px; width: 100%; background: var(--y-s); color: var(--y); border: 1px solid color-mix(in srgb, var(--y) 40%, transparent); border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 13px; font-weight: 700; margin: 8px 0 0; cursor: pointer; } .sosbtn .ic { width: 16px; height: 16px; }
 .badge.y { background: var(--y-s); color: var(--y); }
+.scmp-v .b { color: var(--b); }
