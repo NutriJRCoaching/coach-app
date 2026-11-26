@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.46.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.46.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -479,6 +479,9 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## v1.46.0 (26-nov) — Resumen de la sesión simple (pedido de Joaquín: "entre más simple, mejor")
 - Reemplaza el lado a lado de v1.44 y los colores por dato de v1.45.1 (descartados: bajar reps al subir peso es lógico y no debe verse como malo). Ahora cada ejercicio: nombre + veredicto (único color) + "vs fecha de la última vez"; una línea por serie: `S1  45 × 8 @2 → 47.5 × 8 @2` (lo anterior en gris) y a la derecha cápsulas neutras con lo que cambió (`deltaChips`: "+2.5 kg", "−1 rep", "+1 RIR"; fallo cuenta como RIR −1; sin cambios "Igual"; sin referencia "1ª vez"). Badge chico de técnica ("↑ téc."). Se quitó la frase por serie; queda el aviso de fallo no planificado. `setCell` quedó sin uso.
+
+## v1.46.1 (26-nov)
+- Resumen: se escribe "RIR 1" / "Fallo" (no "@1" / "F"). **Regla de Joaquín: el fallo NO es un RIR** (es una rep incompleta y su fatiga varía: fallar apenas intentas la rep vs pelearla 5 s). Las cápsulas no restan fallo contra RIR: solo "Al fallo" (antes tenía RIR) o "Sin fallo" (antes fue al fallo); "± RIR" solo entre dos RIR numéricos.
 
 ## Estado al 26-nov-2026
 - **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.

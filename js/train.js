@@ -435,10 +435,12 @@ act("svSkip", finish);
 // ================================================================ RESUMEN
 // Cambios de una serie vs la última vez, en cápsulas neutras: "+2 kg", "−1 rep", "+1 RIR" (fallo cuenta como RIR −1). Sin cambios: "Igual".
 function deltaChips(x, ref) {
-  const rn = (v) => (v === "F" ? -1 : v === "" || v == null ? null : +v), sg = (n) => (n > 0 ? "+" : "−") + Math.abs(n);
+  // El fallo NO es un RIR (es una rep incompleta, de fatiga variable): no se resta contra el RIR, solo se avisa si entró o salió del fallo.
+  const sg = (n) => (n > 0 ? "+" : "−") + Math.abs(n), F = (v) => v === "F", num = (v) => v !== "" && v != null && v !== "F";
   const dw = x.w !== "" && ref.w !== "" ? Math.round((+x.w - +ref.w) * 10) / 10 : 0, dr = x.r !== "" && ref.r !== "" ? +x.r - +ref.r : 0;
-  const da = rn(x.rir) != null && rn(ref.rir) != null ? rn(x.rir) - rn(ref.rir) : 0;
-  const c = [dw && `${sg(dw)} kg`, dr && `${sg(dr)} rep${Math.abs(dr) > 1 ? "s" : ""}`, da && `${sg(da)} RIR`].filter(Boolean);
+  const da = num(x.rir) && num(ref.rir) ? +x.rir - +ref.rir : 0;
+  const fa = F(x.rir) && !F(ref.rir) ? "Al fallo" : !F(x.rir) && F(ref.rir) && x.rir !== "" ? "Sin fallo" : "";
+  const c = [dw && `${sg(dw)} kg`, dr && `${sg(dr)} rep${Math.abs(dr) > 1 ? "s" : ""}`, da && `${sg(da)} RIR`, fa].filter(Boolean);
   return (c.length ? c : ["Igual"]).map((t) => `<span class="chip">${t}</span>`).join("");
 }
 // Una serie en el comparador: "18 kg × 7 · RIR 1". Si se pasa ref, lo que cambió se pinta (verde mejor / rojo peor).
@@ -466,7 +468,7 @@ export async function summaryView(id) {
     ${e.sets.map((x, j) => { if (x.w === "" && x.r === "") return ""; const ref = has("train_suggest") ? refSet(prev, e.exId, j) : null; const pg = has("train_suggest") ? setProgress(x, ref) : null;
       const lab = e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`;
       const okRef = ref && ref.w !== "" && ref.r !== "";
-      const v = (y) => `${y.w || "–"} × ${y.r || "–"}${y.rir !== "" && y.rir != null ? ` <i>${y.rir === "F" ? "F" : "@" + y.rir}</i>` : ""}`;
+      const v = (y) => `${y.w || "–"} × ${y.r || "–"}${y.rir !== "" && y.rir != null ? ` <i>${y.rir === "F" ? "Fallo" : "RIR " + y.rir}</i>` : ""}`;
       return `<div class="srow"><span class="sl">${e.sides ? `S${Math.floor(j / 2) + 1}${j % 2 ? "D" : "I"}` : "S" + (j + 1)}</span>
         <span class="sv">${okRef ? `<span class="old">${v(ref)}</span><span class="arr">→</span>` : ""}<b>${v(x)}</b>${x.tech ? ` <span class="badge tech-${x.tech}">${{ mejor: "↑", igual: "=", peor: "↓" }[x.tech] || ""} téc.</span>` : ""}</span>
         <span class="chips">${okRef ? deltaChips(x, ref) : has("train_suggest") ? '<span class="chip">1ª vez</span>' : ""}</span></div>
