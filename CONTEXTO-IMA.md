@@ -467,7 +467,7 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 PENDIENTE:
 1. Verificar en el celular la primera semana de rotación (Marian/Gabriel): "Próximo" / "Sugerido" / "Opcional" y que el check-in del domingo 29 sea la semana 1.
-2. Vicente: darle acceso, armar el día con legumbres como opción propia y revisar los avisos de su plan (confirmar con Joaquín si ya lo hizo).
+2. Vicente (ya tiene acceso desde 26-nov): falta armar el día con legumbres como opción propia y revisar los avisos de su plan (Alternativa 4: lípidos −9; porciones distintas a la pauta en Alt. 1–3).
 
 ## Última vez que abrió la app (v1.43.0, 25-nov-2026)
 - Al abrir la app (y cada vez que vuelve a ella, máx. 1 vez cada 3 min) el cliente guarda `clients/{id}/settings/presence` = `{ at, ver, ua }` (hora en ms, versión de la app, iPhone/Android). Solo clientes reales: no el coach, ni "Mi registro", ni "Ver como cliente". Sin señal queda en cola con la hora real. No requiere cambiar las reglas (`settings` ya es escribible por el cliente).
