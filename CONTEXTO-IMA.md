@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 25-nov-2026, versión **1.43.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.43.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -459,13 +459,15 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## Gabriel (24-nov) — paso a la app desde cero (primer cliente de solo entrenamiento)
 - "Empezar de cero": semana 1 desde lun 23-nov (semanas lun–dom), usa la app desde mié 25-nov (no tenía registros).
 - Rotación Fullbody A → Fullbody B, día por medio (`everyOther`), objetivo mínimo 2 por semana (puede hacer más: salen como "Opcional"). Pasos 7.000. Metas de kcal/macros: las calcula él en su calculadora.
-- Pendiente de Joaquín: su correo (no tiene) para darle acceso, y su día de check-in.
+- 26-nov: ya empezó a usar la app (acceso resuelto).
+
+## Estado al 26-nov-2026
+- **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.
+- "Cambios sin guardar" en las rutinas de Marian: resuelto en v1.39.0 (ya no existe el aviso; todo se guarda solo).
 
 PENDIENTE:
-1. Joaquín: en la ficha de Marian, "Empezar de cero" (semana 1 desde dom 22-nov, usa la app desde lun 23-nov, Mantención) si aún no se hizo, revisar que Día de check-in = domingo, e importar `ima-rutinas-marian.json` en Entrenamiento (queda en rotación sola).
-2. Verificar en su celular la primera semana (Próximo / Sugerido, check-in del domingo 29 = semana 1).
-4. (Probablemente resuelto en v1.39.0: ya no existe el aviso; todo se guarda solo) "Cambios sin guardar" sigue apareciendo en las rutinas de Marian en la cuenta real aunque no se toque nada (también después de v1.37.6). No es grave (guardar sin cambios no marca nada al cliente). Para encontrarlo: abrir su ficha con el navegador integrado logueado y comparar `RE.orig` vs `RE.r.exercises` en la consola; sospechar del listener global de `change` en `[data-rdirty]` o de alguna re-renderización que modifica RE.r.
-3. Joaquín: llenar Biblioteca → Datos para transferir (sus datos los dio en el chat del 22-nov; no se guardan en este archivo).
+1. Verificar en el celular la primera semana de rotación (Marian/Gabriel): "Próximo" / "Sugerido" / "Opcional" y que el check-in del domingo 29 sea la semana 1.
+2. Vicente: darle acceso, armar el día con legumbres como opción propia y revisar los avisos de su plan (confirmar con Joaquín si ya lo hizo).
 
 ## Última vez que abrió la app (v1.43.0, 25-nov-2026)
 - Al abrir la app (y cada vez que vuelve a ella, máx. 1 vez cada 3 min) el cliente guarda `clients/{id}/settings/presence` = `{ at, ver, ua }` (hora en ms, versión de la app, iPhone/Android). Solo clientes reales: no el coach, ni "Mi registro", ni "Ver como cliente". Sin señal queda en cola con la hora real. No requiere cambiar las reglas (`settings` ya es escribible por el cliente).
