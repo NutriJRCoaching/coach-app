@@ -292,16 +292,17 @@ const nRep = (n) => `${n} rep${n === 1 ? "" : "s"}`;
 const plusMinus = (n, what) => (n > 0 ? `${n} ${what} más` : `${-n} ${what} menos`);
 export function perfText(x, ref) {
   const dw = Math.round((x.w - ref.w) * 10) / 10, dr = +x.r - +ref.r;
-  const a = rirN(x.rir), b = rirN(ref.rir), both = a != null && b != null;
-  const da = both ? Math.max(0, a) - Math.max(0, b) : 0, de = dr + da; // de = cambio de reps contando las que quedaron en reserva
-  const fallo = a === -1 && b !== -1 ? " y al fallo" : "";
+  // El fallo NO es un RIR (rep incompleta, fatiga variable): solo se compara la reserva entre dos RIR numéricos
+  const a = rirN(x.rir), b = rirN(ref.rir), both = a != null && b != null && a !== -1 && b !== -1;
+  const da = both ? a - b : 0, de = dr + da; // de = cambio de reps contando las que quedaron en reserva
+  const fallo = a === -1 && b !== -1 ? " y al fallo" : b === -1 && a != null && a !== -1 ? " y sin llegar al fallo" : "";
   const res = da ? `${Math.abs(da)} ${da > 0 ? "más" : "menos"} en reserva` : "";
   if (dw > 0) return { k: "up", t: `Subió ${dw} kg${dr ? ` (${plusMinus(dr, dr === 1 || dr === -1 ? "rep" : "reps")})` : ""}`, s: `+${dw} kg` };
   if (dw < 0) return { k: de > 0 ? "same" : "down", t: `Bajó ${-dw} kg${dr > 0 ? ` e hizo ${nRep(dr)} más` : dr < 0 ? ` e hizo ${nRep(-dr)} menos` : ""}`, s: `−${-dw} kg` };
   // mismo peso
   const k = de > 0 ? "up" : de < 0 ? "down" : "same";
   let t;
-  if (!dr && !da) t = a === -1 && b !== -1 ? "Mismas reps, pero al fallo" : "Igual que la vez anterior";
+  if (!dr && !da) t = a === -1 && b !== -1 ? "Mismas reps, pero al fallo" : b === -1 && a != null && a !== -1 ? "Mismas reps, sin llegar al fallo" : "Igual que la vez anterior";
   else if (!dr) t = `Mismas reps, con ${res}${fallo}`;
   else if (!da) t = `${dr > 0 ? "+" : "−"}${nRep(Math.abs(dr))}${fallo}`;
   else t = `${dr > 0 ? "+" : "−"}${nRep(Math.abs(dr))}${(dr > 0) === (da > 0) ? " y" : ", pero"} con ${res}${fallo}`;
