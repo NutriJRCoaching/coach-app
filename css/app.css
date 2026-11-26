@@ -662,3 +662,14 @@ body.rec-on #undobar { display: none; }
 .sosbtn { display: flex; align-items: center; gap: 6px; width: 100%; background: var(--y-s); color: var(--y); border: 1px solid color-mix(in srgb, var(--y) 40%, transparent); border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 13px; font-weight: 700; margin: 8px 0 0; cursor: pointer; } .sosbtn .ic { width: 16px; height: 16px; }
 .badge.y { background: var(--y-s); color: var(--y); }
 .scmp-v .b { color: var(--b); }
+/* v1.46: resumen compacto — una línea por serie: última vez → hoy + cápsulas neutras de cambio */
+.vsd { display: block; font-size: 11px; margin-top: 1px; }
+.srow { display: grid; grid-template-columns: 26px 1fr; gap: 2px 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.card > .srow:first-of-type, .card .vsd + .srow { margin-top: 8px; }
+.srow .sl { grid-row: span 2; font-size: 11px; font-weight: 800; color: var(--muted); }
+.srow .sv { font-size: 14px; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.srow .sv i { font-style: normal; font-size: 12px; color: var(--acc); font-weight: 700; } .srow .old { color: var(--muted); } .srow .old i { color: var(--muted); }
+.srow .arr { color: var(--dim); } .srow .sv .badge { font-size: 10px; padding: 1px 6px; }
+.srow .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surf2); color: var(--txt); font-variant-numeric: tabular-nums; }
+.srow { grid-template-columns: 24px 1fr auto; padding: 9px 0; } .srow .sl { grid-row: auto; } .srow .chips { justify-content: flex-end; max-width: 130px; }

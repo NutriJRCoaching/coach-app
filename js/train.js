@@ -433,6 +433,14 @@ act("svSave", () => { const s = S.session; s.survey = s.survey || {}; s.survey.a
 act("svSkip", finish);
 
 // ================================================================ RESUMEN
+// Cambios de una serie vs la última vez, en cápsulas neutras: "+2 kg", "−1 rep", "+1 RIR" (fallo cuenta como RIR −1). Sin cambios: "Igual".
+function deltaChips(x, ref) {
+  const rn = (v) => (v === "F" ? -1 : v === "" || v == null ? null : +v), sg = (n) => (n > 0 ? "+" : "−") + Math.abs(n);
+  const dw = x.w !== "" && ref.w !== "" ? Math.round((+x.w - +ref.w) * 10) / 10 : 0, dr = x.r !== "" && ref.r !== "" ? +x.r - +ref.r : 0;
+  const da = rn(x.rir) != null && rn(ref.rir) != null ? rn(x.rir) - rn(ref.rir) : 0;
+  const c = [dw && `${sg(dw)} kg`, dr && `${sg(dr)} rep${Math.abs(dr) > 1 ? "s" : ""}`, da && `${sg(da)} RIR`].filter(Boolean);
+  return (c.length ? c : ["Igual"]).map((t) => `<span class="chip">${t}</span>`).join("");
+}
 // Una serie en el comparador: "18 kg × 7 · RIR 1". Si se pasa ref, lo que cambió se pinta (verde mejor / rojo peor).
 function setCell(x, ref) {
   // verde = subió · azul = igual · rojo = bajó (pedido de Joaquín). Fallo cuenta como menos que RIR 0.
@@ -453,15 +461,16 @@ export async function summaryView(id) {
   return `${head("Resumen de la sesión", "entreno")}
   <div class="card"><h3>${esc(s.routineName)}</h3><div class="muted small">${fmtDate(s.date, true)}${mins ? ` · ${mins} min` : ""}</div>
   <div class="stats3 mt"><div><b>${s.exercises.filter((e) => e.sets.some((x) => x.w !== "" || x.done)).length}</b><small>Ejercicios</small></div><div><b>${sets}</b><small>Series</small></div><div><b>${sv.intensidad ?? sv.dureza ?? "—"}</b><small>Intensidad /10</small></div></div></div>
-  ${s.exercises.map((e) => { const done = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!done.length) return ""; const xp = has("train_suggest") ? exProgress(e, prev) : null; return `<div class="card ${e.extra ? "extra" : ""}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge b">Extra</span>' : ""}${xp && xp.k !== "new" ? ` <span class="prog ${xp.k}">${PGI[xp.k]} ${xp.t}</span>` : ""}${e.replaced ? ` <small class="muted">(en vez de ${esc(e.replacedFrom)})</small>` : ""}
+  ${s.exercises.map((e) => { const done = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!done.length) return ""; const xp = has("train_suggest") ? exProgress(e, prev) : null; return `<div class="card ${e.extra ? "extra" : ""}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge b">Extra</span>' : ""}${xp && xp.k !== "new" ? ` <span class="prog ${xp.k}">${PGI[xp.k]} ${xp.t}</span>` : ""}${e.replaced ? ` <small class="muted">(en vez de ${esc(e.replacedFrom)})</small>` : ""}${refInfo(prev, e.exId)?.date ? `<small class="muted vsd">vs ${fmtDate(refInfo(prev, e.exId).date)}</small>` : ""}
     ${xp?.note ? `<div class="muted small" style="margin-top:4px">${esc(xp.note)}</div>` : ""}
     ${e.sets.map((x, j) => { if (x.w === "" && x.r === "") return ""; const ref = has("train_suggest") ? refSet(prev, e.exId, j) : null; const pg = has("train_suggest") ? setProgress(x, ref) : null;
       const lab = e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`;
       const okRef = ref && ref.w !== "" && ref.r !== "";
-      return `<div class="scmp"><div class="row between"><b class="small">${lab}</b>${x.tech ? `<span class="badge tech-${x.tech}">Téc. ${x.tech}</span>` : ""}</div>
-        <div class="scmp-g${okRef ? "" : " solo"}">${okRef ? `<div class="scmp-c prev"><small>Última vez${refInfo(prev, e.exId)?.date ? " · " + fmtDate(refInfo(prev, e.exId).date) : ""}</small>${setCell(ref)}</div><div class="scmp-sep"></div>` : ""}<div class="scmp-c"><small>${okRef ? "Hoy" : "Primera vez"}</small>${setCell(x, ref)}</div></div>
-        ${pg && pg.k !== "new" ? `<div class="prog ${pg.k}">${PGI[pg.k]} ${esc(pg.t)}</div>` : ""}
-        ${x.rir === "F" && e.target?.[j] && e.target[j].rir !== "F" && e.target[j].rir !== "" && e.target[j].rir != null ? `<div class="hint y">Tu plan no pedía llegar al fallo: la próxima vez deja al menos 1 rep en reserva</div>` : ""}</div>`; }).join("")}</div>`; }).join("")}
+      const v = (y) => `${y.w || "–"} × ${y.r || "–"}${y.rir !== "" && y.rir != null ? ` <i>${y.rir === "F" ? "F" : "@" + y.rir}</i>` : ""}`;
+      return `<div class="srow"><span class="sl">${e.sides ? `S${Math.floor(j / 2) + 1}${j % 2 ? "D" : "I"}` : "S" + (j + 1)}</span>
+        <span class="sv">${okRef ? `<span class="old">${v(ref)}</span><span class="arr">→</span>` : ""}<b>${v(x)}</b>${x.tech ? ` <span class="badge tech-${x.tech}">${{ mejor: "↑", igual: "=", peor: "↓" }[x.tech] || ""} téc.</span>` : ""}</span>
+        <span class="chips">${okRef ? deltaChips(x, ref) : has("train_suggest") ? '<span class="chip">1ª vez</span>' : ""}</span></div>
+        ${x.rir === "F" && e.target?.[j] && e.target[j].rir !== "F" && e.target[j].rir !== "" && e.target[j].rir != null ? `<div class="hint y">Tu plan no pedía llegar al fallo: la próxima vez deja al menos 1 rep en reserva</div>` : ""}`; }).join("")}</div>`; }).join("")}
   ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} ejercicio${nComp > 1 ? "s" : ""} con progreso</b><small class="muted">${[SP.part.length && `${SP.part.length} ejercicio${SP.part.length > 1 ? "s" : ""} con progreso en una serie`, SP.mix.length && `${SP.mix.length} mixto${SP.mix.length > 1 ? "s" : ""} (técnica peor en una serie)`, SP.same.length && `${SP.same.length} se mantuvo${SP.same.length > 1 ? "ron" : ""}`, SP.down.length && `${SP.down.length} bajó${SP.down.length > 1 ? "ron" : ""}`, SP.bad.length && `${SP.bad.length} con técnica peor`].filter(Boolean).join(" · ")}${SP.part.length || SP.mix.length || SP.same.length || SP.down.length || SP.bad.length ? "<br>" : ""}Comparado con la última vez que hiciste cada ejercicio. Un ejercicio progresa si mejora la primera serie (más peso, más reps o las mismas reps con más en reserva) sin empeorar la técnica.</small></div>` : ""}
   ${s.comment ? `<div class="card note">${esc(s.comment)}</div>` : ""}
   ${has("train_audio") ? `<div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
