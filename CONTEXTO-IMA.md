@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.44.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.45.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -465,6 +465,14 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Serie a serie lado a lado** (train.js `setCell`, CSS `.scmp`): "Vez anterior | Hoy" con kg × reps y RIR, separados por una línea; en "Hoy" lo que cambió va en verde (mejor) o rojo (peor). Debajo, una frase simple (`perfText` en data.js): "Mismas reps, con 1 menos en reserva", "+1 rep", "Subió 12 kg (2 reps menos)", "Bajó 7 kg e hizo 2 reps más", "+1 rep, pero con 1 menos en reserva (equivale a lo mismo)". Se eliminó la jerga "(con RIR) · 7+1 → 7". Igual en la diferencia entre lados de unilaterales (`pairDiff`) y en la tabla del panel. `setProgress` devuelve además `s` (texto corto para la imagen para compartir).
 - **Regla de Joaquín: manda la 1ª serie** (`exProgress`): si la serie 1 progresa (sin técnica peor), el ejercicio "Progresó" aunque la 2ª baje o salga con técnica peor (nota: "La serie 2 salió con técnica peor: es normal después de progresar en la primera" — la 1ª deja más fatiga). Si la 1ª se mantiene y otra progresa sin que ninguna baje → Progresó. Si progresa otra serie pero no la 1ª y alguna baja → `part` "Progresó en la serie N". Técnica peor solo cuenta como veredicto si es en la 1ª serie. Se quitó "mixto".
 - **Resumen final**: "X de Y ejercicios con progreso" + "N ejercicio con progreso en una serie · N se mantuvo · N bajó · N con técnica peor" y explicación de la regla. `sessionProgress` devuelve `part` en vez de `mix`.
+
+## v1.45.0 (26-nov) — Última vez por ejercicio, reemplazo SOS y serie a serie en la sesión
+- **Última vez por ejercicio** (`lastEx`, `prevFor`, `refInfo` en data.js): la referencia ya no es la sesión anterior de la misma rutina, sino la **última sesión terminada en que se hizo ese ejercicio** (cualquier rutina). Original = por exId o nombre y solo si NO fue reemplazado; reemplazo SOS = por nombre (aunque haya sido extra u otra semana). `prevFor` arma una sesión "virtual" que se usa igual que antes con `refSet` (sesión, resumen, imagen, panel del coach, preanálisis). "Ver rutina" también usa la última vez real.
+- **Reemplazo SOS** (train.js `sosOpen`, `doReplace`, `sosBack`): botón amarillo "¿Ocupada o no está? Reemplazo SOS" en cada ejercicio (no en extras). Opciones: reemplazos del coach, "Reemplazos que ya usaste" (de sesiones anteriores de ese ejercicio) y "Otro ejercicio" (texto libre). La rutina no cambia: la sesión guarda `replaced`, `replacedFrom`, `orig` {name, video, notes}; "Volver a X" deshace. Badge "SOS · en vez de X". La próxima vez vuelve el original con SU última vez.
+- **Sesión, bajo cada serie** (`setInfo`): tarjeta "Última vez · fecha" con kg × reps, RIR y técnica de esa vez; antes de anotar, sugerencia (`nextHint`: técnica peor → afírmala; fallo sin pedirlo → deja 1 en reserva; faltaron reps → baja; sobró margen → sube; si no, mantén y suma 1 rep o mejor técnica); al anotar, "Hoy: …" con `perfText` (cuenta el RIR: 11.9×6 RIR 0 vs 11.9×5 RIR 1 = "equivale a lo mismo"). Nota de la última vez en barra amarilla (`.lastnote`) y botón azul punteado "✎ Agregar nota a esta serie" (`.notebtn`).
+- **Veredicto** (`exProgress`): técnica peor en una serie y bien en otra → `mix` "Mixto · técnica peor en la serie N" + nota "Bien la serie 1; ajusta tu técnica para que la serie 2 también salga bien". Todas peor → "Técnica peor". Se quitó la nota de "técnica peor es normal" (Joaquín: perder técnica nunca es normal; sí es normal que la 2ª baje en reps tras progresar en la 1ª, y esa nota se mantiene). Se quitó la frase sobre la 2ª serie del resumen final.
+- **Fallo**: mismas reps y peso, al fallo vs RIR 0 = se mantuvo. Si el plan no pedía fallo: aviso "Tu plan no pedía llegar al fallo: la próxima vez deja al menos 1 rep en reserva" (sesión y resumen).
+- Las indicaciones semanales del coach por ejercicio (`weekNote`) el cliente las ve en la sesión arriba de "Lo que tienes que hacer hoy" ("Tu coach: …") y en "Ver rutina".
 
 ## Estado al 26-nov-2026
 - **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.

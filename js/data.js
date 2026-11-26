@@ -173,6 +173,34 @@ export function prevSession(sessions, s) {
   return sessions.filter((x) => x.routineId === s.routineId && x.status === "fin" && x.weekKey < s.weekKey).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0))[0] || null;
 }
 export const refSet = (prev, exId, j) => prev?.exercises?.find((e) => e.exId === exId)?.sets?.[j] || null;
+// "Última vez" de cada ejercicio (v1.45): se busca la última sesión terminada en que se hizo ESE ejercicio, en cualquier rutina.
+// · Ejercicio original: solo cuenta cuando se hizo el original (no un reemplazo SOS que quedó en su lugar).
+// · Reemplazo SOS (e.replaced): la última vez que se hizo ese reemplazo (por nombre), aunque haya sido en otra semana o como extra.
+const normN = (n) => String(n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const sameEx = (y, e) => (e.replaced ? normN(y.name) === normN(e.name) : !y.replaced && (y.exId === e.exId || normN(y.name) === normN(e.name)));
+const hasData = (y) => (y?.sets || []).some((z) => z.w !== "" || z.r !== "");
+export function lastEx(sessions, s, e) {
+  const t0 = s.startedAt || Infinity;
+  const before = sessions.filter((x) => x.status === "fin" && x.id !== s.id && (x.startedAt || 0) < t0).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+  for (const x of before) { const m = (x.exercises || []).find((y) => sameEx(y, e) && hasData(y)); if (m) return { ex: m, date: x.date, sid: x.id }; }
+  return null;
+}
+// Sesión "virtual" de referencia: por cada ejercicio de s, sus series de la última vez (se usa igual que prevSession con refSet)
+export function prevFor(sessions, s) {
+  if (!s) return null;
+  return { virtual: true, exercises: (s.exercises || []).map((e) => { const L = lastEx(sessions, s, e); return { exId: e.exId, name: L?.ex.name || e.name, sets: L?.ex.sets || [], date: L?.date || null, tech: L?.ex.tech || "" }; }) };
+}
+export const refInfo = (prev, exId) => prev?.exercises?.find((e) => e.exId === exId) || null;
+// Qué intentar hoy según cómo salió la última vez (antes de anotar la serie de hoy). Técnica primero.
+export function nextHint(ref, t = {}) {
+  if (!ref || ref.w === "" || ref.r === "") return null;
+  const rg = range(t.reps), tr = t.rir === "F" ? -1 : t.rir === "" || t.rir == null ? 1 : +t.rir, r = +ref.r, a = rirN(ref.rir);
+  if (ref.tech === "peor") return { k: "y", t: "La última vez la técnica salió peor: mantén el peso y afírmala" };
+  if (a === -1 && tr !== -1) return { k: "y", t: "La última vez llegaste al fallo: mantén el peso y deja al menos 1 rep en reserva" };
+  if (rg && r < rg.lo - 1) return { k: "r", t: "La última vez te faltaron reps: baja un poco el peso" };
+  if (rg && (r > rg.hi || (r >= rg.hi && a != null && a > tr))) return { k: "g", t: "La última vez te sobró margen: intenta subir el peso" };
+  return { k: "b", t: "Mantén el peso e intenta sumar 1 rep o hacerla con mejor técnica" };
+}
 
 // Crea una sesión nueva a partir de la rutina
 // Ejercicios unilaterales: cada serie se anota por lado (izquierdo y derecho)
@@ -288,35 +316,34 @@ export function setProgress(x, ref) {
   if (x.tech === "peor") return { k: "bad", perf: p.k, t: `Técnica peor · ${p.t.charAt(0).toLowerCase() + p.t.slice(1)}`, s: "Técnica peor" };
   return p;
 }
-// Veredicto del ejercicio completo vs la vez anterior. Manda la PRIMERA serie (regla de Joaquín):
-// si la 1ª progresa, el ejercicio progresó aunque la 2ª no mejore (es normal: la 1ª deja más fatiga).
-// up = progresó · part = progresó en alguna serie que no es la 1ª, otra bajó · down = bajó · bad = técnica peor en la 1ª · same = se mantuvo
+// Veredicto del ejercicio completo vs la última vez. Manda la PRIMERA serie (regla de Joaquín), pero la técnica nunca se pierde "normal":
+// · una serie con técnica peor y otra bien → mixto (bien la que salió bien, ajusta la técnica de la otra) · todas con técnica peor → bad
+// · la 1ª progresa → up (si la 2ª bajó en reps, se avisa: es normal que cueste más después de progresar en la primera)
+// · progresa otra serie pero la 1ª bajó → part · solo bajas → down · nada cambia → same
 export function exProgress(e, prevS) {
   const all = e.sets.map((x, j) => ({ j, p: setProgress(x, refSet(prevS, e.exId, j)) })).filter((o) => o.p);
   const cmp = all.filter((o) => o.p.k !== "new"); if (!all.length) return null; if (!cmp.length) return { k: "new", t: "Primera vez" };
   const isFirst = (o) => (e.sides ? o.j < 2 : o.j === 0);
+  const sn = (o) => (e.sides ? Math.floor(o.j / 2) + 1 : o.j + 1);
+  const lst = (arr) => [...new Set(arr.map(sn))].join(" y ");
   const first = cmp.filter(isFirst), rest = cmp.filter((o) => !isFirst(o));
   const has = (arr, k) => arr.some((o) => o.p.k === k);
-  const sn = (o) => (e.sides ? Math.floor(o.j / 2) + 1 : o.j + 1);
-  const restWorse = rest.filter((o) => o.p.k === "down" || o.p.k === "bad");
-  const lst = (arr) => [...new Set(arr.map(sn))].join(" y ");
-  const dn = rest.filter((o) => o.p.k === "down"), bd = rest.filter((o) => o.p.k === "bad");
-  const worseTxt = [dn.length && `la serie ${lst(dn)} bajó`, bd.length && `la serie ${lst(bd)} salió con técnica peor`].filter(Boolean).join(" y ");
-  const which = worseTxt ? worseTxt.charAt(0).toUpperCase() + worseTxt.slice(1) : "";
-  if (first.length && has(first, "up") && !has(first, "down") && !has(first, "bad"))
-    return { k: "up", t: "Progresó", note: restWorse.length ? `${which}: es normal después de progresar en la primera.` : "" };
-  if (has(first, "bad")) return { k: "bad", t: "Técnica peor en la serie 1" };
-  const upRest = rest.filter((o) => o.p.k === "up");
-  if (has(first, "down")) return upRest.length ? { k: "part", t: `Progresó en la serie ${[...new Set(upRest.map(sn))].join(" y ")}, bajó en la 1` } : { k: "down", t: "Bajó" };
-  if (upRest.length) return restWorse.length ? { k: "part", t: `Progresó en la serie ${[...new Set(upRest.map(sn))].join(" y ")}` } : { k: "up", t: "Progresó" };
-  if (restWorse.length) return { k: "same", t: "Se mantuvo", note: `${which}.` };
+  const bad = cmp.filter((o) => o.p.k === "bad"), okT = cmp.filter((o) => o.p.k !== "bad");
+  if (bad.length && !okT.length) return { k: "bad", t: "Técnica peor" };
+  if (bad.length) return { k: "mix", t: `Mixto · técnica peor en la serie ${lst(bad)}`, note: `Bien la serie ${lst(okT)}; ajusta tu técnica para que la serie ${lst(bad)} también salga bien.` };
+  const dn = rest.filter((o) => o.p.k === "down"), upRest = rest.filter((o) => o.p.k === "up");
+  if (has(first, "up") && !has(first, "down"))
+    return { k: "up", t: "Progresó", note: dn.length ? `La serie ${lst(dn)} bajó: es normal que cueste más después de progresar en la primera.` : "" };
+  if (has(first, "down")) return upRest.length ? { k: "part", t: `Progresó en la serie ${lst(upRest)}, bajó en la 1` } : { k: "down", t: "Bajó" };
+  if (upRest.length) return dn.length ? { k: "part", t: `Progresó en la serie ${lst(upRest)}` } : { k: "up", t: "Progresó" };
+  if (dn.length) return { k: "same", t: "Se mantuvo", note: `La serie ${lst(dn)} bajó.` };
   return { k: "same", t: "Se mantuvo" };
 }
 // Resumen de la sesión por ejercicio
 export function sessionProgress(s, prevS) {
   const v = s.exercises.map((e) => ({ e, p: exProgress(e, prevS) })).filter((x) => x.p && x.p.k !== "new");
   const c = (k) => v.filter((x) => x.p.k === k);
-  return { comp: v.length, up: c("up"), part: c("part"), same: c("same"), down: c("down"), bad: c("bad") };
+  return { comp: v.length, up: c("up"), part: c("part"), mix: c("mix"), same: c("same"), down: c("down"), bad: c("bad") };
 }
 
 export const MEASURE_ZONES = [

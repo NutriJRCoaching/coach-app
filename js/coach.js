@@ -13,7 +13,7 @@ import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCo
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
-import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, refSet, setProgress, exProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, PHASE_PCT, phaseAt, hasPlans, CHECKIN, CHECKIN_OLD } from "./data.js";
+import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, prevFor, refSet, setProgress, exProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, PHASE_PCT, phaseAt, hasPlans, CHECKIN, CHECKIN_OLD } from "./data.js";
 import { weeksTable } from "./client.js";
 import { GROUPS } from "./foods.js";
 import { menusEditor } from "./menus.js";
@@ -222,12 +222,12 @@ async function sessionsView(c, w) {
   if (!list.length) return `<p class="muted">Sin entrenamientos registrados esta semana.</p>`;
   const routines = await getRoutines(c.id);
   return list.map((s) => {
-    const prev = prevSession(all, s), sv = s.survey || {}, rt = routines.find((r) => r.id === s.routineId);
+    const prev = prevFor(all, s), sv = s.survey || {}, rt = routines.find((r) => r.id === s.routineId);
     return `<div class="card sesc"><div class="row between"><h3>${esc(s.routineName)} <small class="muted">${fmtDate(s.date, true)} · ${s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) + " min" : ""}</small></h3>
     <div class="row gap small">${sv.intensidad ?? sv.dureza ? `<span class="pill">Intensidad ${sv.intensidad ?? sv.dureza}/10</span>` : ""}${sv.fuerza ? `<span class="pill">Fuerza ${sv.fuerza}/5</span>` : ""}${sv.energia ? `<span class="pill">Energía ${sv.energia}/5</span>` : ""}${sv.doms ? `<span class="pill">DOMS ${sv.doms}/5</span>` : ""}${sv.general ? `<span class="pill">General ${sv.general}/5</span>` : ""}${sv.articular === "si" ? `<span class="badge r">Molestia articular: ${esc(sv.articularDet || "")}</span>` : ""}${sv.orden === "no" ? `<span class="badge y">No siguió el orden</span>` : ""}</div></div>
     ${s.comment ? `<div class="note">💬 ${esc(s.comment)}</div>` : ""}
     ${audios.find((a) => a.id === s.id)?.data ? `<div class="note">🎙️ Audio del cliente (${audios.find((a) => a.id === s.id).secs || "?"} s)<br><audio controls src="${audios.find((a) => a.id === s.id).data}"></audio></div>` : ""}
-    <details><summary class="small muted">Ver detalle por serie</summary><table class="tbl"><tr><th>Ejercicio</th><th>Serie</th><th>Esta semana</th><th>Semana anterior</th><th>Δ</th><th>Nota</th></tr>
+    <details><summary class="small muted">Ver detalle por serie</summary><table class="tbl"><tr><th>Ejercicio</th><th>Serie</th><th>Esta semana</th><th>Última vez</th><th>Δ</th><th>Nota</th></tr>
     ${s.exercises.map((e) => e.sets.map((x, j) => { const ref = refSet(prev, e.exId, j); const dw = ref && x.w !== "" && ref.w !== "" ? r1(x.w - ref.w) : null, dr = ref && x.r !== "" && ref.r !== "" ? x.r - ref.r : null;
       return `<tr class="${e.extra ? "extra-row" : ""}">${j === 0 ? `<td rowspan="${e.sets.length}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge extra">Extra</span>' : ""}${e.replaced ? `<br><small class="muted">reemplazó a ${esc(e.replacedFrom)}</small>` : ""}${e.tech ? `<br><span class="badge tech-${e.tech}">Técnica ${e.tech}</span>` : ""}${exnotes.find((n) => n.id === e.exId)?.text ? `<br><small class="muted">⚙ ${esc(exnotes.find((n) => n.id === e.exId).text)}</small>` : ""}</td>` : ""}
       <td>${j + 1}${e.target?.[j] ? `<br><small class="muted">plan ${esc(e.target[j].reps)}${e.target[j].rir !== "" && e.target[j].rir != null ? "@" + e.target[j].rir : ""}</small>` : ""}</td><td><b>${x.w || "–"} × ${x.r || "–"}</b>${x.rir !== "" ? ` RIR ${x.rir}` : ""}${x.tech ? ` <span class="badge tech-${x.tech}">téc. ${x.tech}</span>` : ""}</td><td class="muted">${ref ? `${ref.w}×${ref.r}${ref.rir !== "" ? " RIR " + ref.rir : ""}` : "—"}</td>
@@ -631,7 +631,7 @@ async function preanalysis(c0, w) {
   const plan = weekPlan(c, routines, sessions, w.first);
   const wk = sessions.filter((x) => x.status === "fin" && x.weekKey === w.key);
   let up = 0, comp = 0; const gains = [];
-  for (const x of wk) { const pv = prevSession(sessions, x); for (const e of x.exercises) { const pg = exProgress(e, pv); if (pg && pg.k !== "new") { comp++; if (pg.k === "up") { up++; gains.push(e.name); } } } }
+  for (const x of wk) { const pv = prevFor(sessions, x); for (const e of x.exercises) { const pg = exProgress(e, pv); if (pg && pg.k !== "new") { comp++; if (pg.k === "up") { up++; gains.push(e.name); } } } }
   const good = [], work = [], answer = [], skip = [];
   const wA = A(D, (d) => weightCorr(d)), wP = A(P, (d) => weightCorr(d)), kcal = T("kcal"), prot = T("prot"), steps = A(D, (d) => d.steps), sl = A(D, (d) => sleepHours(d.sleep)), water = A(D, (d) => sum(d.water || [], (y) => y.ml));
   // entrenamiento

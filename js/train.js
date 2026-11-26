@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, chips, beep, notify, confirmBox, $, $$ } from "./ui.js";
 import { LS, esc, ymd, fmtDate, weekInfo, r1, num, embedUrl, uid, pad, parseYmd, D3, compressImage } from "./util.js";
 import { saveAudio, loadAudio, delAudio } from "./audiostore.js";
-import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest, splitSides, setProgress, perfText, repsEff, exProgress, sessionProgress } from "./data.js";
+import { getRoutines, getSessions, weekPlan, prevSession, prevFor, refInfo, nextHint, lastEx, refSet, newSession, suggest, splitSides, setProgress, perfText, repsEff, exProgress, sessionProgress } from "./data.js";
 import { I } from "./icons.js";
 import { has } from "./features.js";
 
@@ -97,7 +97,7 @@ act("viewRoutine", async (el) => {
   const r = (await getRoutines(S.cid)).find((x) => x.id === el.dataset.r); if (!r) return;
   const sessions = await getSessions(S.cid), last = sessions.filter((x) => x.routineId === r.id && x.status === "fin").sort((a, b) => b.startedAt - a.startedAt)[0];
   sheet(r.name, `${r.note ? `<div class="coachnote rnote"><b>Tu coach:</b> ${esc(r.note)}</div>` : ""}${(r.exercises || []).map((e, k) => {
-    const lx = last?.exercises.find((x) => x.exId === e.id), done = (lx?.sets || []).filter((x) => x.w !== "" || x.r !== "");
+    const lx = lastEx(sessions, { id: "", startedAt: Infinity }, { exId: e.id, name: e.name })?.ex, done = (lx?.sets || []).filter((x) => x.w !== "" || x.r !== "");
     return `<div class="rvx" style="--exc:${exColor(k)}"><b>${k + 1}. ${esc(e.name)}</b>${e.changed ? ' <span class="badge r">Modificado</span>' : ""}
     <div class="small">${(e.sets || []).map((t, j) => `<span class="rvset">S${j + 1}: ${planTxt(t)}</span>`).join("") || '<span class="muted">Series libres</span>'}</div>
     ${e.notes ? `<ul class="tiplist small">${String(e.notes).split(/\n|•/).map((x) => x.trim()).filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
@@ -122,7 +122,7 @@ let prev = null;
 async function loadSession(id) {
   if (S.session?.id !== id) { S.session = await db.get(`${P()}/sessions/${id}`); S.exIdx = 0; if (S.session) S.session.id = id; }
   const sessions = await getSessions(S.cid);
-  prev = S.session ? prevSession(sessions, S.session) : null;
+  S.allSess = sessions; prev = S.session ? prevFor(sessions, S.session) : null;
   return S.session;
 }
 const save = () => db.set(`${P()}/sessions/${S.session.id}`, S.session, false);
@@ -139,8 +139,9 @@ export async function sessionView(id) {
   ${s.coachNote && i === 0 ? `<div class="coachnote rnote"><b>Tu coach para hoy:</b> ${esc(s.coachNote)}</div>` : ""}
   <div class="extabs">${s.exercises.map((e, k) => { const done = e.sets.length && e.sets.every((x) => x.done); return `<button class="${k === i ? "on" : ""} ${done ? "done" : ""} ${e.extra ? "extra" : ""} ${e.changed ? "chg" : ""}" style="--exc:${exCol(s.exercises, k)}" data-a="exGo" data-i="${k}" title="${e.extra ? "Ejercicio extra (fuera de tu rutina)" : ""}">${e.extra ? "+" : exNum(s.exercises, k)}</button>`; }).join("")}</div>
   <div class="card ex ${ex.extra ? "extra" : ""}" style="--exc:${exCol(s.exercises, i)}">
-    <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra · fuera de la rutina</span>' : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
+    <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra · fuera de la rutina</span>' : ""}${ex.replaced ? `<br><span class="badge y">SOS · en vez de ${esc(ex.replacedFrom)}</span>` : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
     <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video && has("train_videos") ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
+    ${ex.extra ? "" : `<button class="sosbtn" data-a="sosOpen">${I.swap} ${ex.replaced ? `Volver a ${esc(ex.replacedFrom)} o cambiar el reemplazo` : "¿Ocupada o no está? Reemplazo SOS"}</button>`}
     ${ex.weekNote || ex.wSug ? `<div class="coachnote">${ex.weekNote ? `<b>Tu coach:</b> ${esc(ex.weekNote)}` : ""}${ex.wSug ? `${ex.weekNote ? "<br>" : ""}<b>Peso sugerido:</b> ${esc(ex.wSug)} kg` : ""}</div>` : ""}
     ${!has("train_targets") ? `<div class="goal"><small>Registra el peso y las repeticiones de cada serie</small></div>` : ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div>${ex.tempo || ex.rest ? `<small class="muted">${ex.tempo ? `Tempo ${esc(ex.tempo)} (bajada-pausa-subida-pausa)` : ""}${ex.tempo && ex.rest ? " · " : ""}${ex.rest ? `Descanso ${Math.floor(ex.rest / 60)}:${String(ex.rest % 60).padStart(2, "0")}` : ""}</small>` : ""}</div>` : `<div class="goal"><small>Series libres</small></div>`}
     <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span>${has("train_tech") ? "<span>Técnica</span>" : ""}</div>
@@ -174,16 +175,17 @@ function pairDiff(ex, p) {
   return `<span class="${Math.abs(dr) >= 3 || dw ? "y" : "b"}">Derecha vs izquierda: ${t.charAt(0).toLowerCase() + t.slice(1)}</span>`;
 }
 function setInfo(ex, j) {
-  const st = ex.sets[j], ref = refSet(prev, ex.exId, j);
+  const st = ex.sets[j], ref = refSet(prev, ex.exId, j), ri = refInfo(prev, ex.exId), t = ex.target[j] || {};
+  const okRef = ref && (ref.w !== "" || ref.r !== "");
   let h = "";
-  if (ref) {
-    const dw = st.w !== "" && ref.w !== "" ? r1(st.w - ref.w) : null, dr = st.r !== "" && ref.r !== "" ? st.r - ref.r : null;
-    h += `<span>Sem. pasada: <b>${ref.w || "–"} × ${ref.r || "–"}</b>${ref.rir !== "" && ref.rir != null ? " RIR " + ref.rir : ""}</span>`;
-    if (dw) h += `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw} kg</span>`;
-    if (dr) h += `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr} reps</span>`;
+  if (okRef) {
+    h += `<div class="lastv"><small>Última vez${ri?.date ? " · " + fmtDate(ri.date) : ""}</small><b>${ref.w || "–"} kg × ${ref.r || "–"}</b>${ref.rir !== "" && ref.rir != null ? `<span class="rir">${ref.rir === "F" ? "Fallo" : "RIR " + ref.rir}</span>` : ""}${ref.tech ? `<span class="badge tech-${ref.tech}">Téc. ${ref.tech}</span>` : ""}</div>`;
+    if (st.w !== "" && st.r !== "" && has("train_suggest")) { const pg = setProgress(st, ref); if (pg && pg.k !== "new") h += `<div class="prog ${pg.k}">${{ up: "▲", down: "▼", bad: "⚠", same: "•" }[pg.k] || "•"} Hoy: ${esc(pg.t.charAt(0).toLowerCase() + pg.t.slice(1))}</div>`; }
+    else if (has("train_suggest") && !(ex.sides && j % 2)) { const hn = nextHint(ref, t); if (hn) h += `<div class="hint ${hn.k}">💡 ${esc(hn.t)}</div>`; }
+    if (ref.note) h += `<div class="lastnote">📝 <b>Tu nota de la última vez:</b> ${esc(ref.note)}</div>`;
   }
-  h += `<button class="lnk" data-a="setNote" data-j="${j}">${st.note ? "Nota: " + esc(st.note) : "+ nota"}</button>`;
-  if (ref?.note) h += `<span class="lastnote">Tu nota de la semana pasada: ${esc(ref.note)}</span>`;
+  if (st.rir === "F" && t.rir !== "F" && t.rir != null && t.rir !== "") h += `<div class="hint y">Tu plan no pedía llegar al fallo: la próxima vez deja al menos 1 rep en reserva</div>`;
+  h += `<button class="notebtn ${st.note ? "on" : ""}" data-a="setNote" data-j="${j}">✎ ${st.note ? "Tu nota: " + esc(st.note) : "Agregar nota a esta serie"}</button>`;
   return h;
 }
 function sugHtml(ex) {
@@ -236,7 +238,7 @@ act("toggleSides", () => {
 });
 act("setNote", (el) => {
   const j = +el.dataset.j, ref = refSet(prev, cur().exId, j);
-  sheet(`Nota · serie ${j + 1}`, `${ref?.note ? `<div class="note">Semana pasada: ${esc(ref.note)}</div>` : ""}<textarea id="sNt" rows="3" placeholder="Ej: primera serie muy liviana">${esc(cur().sets[j].note || "")}</textarea><button class="btn primary big" data-a="setNoteSave" data-j="${j}">Guardar</button>`);
+  sheet(`Nota · serie ${j + 1}`, `${ref?.note ? `<div class="lastnote">📝 <b>Tu nota de la última vez:</b> ${esc(ref.note)}</div>` : ""}<textarea id="sNt" rows="3" placeholder="Ej: primera serie muy liviana">${esc(cur().sets[j].note || "")}</textarea><button class="btn primary big" data-a="setNoteSave" data-j="${j}">Guardar</button>`);
 });
 act("setNoteSave", (el) => { cur().sets[+el.dataset.j].note = $("#sNt").value; save(); closeSheet(); updateSet(+el.dataset.j); });
 
@@ -287,10 +289,37 @@ act("tips", async () => {
   ${ex.alts?.length ? `<div class="card-t mt">${I.swap}Reemplazos de emergencia</div><p class="muted small">Si la máquina está ocupada o no está disponible (mismo patrón de movimiento):</p>
   ${ex.alts.map((a, k) => `<div class="li row between"><b>${esc(a.name)}</b><span class="row gap">${a.video ? `<a class="btn tiny" target="_blank" href="${esc(a.video)}">Video</a>` : ""}<button class="btn tiny primary" data-a="useAlt" data-k="${k}">Usar</button></span></div>`).join("")}` : ""}`);
 });
-act("useAlt", (el) => {
-  const ex = cur(), a = ex.alts[+el.dataset.k];
-  ex.replacedFrom = ex.replacedFrom || ex.name; ex.name = a.name; ex.video = a.video || ""; ex.notes = a.tips || ex.notes; ex.replaced = true;
-  save(); closeSheet(); toast("Reemplazado por " + a.name); refresh();
+// ---------- Reemplazo SOS: la rutina no cambia; solo hoy se hace otro ejercicio en su lugar.
+// La próxima vez vuelve el original con SU última vez; el reemplazo guarda su propia historia (por nombre).
+function sosUsed(ex) {
+  const orig = ex.replaced ? ex.replacedFrom : ex.name, seen = new Map();
+  for (const x of (S.allSess || []).filter((y) => y.status === "fin").sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0)))
+    for (const y of x.exercises || []) if (y.replaced && (y.exId === ex.exId || y.replacedFrom === orig) && !seen.has(y.name.toLowerCase())) seen.set(y.name.toLowerCase(), { name: y.name, date: x.date });
+  return [...seen.values()];
+}
+act("sosOpen", () => {
+  const ex = cur(), used = sosUsed(ex).filter((u) => !(ex.alts || []).some((a) => a.name.toLowerCase() === u.name.toLowerCase()));
+  const line = (name, extra, attrs) => `<div class="li row between"><span><b>${esc(name)}</b>${extra ? `<br><small class="muted">${extra}</small>` : ""}</span><button class="btn tiny primary" ${attrs}>${ex.replaced && ex.name === name ? "Usando" : "Usar"}</button></div>`;
+  sheet("Reemplazo SOS", `<p class="muted small">Solo para hoy, si <b>${esc(ex.replaced ? ex.replacedFrom : ex.name)}</b> está ocupado o no está disponible. Tu rutina no cambia: la próxima vez vuelve el original con lo que hiciste la última vez que lo hiciste.</p>
+  ${ex.replaced ? `<button class="btn block mt" data-a="sosBack">↩ Volver a ${esc(ex.replacedFrom)}</button>` : ""}
+  ${(ex.alts || []).length ? `<div class="card-t mt">Reemplazos de tu coach</div>${ex.alts.map((a, k) => line(a.name, a.video ? `<a target="_blank" href="${esc(a.video)}">Ver video</a>` : "", `data-a="useAlt" data-k="${k}"`)).join("")}` : ""}
+  ${used.length ? `<div class="card-t mt">Reemplazos que ya usaste</div>${used.map((u) => line(u.name, "Última vez: " + fmtDate(u.date), `data-a="useAltName" data-n="${esc(u.name)}"`)).join("")}` : ""}
+  <div class="card-t mt">Otro ejercicio</div><div class="row gap"><input id="sosN" placeholder="Ej: Curl con apoyo en tríceps"><button class="btn primary" data-a="useAltFree">Usar</button></div>
+  <p class="muted small">Elige uno del mismo patrón de movimiento. Tu coach verá que lo reemplazaste.</p>`);
+});
+function doReplace(a) {
+  const ex = cur();
+  if (!ex.replaced) { ex.orig = { name: ex.name, video: ex.video || "", notes: ex.notes || "" }; ex.replacedFrom = ex.name; }
+  ex.name = a.name; ex.video = a.video || ""; ex.notes = a.tips || ""; ex.replaced = true;
+  save(); closeSheet(); toast("Hoy: " + a.name); refresh();
+}
+act("useAlt", (el) => doReplace(cur().alts[+el.dataset.k]));
+act("useAltName", (el) => doReplace({ name: el.dataset.n }));
+act("useAltFree", () => { const n = $("#sosN").value.trim(); if (!n) return toast("Escribe el nombre del ejercicio"); doReplace({ name: n }); });
+act("sosBack", () => {
+  const ex = cur(), o = ex.orig || { name: ex.replacedFrom };
+  ex.name = o.name; ex.video = o.video ?? ex.video; ex.notes = o.notes ?? ex.notes; ex.replaced = false; delete ex.replacedFrom; delete ex.orig;
+  save(); closeSheet(); toast("Volviste a " + ex.name); refresh();
 });
 act("setupSave", async () => { await db.set(`${P()}/exnotes/${cur().exId}`, { text: $("#suT").value }); closeSheet(); toast("Guardado"); refresh(); });
 act("setupPhoto", async (el) => {
@@ -418,7 +447,7 @@ export async function summaryView(id) {
   const sv = s.survey || {}, mins = s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) : null;
   const sets = s.exercises.reduce((t, e) => t + e.sets.filter((x) => x.done || x.w !== "").length, 0);
   const SP = sessionProgress(s, prev), nUp = SP.up.length, nComp = SP.comp;
-  const PGI = { up: "▲", down: "▼", bad: "⚠", part: "▲", same: "•", new: "•" };
+  const PGI = { up: "▲", down: "▼", bad: "⚠", part: "▲", mix: "↕", same: "•", new: "•" };
   const audio = await loadAudio(`${P()}/audios`, s.id);
   return `${head("Resumen de la sesión", "entreno")}
   <div class="card"><h3>${esc(s.routineName)}</h3><div class="muted small">${fmtDate(s.date, true)}${mins ? ` · ${mins} min` : ""}</div>
@@ -429,9 +458,10 @@ export async function summaryView(id) {
       const lab = e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`;
       const okRef = ref && ref.w !== "" && ref.r !== "";
       return `<div class="scmp"><div class="row between"><b class="small">${lab}</b>${x.tech ? `<span class="badge tech-${x.tech}">Téc. ${x.tech}</span>` : ""}</div>
-        <div class="scmp-g${okRef ? "" : " solo"}">${okRef ? `<div class="scmp-c prev"><small>Vez anterior</small>${setCell(ref)}</div><div class="scmp-sep"></div>` : ""}<div class="scmp-c"><small>${okRef ? "Hoy" : "Primera vez"}</small>${setCell(x, ref)}</div></div>
-        ${pg && pg.k !== "new" ? `<div class="prog ${pg.k}">${PGI[pg.k]} ${esc(pg.t)}</div>` : ""}</div>`; }).join("")}</div>`; }).join("")}
-  ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} ejercicio${nComp > 1 ? "s" : ""} con progreso</b><small class="muted">${[SP.part.length && `${SP.part.length} ejercicio${SP.part.length > 1 ? "s" : ""} con progreso en una serie`, SP.same.length && `${SP.same.length} se mantuvo${SP.same.length > 1 ? "ron" : ""}`, SP.down.length && `${SP.down.length} bajó${SP.down.length > 1 ? "ron" : ""}`, SP.bad.length && `${SP.bad.length} con técnica peor`].filter(Boolean).join(" · ")}${SP.part.length || SP.same.length || SP.down.length || SP.bad.length ? "<br>" : ""}Comparado con la vez anterior. Un ejercicio progresa si mejora la primera serie (más peso, más reps o las mismas reps con más en reserva) sin empeorar la técnica. Es normal que la segunda serie cueste más cuando progresas en la primera.</small></div>` : ""}
+        <div class="scmp-g${okRef ? "" : " solo"}">${okRef ? `<div class="scmp-c prev"><small>Última vez${refInfo(prev, e.exId)?.date ? " · " + fmtDate(refInfo(prev, e.exId).date) : ""}</small>${setCell(ref)}</div><div class="scmp-sep"></div>` : ""}<div class="scmp-c"><small>${okRef ? "Hoy" : "Primera vez"}</small>${setCell(x, ref)}</div></div>
+        ${pg && pg.k !== "new" ? `<div class="prog ${pg.k}">${PGI[pg.k]} ${esc(pg.t)}</div>` : ""}
+        ${x.rir === "F" && e.target?.[j] && e.target[j].rir !== "F" && e.target[j].rir !== "" && e.target[j].rir != null ? `<div class="hint y">Tu plan no pedía llegar al fallo: la próxima vez deja al menos 1 rep en reserva</div>` : ""}</div>`; }).join("")}</div>`; }).join("")}
+  ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} ejercicio${nComp > 1 ? "s" : ""} con progreso</b><small class="muted">${[SP.part.length && `${SP.part.length} ejercicio${SP.part.length > 1 ? "s" : ""} con progreso en una serie`, SP.mix.length && `${SP.mix.length} mixto${SP.mix.length > 1 ? "s" : ""} (técnica peor en una serie)`, SP.same.length && `${SP.same.length} se mantuvo${SP.same.length > 1 ? "ron" : ""}`, SP.down.length && `${SP.down.length} bajó${SP.down.length > 1 ? "ron" : ""}`, SP.bad.length && `${SP.bad.length} con técnica peor`].filter(Boolean).join(" · ")}${SP.part.length || SP.mix.length || SP.same.length || SP.down.length || SP.bad.length ? "<br>" : ""}Comparado con la última vez que hiciste cada ejercicio. Un ejercicio progresa si mejora la primera serie (más peso, más reps o las mismas reps con más en reserva) sin empeorar la técnica.</small></div>` : ""}
   ${s.comment ? `<div class="card note">${esc(s.comment)}</div>` : ""}
   ${has("train_audio") ? `<div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
     ${audio?.data ? `<audio controls src="${audio.data}"></audio><button class="btn primary big" data-a="audioShare">Enviar audio por WhatsApp</button><button class="btn ghost block" data-a="audioRec">Grabar de nuevo</button>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>` : ""}
@@ -518,7 +548,7 @@ async function sessionImage(s) {
       g.fillStyle = "#fff"; g.font = F(700, 30); g.fillText(`${x.w || "–"} kg × ${x.r || "–"}`, P + 170, yy);
       if (x.rir !== "") { g.fillStyle = "#e0313b"; g.font = F(800, 26); g.fillText(`RIR ${x.rir}`, P + 450, yy); }
       if (x.tech) { const tc = TECHC[x.tech]; g.fillStyle = tc + "33"; g.beginPath(); g.roundRect(P + 560, yy - 28, 150, 38, 19); g.fill(); g.fillStyle = tc; g.font = F(700, 21); g.fillText(`Téc. ${x.tech}`, P + 578, yy - 2); }
-      const pg = setProgress(x, refSet(prev, e.exId, j)); if (pg && pg.k !== "new") { g.fillStyle = { up: "#22c55e", down: "#ef4444", bad: "#f59e0b", same: "#a1a1aa" }[pg.k]; g.font = F(700, 21); const tt = (pg.k === "up" ? "▲ " : pg.k === "down" ? "▼ " : "") + (pg.s || pg.t); g.fillText(tt.length > 26 ? tt.slice(0, 25) + "…" : tt, P + 725, yy - 2); }
+      const pg = setProgress(x, refSet(prev, e.exId, j)); if (pg && pg.k !== "new") { g.fillStyle = ({ up: "#22c55e", down: "#ef4444", bad: "#f59e0b", same: "#a1a1aa" }[pg.k] || "#a1a1aa"); g.font = F(700, 21); const tt = (pg.k === "up" ? "▲ " : pg.k === "down" ? "▼ " : "") + (pg.s || pg.t); g.fillText(tt.length > 26 ? tt.slice(0, 25) + "…" : tt, P + 725, yy - 2); }
       if (x.note) { g.fillStyle = "#a1a1aa"; g.font = F(500, 20); g.fillText("✎", W - P - 40, yy - 2); }
       yy += 46;
     });
