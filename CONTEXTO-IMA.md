@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.43.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.44.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -460,6 +460,11 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - "Empezar de cero": semana 1 desde lun 23-nov (semanas lun–dom), usa la app desde mié 25-nov (no tenía registros).
 - Rotación Fullbody A → Fullbody B, día por medio (`everyOther`), objetivo mínimo 2 por semana (puede hacer más: salen como "Opcional"). Pasos 7.000. Metas de kcal/macros: las calcula él en su calculadora.
 - 26-nov: ya empezó a usar la app (acceso resuelto).
+
+## v1.44.0 (26-nov) — Resumen de la sesión más entendible (pedido de Joaquín)
+- **Serie a serie lado a lado** (train.js `setCell`, CSS `.scmp`): "Vez anterior | Hoy" con kg × reps y RIR, separados por una línea; en "Hoy" lo que cambió va en verde (mejor) o rojo (peor). Debajo, una frase simple (`perfText` en data.js): "Mismas reps, con 1 menos en reserva", "+1 rep", "Subió 12 kg (2 reps menos)", "Bajó 7 kg e hizo 2 reps más", "+1 rep, pero con 1 menos en reserva (equivale a lo mismo)". Se eliminó la jerga "(con RIR) · 7+1 → 7". Igual en la diferencia entre lados de unilaterales (`pairDiff`) y en la tabla del panel. `setProgress` devuelve además `s` (texto corto para la imagen para compartir).
+- **Regla de Joaquín: manda la 1ª serie** (`exProgress`): si la serie 1 progresa (sin técnica peor), el ejercicio "Progresó" aunque la 2ª baje o salga con técnica peor (nota: "La serie 2 salió con técnica peor: es normal después de progresar en la primera" — la 1ª deja más fatiga). Si la 1ª se mantiene y otra progresa sin que ninguna baje → Progresó. Si progresa otra serie pero no la 1ª y alguna baja → `part` "Progresó en la serie N". Técnica peor solo cuenta como veredicto si es en la 1ª serie. Se quitó "mixto".
+- **Resumen final**: "X de Y ejercicios con progreso" + "N ejercicio con progreso en una serie · N se mantuvo · N bajó · N con técnica peor" y explicación de la regla. `sessionProgress` devuelve `part` en vez de `mix`.
 
 ## Estado al 26-nov-2026
 - **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.

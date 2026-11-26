@@ -258,38 +258,65 @@ function suggestSides(ex, j) {
 // Es la forma justa de comparar dos series (lados izq/der, o semana vs semana). Sin RIR anotado se usan las reps tal cual.
 const rirN = (v) => (v === "F" ? -1 : v === "" || v == null ? null : +v);
 export const repsEff = (x) => { const r = +x.r, a = rirN(x.rir); return a == null ? r : r + Math.max(0, a); };
-const effTxt = (x) => { const a = rirN(x.rir); return a == null || a <= 0 ? `${x.r}` : `${x.r}+${a}`; };
-// ¿Hubo progreso en esta serie vs la misma serie de la semana pasada? (siempre que la técnica no empeore)
+// ¿Cómo salió esta serie vs la misma serie de la vez anterior? Texto en palabras simples (sin "reps + RIR").
+// k: up / same / down / bad (técnica peor) / new. t = frase larga, s = frase corta (imagen para compartir).
+const nRep = (n) => `${n} rep${n === 1 ? "" : "s"}`;
+const plusMinus = (n, what) => (n > 0 ? `${n} ${what} más` : `${-n} ${what} menos`);
+export function perfText(x, ref) {
+  const dw = Math.round((x.w - ref.w) * 10) / 10, dr = +x.r - +ref.r;
+  const a = rirN(x.rir), b = rirN(ref.rir), both = a != null && b != null;
+  const da = both ? Math.max(0, a) - Math.max(0, b) : 0, de = dr + da; // de = cambio de reps contando las que quedaron en reserva
+  const fallo = a === -1 && b !== -1 ? " y al fallo" : "";
+  const res = da ? `${Math.abs(da)} ${da > 0 ? "más" : "menos"} en reserva` : "";
+  if (dw > 0) return { k: "up", t: `Subió ${dw} kg${dr ? ` (${plusMinus(dr, dr === 1 || dr === -1 ? "rep" : "reps")})` : ""}`, s: `+${dw} kg` };
+  if (dw < 0) return { k: de > 0 ? "same" : "down", t: `Bajó ${-dw} kg${dr > 0 ? ` e hizo ${nRep(dr)} más` : dr < 0 ? ` e hizo ${nRep(-dr)} menos` : ""}`, s: `−${-dw} kg` };
+  // mismo peso
+  const k = de > 0 ? "up" : de < 0 ? "down" : "same";
+  let t;
+  if (!dr && !da) t = a === -1 && b !== -1 ? "Mismas reps, pero al fallo" : "Igual que la vez anterior";
+  else if (!dr) t = `Mismas reps, con ${res}${fallo}`;
+  else if (!da) t = `${dr > 0 ? "+" : "−"}${nRep(Math.abs(dr))}${fallo}`;
+  else t = `${dr > 0 ? "+" : "−"}${nRep(Math.abs(dr))}${(dr > 0) === (da > 0) ? " y" : ", pero"} con ${res}${fallo}`;
+  if (dr && da && !de) t += " (equivale a lo mismo)";
+  const sh = !dr && !da ? "Igual" : !dr ? `${da > 0 ? "+" : "−"}${Math.abs(da)} en reserva` : `${dr > 0 ? "+" : "−"}${nRep(Math.abs(dr))}${da ? `, ${da > 0 ? "+" : "−"}${Math.abs(da)} RIR` : ""}`;
+  return { k, t, s: sh };
+}
 export function setProgress(x, ref) {
   if (x.w === "" || x.r === "") return null;
-  if (!ref || ref.w === "" || ref.r === "") return { k: "new", t: "Primera vez" };
-  if (x.tech === "peor") return { k: "bad", t: "Técnica peor" };
-  const dw = Math.round((x.w - ref.w) * 10) / 10, both = rirN(x.rir) != null && rirN(ref.rir) != null;
-  const dr = both ? repsEff(x) - repsEff(ref) : x.r - ref.r, u = both ? " (con RIR)" : "", det = both ? ` · ${effTxt(ref)} → ${effTxt(x)}` : "";
-  if (dw > 0) return { k: "up", t: `Subió ${dw} kg${dr < 0 ? ` (${dr} reps${u})` : ""}` };
-  if (dw < 0) return { k: dr > 0 ? "same" : "down", t: `Bajó ${-dw} kg${dr > 0 ? ` (+${dr} reps${u})` : ""}` };
-  if (dr > 0) return { k: "up", t: `+${dr} rep${dr > 1 ? "s" : ""}${u} mismo peso${det}` };
-  if (dr < 0) return { k: "down", t: `${dr} rep${dr < -1 ? "s" : ""}${u} mismo peso${det}` };
-  return { k: "same", t: "Mantuvo" };
+  if (!ref || ref.w === "" || ref.r === "") return { k: "new", t: "Primera vez", s: "Primera vez" };
+  const p = perfText(x, ref);
+  if (x.tech === "peor") return { k: "bad", perf: p.k, t: `Técnica peor · ${p.t.charAt(0).toLowerCase() + p.t.slice(1)}`, s: "Técnica peor" };
+  return p;
 }
-// Veredicto de un ejercicio completo (no serie por serie) vs la semana pasada:
-// "up" = alguna serie progresó y ninguna retrocedió · "down" = alguna retrocedió y ninguna progresó · "mix" = unas sí y otras no
-// "bad" = alguna serie con técnica peor · "same" = todo igual · "new" = no hay con qué comparar
+// Veredicto del ejercicio completo vs la vez anterior. Manda la PRIMERA serie (regla de Joaquín):
+// si la 1ª progresa, el ejercicio progresó aunque la 2ª no mejore (es normal: la 1ª deja más fatiga).
+// up = progresó · part = progresó en alguna serie que no es la 1ª, otra bajó · down = bajó · bad = técnica peor en la 1ª · same = se mantuvo
 export function exProgress(e, prevS) {
-  const pgs = e.sets.map((x, j) => setProgress(x, refSet(prevS, e.exId, j))).filter(Boolean);
-  const cmp = pgs.filter((p) => p.k !== "new"); if (!pgs.length) return null; if (!cmp.length) return { k: "new", t: "Primera vez" };
-  const n = (k) => cmp.filter((p) => p.k === k).length, up = n("up"), down = n("down");
-  if (n("bad")) return { k: "bad", t: "Técnica peor en alguna serie" };
-  if (up && !down) return { k: "up", t: "Progresó" };
-  if (down && !up) return { k: "down", t: "Bajó" };
-  if (up && down) return { k: "mix", t: `Mixto: ${up} serie${up > 1 ? "s" : ""} mejor, ${down} peor` };
+  const all = e.sets.map((x, j) => ({ j, p: setProgress(x, refSet(prevS, e.exId, j)) })).filter((o) => o.p);
+  const cmp = all.filter((o) => o.p.k !== "new"); if (!all.length) return null; if (!cmp.length) return { k: "new", t: "Primera vez" };
+  const isFirst = (o) => (e.sides ? o.j < 2 : o.j === 0);
+  const first = cmp.filter(isFirst), rest = cmp.filter((o) => !isFirst(o));
+  const has = (arr, k) => arr.some((o) => o.p.k === k);
+  const sn = (o) => (e.sides ? Math.floor(o.j / 2) + 1 : o.j + 1);
+  const restWorse = rest.filter((o) => o.p.k === "down" || o.p.k === "bad");
+  const lst = (arr) => [...new Set(arr.map(sn))].join(" y ");
+  const dn = rest.filter((o) => o.p.k === "down"), bd = rest.filter((o) => o.p.k === "bad");
+  const worseTxt = [dn.length && `la serie ${lst(dn)} bajó`, bd.length && `la serie ${lst(bd)} salió con técnica peor`].filter(Boolean).join(" y ");
+  const which = worseTxt ? worseTxt.charAt(0).toUpperCase() + worseTxt.slice(1) : "";
+  if (first.length && has(first, "up") && !has(first, "down") && !has(first, "bad"))
+    return { k: "up", t: "Progresó", note: restWorse.length ? `${which}: es normal después de progresar en la primera.` : "" };
+  if (has(first, "bad")) return { k: "bad", t: "Técnica peor en la serie 1" };
+  const upRest = rest.filter((o) => o.p.k === "up");
+  if (has(first, "down")) return upRest.length ? { k: "part", t: `Progresó en la serie ${[...new Set(upRest.map(sn))].join(" y ")}, bajó en la 1` } : { k: "down", t: "Bajó" };
+  if (upRest.length) return restWorse.length ? { k: "part", t: `Progresó en la serie ${[...new Set(upRest.map(sn))].join(" y ")}` } : { k: "up", t: "Progresó" };
+  if (restWorse.length) return { k: "same", t: "Se mantuvo", note: `${which}.` };
   return { k: "same", t: "Se mantuvo" };
 }
 // Resumen de la sesión por ejercicio
 export function sessionProgress(s, prevS) {
   const v = s.exercises.map((e) => ({ e, p: exProgress(e, prevS) })).filter((x) => x.p && x.p.k !== "new");
   const c = (k) => v.filter((x) => x.p.k === k);
-  return { comp: v.length, up: c("up"), same: c("same"), down: c("down"), mix: c("mix"), bad: c("bad") };
+  return { comp: v.length, up: c("up"), part: c("part"), same: c("same"), down: c("down"), bad: c("bad") };
 }
 
 export const MEASURE_ZONES = [

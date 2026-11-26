@@ -638,3 +638,13 @@ body.rec-on #undobar { display: none; }
 .calccta { border-color: var(--acc); } .calccta .btn { margin-top: 6px; }
 /* Última vez que el cliente abrió la app (panel del coach) */
 .lastopen { color: var(--muted, #888); } .lastopen.g { color: var(--g); } .lastopen.y { color: var(--y); } .lastopen.r { color: var(--r); font-weight: 700; }
+/* v1.44: comparación serie a serie en el resumen (vez anterior | hoy) */
+.prog.part { color: var(--g); }
+.scmp { padding: 10px 0; border-top: 1px solid var(--line); } .card > b + .scmp, .card .scmp:first-of-type { margin-top: 8px; }
+.scmp-g { display: grid; grid-template-columns: 1fr 1px 1fr; gap: 12px; align-items: center; margin: 6px 0 4px; } .scmp-g.solo { grid-template-columns: 1fr; }
+.scmp-sep { align-self: stretch; background: var(--line); }
+.scmp-c small { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin-bottom: 2px; }
+.scmp-c.prev .scmp-v { color: var(--muted); } .scmp-c.prev .scmp-v b { color: var(--muted); }
+.scmp-v { font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; } .scmp-v .rir { font-size: 12px; font-weight: 700; color: var(--muted); margin-left: 2px; }
+.scmp-v .g { color: var(--g); } .scmp-v .r { color: var(--r); }
+.scmp .prog { font-size: 12.5px; margin-top: 2px; }

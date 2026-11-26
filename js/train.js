@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, chips, beep, notify, confirmBox, $, $$ } from "./ui.js";
 import { LS, esc, ymd, fmtDate, weekInfo, r1, num, embedUrl, uid, pad, parseYmd, D3, compressImage } from "./util.js";
 import { saveAudio, loadAudio, delAudio } from "./audiostore.js";
-import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest, splitSides, setProgress, repsEff, exProgress, sessionProgress } from "./data.js";
+import { getRoutines, getSessions, weekPlan, prevSession, refSet, newSession, suggest, splitSides, setProgress, perfText, repsEff, exProgress, sessionProgress } from "./data.js";
 import { I } from "./icons.js";
 import { has } from "./features.js";
 
@@ -170,9 +170,8 @@ function pairDiff(ex, p) {
   const a = ex.sets[p * 2], b = ex.sets[p * 2 + 1]; if (!a || !b || a.r === "" || b.r === "") return "";
   const ea = repsEff(a), eb = repsEff(b), dr = eb - ea, dw = a.w !== "" && b.w !== "" ? r1(b.w - a.w) : 0;
   if (!dw && Math.abs(dr) <= 1) return `<span class="g">Lados parejos ✓</span>`;
-  const parts = []; if (dw) parts.push(`${dw > 0 ? "+" : ""}${dw} kg`);
-  if (dr) parts.push(`${dr > 0 ? "+" : ""}${dr} rep${Math.abs(dr) > 1 ? "s" : ""} contando el RIR (${ea} vs ${eb})`);
-  return `<span class="${Math.abs(dr) >= 3 || dw ? "y" : "b"}">Der. vs Izq.: ${parts.join(" · ")}</span>`;
+  const t = a.w !== "" && b.w !== "" ? perfText(b, a).t : `${dr > 0 ? "+" : ""}${dr} reps`;
+  return `<span class="${Math.abs(dr) >= 3 || dw ? "y" : "b"}">Derecha vs izquierda: ${t.charAt(0).toLowerCase() + t.slice(1)}</span>`;
 }
 function setInfo(ex, j) {
   const st = ex.sets[j], ref = refSet(prev, ex.exId, j);
@@ -405,21 +404,34 @@ act("svSave", () => { const s = S.session; s.survey = s.survey || {}; s.survey.a
 act("svSkip", finish);
 
 // ================================================================ RESUMEN
+// Una serie en el comparador: "18 kg × 7 · RIR 1". Si se pasa ref, lo que cambió se pinta (verde mejor / rojo peor).
+function setCell(x, ref) {
+  const c = (d) => (!ref || !d ? "" : d > 0 ? "g" : "r");
+  const rn = (v) => (v === "F" ? 0 : v === "" || v == null ? null : +v);
+  const dw = ref && x.w !== "" && ref.w !== "" ? +x.w - +ref.w : 0, dr = ref && x.r !== "" && ref.r !== "" ? +x.r - +ref.r : 0;
+  const da = ref && rn(x.rir) != null && rn(ref.rir) != null ? rn(x.rir) - rn(ref.rir) : 0;
+  return `<span class="scmp-v"><b class="${c(dw)}">${x.w || "–"} kg</b> × <b class="${c(dr)}">${x.r || "–"}</b>${x.rir !== "" && x.rir != null ? ` <span class="rir ${c(da)}">${x.rir === "F" ? "Fallo" : "RIR " + x.rir}</span>` : ""}</span>`;
+}
 export async function summaryView(id) {
   const s = await loadSession(id); if (!s) return "";
   document.getElementById("app")?.classList.remove("in-session");
   const sv = s.survey || {}, mins = s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) : null;
   const sets = s.exercises.reduce((t, e) => t + e.sets.filter((x) => x.done || x.w !== "").length, 0);
   const SP = sessionProgress(s, prev), nUp = SP.up.length, nComp = SP.comp;
-  const PGI = { up: "▲", down: "▼", bad: "⚠", mix: "↕", same: "•", new: "•" };
+  const PGI = { up: "▲", down: "▼", bad: "⚠", part: "▲", same: "•", new: "•" };
   const audio = await loadAudio(`${P()}/audios`, s.id);
   return `${head("Resumen de la sesión", "entreno")}
   <div class="card"><h3>${esc(s.routineName)}</h3><div class="muted small">${fmtDate(s.date, true)}${mins ? ` · ${mins} min` : ""}</div>
   <div class="stats3 mt"><div><b>${s.exercises.filter((e) => e.sets.some((x) => x.w !== "" || x.done)).length}</b><small>Ejercicios</small></div><div><b>${sets}</b><small>Series</small></div><div><b>${sv.intensidad ?? sv.dureza ?? "—"}</b><small>Intensidad /10</small></div></div></div>
-  ${s.exercises.map((e) => { const done = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!done.length) return ""; const xp = has("train_suggest") ? exProgress(e, prev) : null; return `<div class="card ${e.extra ? "extra" : ""}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge b">Extra</span>' : ""}${xp && xp.k !== "new" ? ` <span class="prog ${xp.k === "mix" ? "same" : xp.k}">${PGI[xp.k]} ${xp.t}</span>` : ""}${e.replaced ? ` <small class="muted">(en vez de ${esc(e.replacedFrom)})</small>` : ""}
-    ${e.sets.map((x, j) => { if (x.w === "" && x.r === "") return ""; const ref = refSet(prev, e.exId, j); const dw = ref && x.w !== "" && ref.w !== "" ? r1(x.w - ref.w) : 0, dr = ref && x.r !== "" && ref.r !== "" ? x.r - ref.r : 0;
-      return `<div class="li row between small"><span>${e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`}: <b>${x.w || "–"} kg × ${x.r || "–"}</b>${x.rir !== "" ? " RIR " + x.rir : ""}${x.tech ? ` <span class="badge tech-${x.tech}">Téc. ${x.tech}</span>` : ""}${(() => { const pg = !has("train_suggest") ? null : setProgress(x, ref); return pg ? `<br><span class="prog ${pg.k}">${pg.k === "up" ? "▲" : pg.k === "down" ? "▼" : pg.k === "bad" ? "⚠" : "•"} ${pg.t}</span>` : ""; })()}</span><span>${ref ? `<span class="muted">${ref.w}×${ref.r}</span> ${dw ? `<span class="${dw > 0 ? "g" : "r"}">${dw > 0 ? "+" : ""}${dw}kg</span>` : ""} ${dr ? `<span class="${dr > 0 ? "g" : "r"}">${dr > 0 ? "+" : ""}${dr}r</span>` : ""}` : ""}</span></div>`; }).join("")}</div>`; }).join("")}
-  ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} ejercicio${nComp > 1 ? "s" : ""} con progreso</b><small class="muted">${[SP.same.length && `${SP.same.length} se mantuvo${SP.same.length > 1 ? "ron" : ""}`, SP.mix.length && `${SP.mix.length} mixto${SP.mix.length > 1 ? "s" : ""}`, SP.down.length && `${SP.down.length} bajó${SP.down.length > 1 ? "ron" : ""}`, SP.bad.length && `${SP.bad.length} con técnica peor`].filter(Boolean).join(" · ")}${SP.same.length || SP.mix.length || SP.down.length || SP.bad.length ? "<br>" : ""}vs la semana pasada · un ejercicio progresa si sube el peso o las reps contando el RIR (reps + reserva) en alguna serie, sin que otra baje ni empeore la técnica</small></div>` : ""}
+  ${s.exercises.map((e) => { const done = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!done.length) return ""; const xp = has("train_suggest") ? exProgress(e, prev) : null; return `<div class="card ${e.extra ? "extra" : ""}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge b">Extra</span>' : ""}${xp && xp.k !== "new" ? ` <span class="prog ${xp.k}">${PGI[xp.k]} ${xp.t}</span>` : ""}${e.replaced ? ` <small class="muted">(en vez de ${esc(e.replacedFrom)})</small>` : ""}
+    ${xp?.note ? `<div class="muted small" style="margin-top:4px">${esc(xp.note)}</div>` : ""}
+    ${e.sets.map((x, j) => { if (x.w === "" && x.r === "") return ""; const ref = has("train_suggest") ? refSet(prev, e.exId, j) : null; const pg = has("train_suggest") ? setProgress(x, ref) : null;
+      const lab = e.sides ? `Serie ${Math.floor(j / 2) + 1} ${j % 2 ? "der." : "izq."}` : `Serie ${j + 1}`;
+      const okRef = ref && ref.w !== "" && ref.r !== "";
+      return `<div class="scmp"><div class="row between"><b class="small">${lab}</b>${x.tech ? `<span class="badge tech-${x.tech}">Téc. ${x.tech}</span>` : ""}</div>
+        <div class="scmp-g${okRef ? "" : " solo"}">${okRef ? `<div class="scmp-c prev"><small>Vez anterior</small>${setCell(ref)}</div><div class="scmp-sep"></div>` : ""}<div class="scmp-c"><small>${okRef ? "Hoy" : "Primera vez"}</small>${setCell(x, ref)}</div></div>
+        ${pg && pg.k !== "new" ? `<div class="prog ${pg.k}">${PGI[pg.k]} ${esc(pg.t)}</div>` : ""}</div>`; }).join("")}</div>`; }).join("")}
+  ${nComp ? `<div class="card progcard"><b>${nUp} de ${nComp} ejercicio${nComp > 1 ? "s" : ""} con progreso</b><small class="muted">${[SP.part.length && `${SP.part.length} ejercicio${SP.part.length > 1 ? "s" : ""} con progreso en una serie`, SP.same.length && `${SP.same.length} se mantuvo${SP.same.length > 1 ? "ron" : ""}`, SP.down.length && `${SP.down.length} bajó${SP.down.length > 1 ? "ron" : ""}`, SP.bad.length && `${SP.bad.length} con técnica peor`].filter(Boolean).join(" · ")}${SP.part.length || SP.same.length || SP.down.length || SP.bad.length ? "<br>" : ""}Comparado con la vez anterior. Un ejercicio progresa si mejora la primera serie (más peso, más reps o las mismas reps con más en reserva) sin empeorar la técnica. Es normal que la segunda serie cueste más cuando progresas en la primera.</small></div>` : ""}
   ${s.comment ? `<div class="card note">${esc(s.comment)}</div>` : ""}
   ${has("train_audio") ? `<div class="card audiofb"><div class="card-t">🎙️ Retroalimentación por audio</div><p class="muted small">Cuéntale a tu coach cómo te sentiste, qué costó, molestias, lo que quieras. Al terminar se abre WhatsApp para mandárselo (y queda guardado en su panel).</p>
     ${audio?.data ? `<audio controls src="${audio.data}"></audio><button class="btn primary big" data-a="audioShare">Enviar audio por WhatsApp</button><button class="btn ghost block" data-a="audioRec">Grabar de nuevo</button>` : `<button class="btn primary big" data-a="audioRec" id="recB">● Grabar audio</button>`}</div>` : ""}
@@ -506,7 +518,7 @@ async function sessionImage(s) {
       g.fillStyle = "#fff"; g.font = F(700, 30); g.fillText(`${x.w || "–"} kg × ${x.r || "–"}`, P + 170, yy);
       if (x.rir !== "") { g.fillStyle = "#e0313b"; g.font = F(800, 26); g.fillText(`RIR ${x.rir}`, P + 450, yy); }
       if (x.tech) { const tc = TECHC[x.tech]; g.fillStyle = tc + "33"; g.beginPath(); g.roundRect(P + 560, yy - 28, 150, 38, 19); g.fill(); g.fillStyle = tc; g.font = F(700, 21); g.fillText(`Téc. ${x.tech}`, P + 578, yy - 2); }
-      const pg = setProgress(x, refSet(prev, e.exId, j)); if (pg && pg.k !== "new") { g.fillStyle = { up: "#22c55e", down: "#ef4444", bad: "#f59e0b", same: "#a1a1aa" }[pg.k]; g.font = F(700, 21); const tt = (pg.k === "up" ? "▲ " : pg.k === "down" ? "▼ " : "") + pg.t; g.fillText(tt.length > 26 ? tt.slice(0, 25) + "…" : tt, P + 725, yy - 2); }
+      const pg = setProgress(x, refSet(prev, e.exId, j)); if (pg && pg.k !== "new") { g.fillStyle = { up: "#22c55e", down: "#ef4444", bad: "#f59e0b", same: "#a1a1aa" }[pg.k]; g.font = F(700, 21); const tt = (pg.k === "up" ? "▲ " : pg.k === "down" ? "▼ " : "") + (pg.s || pg.t); g.fillText(tt.length > 26 ? tt.slice(0, 25) + "…" : tt, P + 725, yy - 2); }
       if (x.note) { g.fillStyle = "#a1a1aa"; g.font = F(500, 20); g.fillText("✎", W - P - 40, yy - 2); }
       yy += 46;
     });
