@@ -673,3 +673,8 @@ body.rec-on #undobar { display: none; }
 .srow .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surf2); color: var(--txt); font-variant-numeric: tabular-nums; }
 .srow { grid-template-columns: 24px 1fr auto; padding: 9px 0; } .srow .sl { grid-row: auto; } .srow .chips { justify-content: flex-end; max-width: 130px; }
+/* v1.47: retro por entrenamiento (panel) */
+.sretro { margin: 10px 0 6px; padding: 9px 10px; border-radius: 10px; background: var(--surf2); border-left: 3px solid var(--g); }
+.sretro.srp { border-left-color: var(--y); background: color-mix(in srgb, var(--y) 7%, var(--surf2)); }
+.sretro textarea { margin: 6px 0 4px; }
+.badge.g { background: var(--g-s); color: var(--g); }

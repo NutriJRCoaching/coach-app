@@ -460,9 +460,12 @@ export async function summaryView(id) {
   const SP = sessionProgress(s, prev), nUp = SP.up.length, nComp = SP.comp;
   const PGI = { up: "▲", down: "▼", bad: "⚠", part: "▲", mix: "↕", same: "•", new: "•" };
   const audio = await loadAudio(`${P()}/audios`, s.id);
+  const sr = await db.get(`${P()}/sretros/${s.id}`).catch(() => null);
+  if (sr?.text && !sr.seen && !S.preview) db.set(`${P()}/sretros/${s.id}`, { seen: true, seenAt: Date.now() });
   return `${head("Resumen de la sesión", "entreno")}
   <div class="card"><h3>${esc(s.routineName)}</h3><div class="muted small">${fmtDate(s.date, true)}${mins ? ` · ${mins} min` : ""}</div>
-  <div class="stats3 mt"><div><b>${s.exercises.filter((e) => e.sets.some((x) => x.w !== "" || x.done)).length}</b><small>Ejercicios</small></div><div><b>${sets}</b><small>Series</small></div><div><b>${sv.intensidad ?? sv.dureza ?? "—"}</b><small>Intensidad /10</small></div></div></div>
+  <div class="stats3 mt"><div><b>${s.exercises.filter((e) => e.sets.some((x) => x.w !== "" || x.done)).length}</b><small>Ejercicios</small></div><div><b>${sets}</b><small>Series</small></div><div><b>${sv.intensidad ?? sv.dureza ?? "—"}</b><small>Intensidad /10</small></div></div>
+  ${sr?.text ? `<div class="card coachnote"><b>💬 Tu coach:</b> ${esc(sr.text)}</div>` : ""}</div>
   ${s.exercises.map((e) => { const done = e.sets.filter((x) => x.w !== "" || x.r !== ""); if (!done.length) return ""; const xp = has("train_suggest") ? exProgress(e, prev) : null; return `<div class="card ${e.extra ? "extra" : ""}"><b>${esc(e.name)}</b>${e.extra ? ' <span class="badge b">Extra</span>' : ""}${xp && xp.k !== "new" ? ` <span class="prog ${xp.k}">${PGI[xp.k]} ${xp.t}</span>` : ""}${e.replaced ? ` <small class="muted">(en vez de ${esc(e.replacedFrom)})</small>` : ""}${refInfo(prev, e.exId)?.date ? `<small class="muted vsd">vs ${fmtDate(refInfo(prev, e.exId).date)}</small>` : ""}
     ${xp?.note ? `<div class="muted small" style="margin-top:4px">${esc(xp.note)}</div>` : ""}
     ${e.sets.map((x, j) => { if (x.w === "" && x.r === "") return ""; const ref = has("train_suggest") ? refSet(prev, e.exId, j) : null; const pg = has("train_suggest") ? setProgress(x, ref) : null;

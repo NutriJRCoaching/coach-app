@@ -16,14 +16,15 @@ export const emailKey = (e) => String(e || "").trim().toLowerCase();
 export async function loadCtx(c) {
   const today = ymd();
   if (c.service === "entrenamiento" && c.selfCalc === undefined) c.selfCalc = await db.get(`clients/${c.id}/settings/calc`).catch(() => null);
-  const [routines, sessions, days, checkins, feedbacks, fbreplies, access, onb, presence] = await Promise.all([
+  const [routines, sessions, days, checkins, feedbacks, fbreplies, access, onb, presence, sretros] = await Promise.all([
     getRoutines(c.id), getSessions(c.id), getDays([addDays(today, -6), c.startDate ? weekInfo(c, today).first : today].sort()[0], today, c.id),
     db.list(`clients/${c.id}/checkins`), db.list(`clients/${c.id}/feedbacks`), db.list(`clients/${c.id}/fbreplies`),
     c.email ? db.get("access/" + emailKey(c.email)).catch(() => null) : null,
     db.get(`clients/${c.id}/settings/onboarding`).catch(() => null),
-    db.get(`clients/${c.id}/settings/presence`).catch(() => null)
+    db.get(`clients/${c.id}/settings/presence`).catch(() => null),
+    db.list(`clients/${c.id}/sretros`).catch(() => [])
   ]);
-  return { routines, sessions, days, checkins, feedbacks, fbreplies, access, onb, presence };
+  return { routines, sessions, days, checkins, feedbacks, fbreplies, access, onb, presence, sretros };
 }
 
 // ---------- ¿Algo no calza en los planes de alimentación? (planes de la etapa actual y de las que vienen)
@@ -165,8 +166,10 @@ export function alertsFor(c, x) {
       const wk = x.sessions.filter((s) => s.status === "fin" && s.weekKey === w.key);
       if (wk.some((s) => s.survey?.articular === "si")) add("r", "Reportó molestia articular", "entrenos");
       if (wk.some((s) => s.exercises?.some((e) => e.tech === "peor" || e.sets?.some((y) => y.tech === "peor")))) add("y", "Técnica peor en algún ejercicio", "entrenos");
-      const seen = c.seen?.entrenos || 0, nuevos = x.sessions.filter((s) => s.status === "fin" && !s.imported && (s.endedAt || 0) > seen).length;
-      if (nuevos) add("i", `${nuevos} entrenamiento${nuevos > 1 ? "s" : ""} nuevo${nuevos > 1 ? "s" : ""} para revisar`, "entrenos");
+      // Retro por entrenamiento (v1.47): cada entrenamiento terminado espera tu comentario (o "sin comentarios")
+      const done = new Set((x.sretros || []).map((r) => r.id)), from = [appStart(c), addDays(today, -21)].sort()[1];
+      const sinRetro = x.sessions.filter((s) => s.status === "fin" && !s.imported && s.date >= from && !done.has(s.id)).sort((a, b) => (a.date < b.date ? -1 : 1));
+      if (sinRetro.length) add(sinRetro.some((s) => diffDays(today, s.date) >= 3) ? "r" : "y", `Anota tu retro de ${sinRetro.length === 1 ? "su entrenamiento" : sinRetro.length + " entrenamientos"}: ${sinRetro.slice(0, 3).map((s) => `${s.routineName} (${fmtDate(s.date)})`).join(", ")}${sinRetro.length > 3 ? "…" : ""}`, "entrenos");
     }
     if (active) {
       // Proporcional a lo que va de su semana: avisa si ya le faltan 2 o más días sin registrar comida, o menos de 3 de cada 7 pesajes

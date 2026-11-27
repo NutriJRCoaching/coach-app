@@ -212,11 +212,18 @@ act("tlWeek", (el) => { CW.n = +el.dataset.w; refresh(); });
 async function trainingView(c, w) {
   return `<div class="card-t mt">Semana ${w.n} · lo que hizo</div><div class="ses-grid">${await sessionsView(c, w)}</div>${await routinesView(c)}`;
 }
+// ---------- Retro por entrenamiento: clients/{id}/sretros/{sessionId} = { text, at, seen } o { skip: true }
+act("srSave", async (el) => {
+  const text = el.value.trim(), path = `clients/${CW.cid}/sretros/${el.dataset.sid}`;
+  if (text) await db.set(path, { text, at: Date.now(), seen: false, skip: false }); else await db.del(path);
+  resetAlerts(); toast(text ? "Retro guardada ✓ (tu cliente la ve en su entrenamiento)" : "Retro borrada"); refresh();
+});
+act("srSkip", async (el) => { await db.set(`clients/${CW.cid}/sretros/${el.dataset.sid}`, { skip: true, at: Date.now() }); resetAlerts(); toast("Marcado como revisado"); refresh(); });
 // ---------- Entrenamientos de la semana
 async function sessionsView(c, w) {
   const all = await getSessions(c.id);
   const list = all.filter((s) => s.weekKey === w.key && s.status === "fin").sort((a, b) => a.startedAt - b.startedAt);
-  const [exnotes, audios0] = await Promise.all([db.list(`clients/${c.id}/exnotes`), db.list(`clients/${c.id}/audios`)]);
+  const [exnotes, audios0, sretros] = await Promise.all([db.list(`clients/${c.id}/exnotes`), db.list(`clients/${c.id}/audios`), db.list(`clients/${c.id}/sretros`).catch(() => [])]);
   // audios en partes (alta calidad): se arma cada uno con sus partes, que vienen en la misma lista
   const audios = audios0.filter((a) => !String(a.id).includes("~p")).map((a) => (a.parts > 1 ? { ...a, data: a.data + [...Array(a.parts - 1)].map((_, k) => audios0.find((x) => x.id === `${a.id}~p${k + 2}`)?.data ?? "\u0000").join("") } : a)).map((a) => (a.data?.includes("\u0000") ? { ...a, data: "" } : a));
   if (!list.length) return `<p class="muted">Sin entrenamientos registrados esta semana.</p>`;
@@ -226,6 +233,10 @@ async function sessionsView(c, w) {
     return `<div class="card sesc"><div class="row between"><h3>${esc(s.routineName)} <small class="muted">${fmtDate(s.date, true)} · ${s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) + " min" : ""}</small></h3>
     <div class="row gap small">${sv.intensidad ?? sv.dureza ? `<span class="pill">Intensidad ${sv.intensidad ?? sv.dureza}/10</span>` : ""}${sv.fuerza ? `<span class="pill">Fuerza ${sv.fuerza}/5</span>` : ""}${sv.energia ? `<span class="pill">Energía ${sv.energia}/5</span>` : ""}${sv.doms ? `<span class="pill">DOMS ${sv.doms}/5</span>` : ""}${sv.general ? `<span class="pill">General ${sv.general}/5</span>` : ""}${sv.articular === "si" ? `<span class="badge r">Molestia articular: ${esc(sv.articularDet || "")}</span>` : ""}${sv.orden === "no" ? `<span class="badge y">No siguió el orden</span>` : ""}</div></div>
     ${s.comment ? `<div class="note">💬 ${esc(s.comment)}</div>` : ""}
+    ${(() => { const r = sretros.find((y) => y.id === s.id); const st = !r ? `<span class="badge y">Pendiente</span>` : r.skip ? `<span class="badge">Revisado sin comentario</span>` : `<span class="badge g">✓ Enviada${r.seen ? " · la vio" : ""}</span>`;
+      return `<div class="sretro ${r ? "" : "srp"}"><div class="row between"><b class="small">💬 Tu retro de este entrenamiento</b>${st}</div>
+      <textarea rows="2" placeholder="Ej: muy bien la prensa, la próxima sube 5 kg. En el curl cuida no balancear." data-a-change="srSave" data-sid="${s.id}">${esc(r?.text || "")}</textarea>
+      ${!r || (!r.text && !r.skip) ? `<button class="btn tiny ghost" data-a="srSkip" data-sid="${s.id}">Revisado, sin comentario</button>` : ""}</div>`; })()}
     ${audios.find((a) => a.id === s.id)?.data ? `<div class="note">🎙️ Audio del cliente (${audios.find((a) => a.id === s.id).secs || "?"} s)<br><audio controls src="${audios.find((a) => a.id === s.id).data}"></audio></div>` : ""}
     <details><summary class="small muted">Ver detalle por serie</summary><table class="tbl"><tr><th>Ejercicio</th><th>Serie</th><th>Esta semana</th><th>Última vez</th><th>Δ</th><th>Nota</th></tr>
     ${s.exercises.map((e) => e.sets.map((x, j) => { const ref = refSet(prev, e.exId, j); const dw = ref && x.w !== "" && ref.w !== "" ? r1(x.w - ref.w) : null, dr = ref && x.r !== "" && ref.r !== "" ? x.r - ref.r : null;

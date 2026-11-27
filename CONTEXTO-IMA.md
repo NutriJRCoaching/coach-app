@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.46.2**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.47.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -482,6 +482,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 
 ## v1.46.1–1.46.2 (26-nov)
 - Resumen: se escribe "RIR 1" / "Fallo" (no "@1" / "F"). **Regla de Joaquín: el fallo NO es un RIR** (es una rep incompleta y su fatiga varía: fallar apenas intentas la rep vs pelearla 5 s). Las cápsulas no restan fallo contra RIR: solo "Al fallo" (antes tenía RIR) o "Sin fallo" (antes fue al fallo); "± RIR" solo entre dos RIR numéricos. v1.46.2: igual en `perfText` (frases de la sesión y veredicto): el fallo no suma ni resta reserva; se dice "y al fallo" / "sin llegar al fallo".
+
+## v1.47.0 (26-nov) — Retro por entrenamiento (pedido de Joaquín)
+- Datos: `clients/{id}/sretros/{sessionId}` = `{ text, at, seen, seenAt }` o `{ skip: true, at }` (revisado sin comentario). Las reglas actuales ya lo cubren (comodín de subcolecciones: el cliente lo lee y marca `seen`).
+- **Panel → Entrenamiento**, en cada sesión: recuadro "💬 Tu retro de este entrenamiento" (amarillo "Pendiente" / verde "✓ Enviada · la vio" / "Revisado sin comentario"); se guarda al salir del campo (`srSave`; vacío = borra) y botón "Revisado, sin comentario" (`srSkip`). Clase `.sretro` / `.srp` (ojo: `.pend` ya existía para la lista de pendientes).
+- **Campana** (`alertsFor`, `loadCtx` carga `sretros`): "Anota tu retro de N entrenamientos: Rutina (fecha)…" por cada entrenamiento terminado (no importado, desde `appStart` y máx. 21 días atrás) sin retro; amarillo, rojo si alguno tiene 3+ días. Reemplaza el gris "N entrenamientos nuevos para revisar".
+- **Cliente**: tarjeta en el inicio "💬 Tu coach comentó tu entrenamiento" hasta que la abre (`sretroCard` en client.js → `#resumen/{id}`); en el resumen de la sesión sale arriba "💬 Tu coach: …" y se marca `seen` (no en la vista previa del coach).
 
 ## Estado al 26-nov-2026
 - **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.

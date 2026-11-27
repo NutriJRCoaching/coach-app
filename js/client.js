@@ -102,6 +102,7 @@ async function home() {
   ${date === today ? `<details class="pendbox ${pend.length ? "" : "ok"}"><summary>${pend.length ? I.info : I.check}${pend.length ? `Tienes ${pend.length} pendiente${pend.length > 1 ? "s" : ""}` : "Todo al día"}${pend.length ? I.chevDown : ""}</summary>
     ${pend.length ? `<div class="pendlist">${pend.map((p) => `<a class="pend ${p.c}" href="#${p.to}"><span class="dot"></span>${esc(p.t)}${I.chev}</a>`).join("")}</div>` : ""}</details>` : ""}
   ${date === today ? await coachVideosCard() : ""}
+  ${date === today ? await sretroCard() : ""}
   ${date === today && has("macro_guide") ? calcHomeCard(c) : ""}
   ${ps === "hoy" ? `<div class="card paycard">${payMsg(c, pay)}</div>` : ""}
   ${ps === "vencido" ? `<div class="card paycard late">${payMsg(c, pay, true)}</div>` : ""}
@@ -872,6 +873,11 @@ async function planView() {
   ${has("plan_pauta") && !(S.client.menus || []).length ? legHtml(S.client) : ""}`;
 }
 
+// ---------- Retro de tu coach a un entrenamiento (v1.47): tarjeta en el inicio hasta que la abre
+async function sretroCard() {
+  const [rs, ss] = await Promise.all([db.list(`${P()}/sretros`).catch(() => []), getSessions(S.cid).catch(() => [])]);
+  return rs.filter((r) => r.text && !r.seen).map((r) => { const s = ss.find((x) => x.id === r.id); return s ? `<a class="card fbmini" href="#resumen/${esc(r.id)}"><div class="card-t">💬 Tu coach comentó tu entrenamiento</div><div class="small"><b>${esc(s.routineName)}</b> · ${fmtDate(s.date, true)} · toca para verlo</div></a>` : ""; }).join("");
+}
 // ---------- Videos que te manda tu coach (fuera de la retro semanal): aparecen en el inicio hasta que los ves; todos quedan en Más
 const coachVideos = async () => (await db.list(`${P()}/videos`).catch(() => [])).sort((a, b) => (b.at || 0) - (a.at || 0));
 async function coachVideosCard() {
