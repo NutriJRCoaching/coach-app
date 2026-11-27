@@ -678,3 +678,14 @@ body.rec-on #undobar { display: none; }
 .sretro.srp { border-left-color: var(--y); background: color-mix(in srgb, var(--y) 7%, var(--surf2)); }
 .sretro textarea { margin: 6px 0 4px; }
 .badge.g { background: var(--g-s); color: var(--g); }
+/* v1.49: info de serie compacta */
+.setinfo { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+.setinfo .lastv { display: block; background: none; padding: 0; margin: 2px 0 1px; font-size: 12px; color: var(--muted); }
+.setinfo .lastv b { font-size: 12.5px; color: var(--txt); font-weight: 700; } .setinfo .lastv .tc.peor { color: var(--r); } .setinfo .lastv .tc.mejor { color: var(--g); }
+.setinfo .prog { font-size: 12px; margin: 1px 0; }
+.setinfo .hint, .hint { color: var(--txt); font-weight: 500; font-size: 12px; margin: 1px 0; opacity: .85; }
+.setinfo .lastnote { background: none; border: 0; border-left: 2px solid var(--y); border-radius: 0; padding: 0 0 0 7px; margin: 3px 0; font-size: 12px; color: var(--y); }
+.notebtn, .notebtn.on { display: inline; width: auto; border: 0; background: none; padding: 0; margin: 2px 0 0; color: var(--muted); font-size: 12px; font-weight: 600; text-align: left; }
+.notebtn.on { color: var(--txt); font-weight: 500; }
+.sosb { white-space: nowrap; } .sosb .ic { width: 14px; height: 14px; }
+.ex-h { gap: 8px; align-items: flex-start; }

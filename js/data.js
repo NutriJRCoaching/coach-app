@@ -195,11 +195,11 @@ export const refInfo = (prev, exId) => prev?.exercises?.find((e) => e.exId === e
 export function nextHint(ref, t = {}) {
   if (!ref || ref.w === "" || ref.r === "") return null;
   const rg = range(t.reps), tr = t.rir === "F" ? -1 : t.rir === "" || t.rir == null ? 1 : +t.rir, r = +ref.r, a = rirN(ref.rir);
-  if (ref.tech === "peor") return { k: "y", t: "La última vez la técnica salió peor: mantén el peso y afírmala" };
-  if (a === -1 && tr !== -1) return { k: "y", t: "La última vez llegaste al fallo: mantén el peso y deja al menos 1 rep en reserva" };
-  if (rg && r < rg.lo - 1) return { k: "r", t: "La última vez te faltaron reps: baja un poco el peso" };
-  if (rg && (r > rg.hi || (r >= rg.hi && a != null && a > tr))) return { k: "g", t: "La última vez te sobró margen: intenta subir el peso" };
-  return { k: "b", t: "Mantén el peso e intenta sumar 1 rep o hacerla con mejor técnica" };
+  if (ref.tech === "peor") return { k: "y", t: "Técnica peor la última vez: mantén el peso y afírmala" };
+  if (a === -1 && tr !== -1) return { k: "y", t: "Llegaste al fallo: mantén el peso y deja 1 rep en reserva" };
+  if (rg && r < rg.lo - 1) return { k: "r", t: "Te faltaron reps: baja un poco el peso" };
+  if (rg && (r > rg.hi || (r >= rg.hi && a != null && a > tr))) return { k: "g", t: "Te sobró margen: intenta subir el peso" };
+  return null; // sin nada especial que cambiar: no se muestra sugerencia (menos ruido)
 }
 
 // ---------- Modificaciones de rutina que ve el cliente (v1.48, regla de Joaquín):

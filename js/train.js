@@ -139,9 +139,8 @@ export async function sessionView(id) {
   ${s.coachNote && i === 0 ? `<div class="coachnote rnote"><b>Tu coach para hoy:</b> ${esc(s.coachNote)}</div>` : ""}
   <div class="extabs">${s.exercises.map((e, k) => { const done = e.sets.length && e.sets.every((x) => x.done); return `<button class="${k === i ? "on" : ""} ${done ? "done" : ""} ${e.extra ? "extra" : ""} ${e.changed ? "chg" : ""}" style="--exc:${exCol(s.exercises, k)}" data-a="exGo" data-i="${k}" title="${e.extra ? "Ejercicio extra (fuera de tu rutina)" : ""}">${e.extra ? "+" : exNum(s.exercises, k)}</button>`; }).join("")}</div>
   <div class="card ex ${ex.extra ? "extra" : ""}" style="--exc:${exCol(s.exercises, i)}">
-    <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra · fuera de la rutina</span>' : ""}${ex.replaced ? `<br><span class="badge y">SOS · en vez de ${esc(ex.replacedFrom)}</span>` : ""}</h3><button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></div>
-    <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video && has("train_videos") ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos de emergencia" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
-    ${ex.extra ? "" : `<button class="sosbtn" data-a="sosOpen">${I.swap} ${ex.replaced ? `Volver a ${esc(ex.replacedFrom)} o cambiar el reemplazo` : "¿Ocupada o no está? Reemplazo SOS"}</button>`}
+    <div class="ex-h"><h3>${esc(ex.name)}${ex.changed ? ' <span class="badge r">Modificado</span>' : ""}${ex.extra ? ' <span class="badge b">Extra · fuera de la rutina</span>' : ""}${ex.replaced ? `<br><span class="badge y">SOS · en vez de ${esc(ex.replacedFrom)}</span>` : ""}</h3><span class="row gap">${ex.extra ? "" : `<button class="btn tiny ghost sosb" data-a="sosOpen">${I.swap} Reemplazos SOS</button>`}<button class="btn tiny ${ex.sides ? "primary" : "ghost"}" data-a="toggleSides" title="Anotar cada lado por separado">Izq / Der</button></span></div>
+    <button class="tips" data-a="tips"><span class="ti-ic">${I.play}</span><span><b>Tips de ejecución</b><small>${[ex.video && has("train_videos") ? "Video" : "", ex.notes ? "Indicaciones" : "", "Configuración", ex.alts?.length ? "Reemplazos SOS" : ""].filter(Boolean).join(" · ")}${exNote.text ? " ●" : ""}</small></span>${I.chev}</button>
     ${ex.weekNote || ex.wSug ? `<div class="coachnote">${ex.weekNote ? `<b>Tu coach:</b> ${esc(ex.weekNote)}` : ""}${ex.wSug ? `${ex.weekNote ? "<br>" : ""}<b>Peso sugerido:</b> ${esc(ex.wSug)} kg` : ""}</div>` : ""}
     ${!has("train_targets") ? `<div class="goal"><small>Registra el peso y las repeticiones de cada serie</small></div>` : ex.target.length ? `<div class="goal"><small>Lo que tienes que hacer hoy${ex.sides ? " · cada lado" : ""}</small><div>${(ex.sides ? ex.target.filter((_, k) => k % 2 === 0) : ex.target).map((t, j) => `<span><b>Serie ${j + 1}</b>${planTxt(t)}</span>`).join("")}</div>${ex.tempo || ex.rest ? `<small class="muted">${ex.tempo ? `Tempo ${esc(ex.tempo)} (bajada-pausa-subida-pausa)` : ""}${ex.tempo && ex.rest ? " · " : ""}${ex.rest ? `Descanso ${Math.floor(ex.rest / 60)}:${String(ex.rest % 60).padStart(2, "0")}` : ""}</small>` : ""}</div>` : `<div class="goal"><small>Series libres</small></div>`}
     <div class="sets"><div class="sh"><span>Serie</span><span>Peso kg</span><span>Reps</span><span>RIR</span>${has("train_tech") ? "<span>Técnica</span>" : ""}</div>
@@ -175,17 +174,18 @@ function pairDiff(ex, p) {
   return `<span class="${Math.abs(dr) >= 3 || dw ? "y" : "b"}">Derecha vs izquierda: ${t.charAt(0).toLowerCase() + t.slice(1)}</span>`;
 }
 function setInfo(ex, j) {
+  // v1.49: compacto. Una línea gris con la última vez; sugerencia solo si hay algo que cambiar; nota como enlace chico.
   const st = ex.sets[j], ref = refSet(prev, ex.exId, j), ri = refInfo(prev, ex.exId), t = ex.target[j] || {};
   const okRef = ref && (ref.w !== "" || ref.r !== "");
   let h = "";
   if (okRef) {
-    h += `<div class="lastv"><small>Última vez${ri?.date ? " · " + fmtDate(ri.date) : ""}</small><b>${ref.w || "–"} kg × ${ref.r || "–"}</b>${ref.rir !== "" && ref.rir != null ? `<span class="rir">${ref.rir === "F" ? "Fallo" : "RIR " + ref.rir}</span>` : ""}${ref.tech ? `<span class="badge tech-${ref.tech}">Téc. ${ref.tech}</span>` : ""}</div>`;
-    if (st.w !== "" && st.r !== "" && has("train_suggest")) { const pg = setProgress(st, ref); if (pg && pg.k !== "new") h += `<div class="prog ${pg.k}">${{ up: "▲", down: "▼", bad: "⚠", same: "•" }[pg.k] || "•"} Hoy: ${esc(pg.t.charAt(0).toLowerCase() + pg.t.slice(1))}</div>`; }
-    else if (has("train_suggest") && !(ex.sides && j % 2)) { const hn = nextHint(ref, t); if (hn) h += `<div class="hint ${hn.k}">💡 ${esc(hn.t)}</div>`; }
-    if (ref.note) h += `<div class="lastnote">📝 <b>Tu nota de la última vez:</b> ${esc(ref.note)}</div>`;
+    h += `<div class="lastv">Última vez${ri?.date ? " (" + fmtDate(ri.date) + ")" : ""}: <b>${ref.w || "–"} × ${ref.r || "–"}</b>${ref.rir !== "" && ref.rir != null ? ` · ${ref.rir === "F" ? "Fallo" : "RIR " + ref.rir}` : ""}${ref.tech ? ` · <span class="tc ${ref.tech}">téc. ${ref.tech}</span>` : ""}</div>`;
+    if (st.w !== "" && st.r !== "" && has("train_suggest")) { const pg = setProgress(st, ref); if (pg && pg.k !== "new") h += `<div class="prog ${pg.k}">Hoy: ${esc(pg.t.charAt(0).toLowerCase() + pg.t.slice(1))}</div>`; }
+    else if (has("train_suggest") && !(ex.sides && j % 2)) { const hn = nextHint(ref, t); if (hn) h += `<div class="hint">→ ${esc(hn.t)}</div>`; }
+    if (ref.note) h += `<div class="lastnote">Tu nota: ${esc(ref.note)}</div>`;
   }
-  if (st.rir === "F" && t.rir !== "F" && t.rir != null && t.rir !== "") h += `<div class="hint y">Tu plan no pedía llegar al fallo: la próxima vez deja al menos 1 rep en reserva</div>`;
-  h += `<button class="notebtn ${st.note ? "on" : ""}" data-a="setNote" data-j="${j}">✎ ${st.note ? "Tu nota: " + esc(st.note) : "Agregar nota a esta serie"}</button>`;
+  if (st.rir === "F" && t.rir !== "F" && t.rir != null && t.rir !== "") h += `<div class="hint">→ Tu plan no pedía fallo: la próxima deja 1 rep en reserva</div>`;
+  h += `<button class="notebtn ${st.note ? "on" : ""}" data-a="setNote" data-j="${j}">${st.note ? "✎ " + esc(st.note) : "+ nota"}</button>`;
   return h;
 }
 function sugHtml(ex) {
@@ -286,7 +286,7 @@ act("tips", async () => {
   ${e ? `<div class="video"><iframe src="${e}" allowfullscreen></iframe></div>` : ex.video ? `<a class="btn primary block" target="_blank" href="${esc(ex.video)}">${I.play} Ver video</a>` : `<p class="muted small">Tu coach aún no carga el video de este ejercicio.</p>`}`}
   <div class="card-t mt">Tips de ejecución</div>
   ${tips.length ? `<ul class="tiplist">${tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : `<p class="muted small">Tu coach aún no carga los tips de este ejercicio.</p>`}
-  ${ex.alts?.length ? `<div class="card-t mt">${I.swap}Reemplazos de emergencia</div><p class="muted small">Si la máquina está ocupada o no está disponible (mismo patrón de movimiento):</p>
+  ${ex.alts?.length ? `<div class="card-t mt">${I.swap}Reemplazos SOS</div><p class="muted small">Si la máquina está ocupada o no está disponible (mismo patrón de movimiento):</p>
   ${ex.alts.map((a, k) => `<div class="li row between"><b>${esc(a.name)}</b><span class="row gap">${a.video ? `<a class="btn tiny" target="_blank" href="${esc(a.video)}">Video</a>` : ""}<button class="btn tiny primary" data-a="useAlt" data-k="${k}">Usar</button></span></div>`).join("")}` : ""}`);
 });
 // ---------- Reemplazo SOS: la rutina no cambia; solo hoy se hace otro ejercicio en su lugar.
