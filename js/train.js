@@ -5,7 +5,7 @@ import { S, refresh, go } from "./state.js";
 import { act, toast, sheet, closeSheet, chips, beep, notify, confirmBox, $, $$ } from "./ui.js";
 import { LS, esc, ymd, fmtDate, weekInfo, r1, num, embedUrl, uid, pad, parseYmd, D3, compressImage } from "./util.js";
 import { saveAudio, loadAudio, delAudio } from "./audiostore.js";
-import { getRoutines, getSessions, weekPlan, prevSession, prevFor, refInfo, nextHint, lastEx, refSet, newSession, suggest, splitSides, setProgress, perfText, repsEff, exProgress, sessionProgress } from "./data.js";
+import { getRoutines, getSessions, weekPlan, prevSession, prevFor, routineMods, refInfo, nextHint, lastEx, refSet, newSession, suggest, splitSides, setProgress, perfText, repsEff, exProgress, sessionProgress } from "./data.js";
 import { I } from "./icons.js";
 import { has } from "./features.js";
 
@@ -28,14 +28,14 @@ export async function trainView() {
   const [routines, sessions] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]);
   const plan = weekPlan(S.client, routines, sessions);
   const cur = sessions.find((s) => s.status === "curso");
-  const changed = routines.filter((r) => r.changes?.week === plan.week.key);
+  const changed = routines.map((r) => ({ r, l: routineMods(r, plan.week.key).list })).filter((x) => x.l.length);
   const today = ymd();
   const day = (d) => { const dt = parseYmd(d); return `<span class="sd2"><b>${D3[dt.getDay()]}</b>${dt.getDate()}</span>`; };
   return `${head("Entrenamiento")}
   <div class="card"><div class="row between"><div><div class="card-t" style="margin:0">Semana ${plan.week.n}</div><div class="muted small">${fmtDate(plan.week.first)} – ${fmtDate(plan.week.last)}</div></div><div class="big">${plan.doneCount}<small>/${plan.total}</small></div></div>
   <div class="progress"><i style="width:${plan.total ? Math.min(100, (plan.doneCount / plan.total) * 100) : 0}%"></i></div></div>
   ${cur ? `<div class="card row between" style="border-color:var(--acc)"><span><small class="muted">Sesión en curso${cur.date !== today ? " · desde el " + fmtDate(cur.date) : ""}</small><br><b>${esc(cur.routineName)}</b></span><span class="row gap"><button class="btn tiny ghost" data-a="discardById" data-id="${cur.id}">Descartar</button><a class="btn primary small" href="#sesion/${cur.id}">Continuar</a></span></div>` : ""}
-  ${changed.length ? `<div class="card mod"><b>Esta semana hubo modificaciones en tu rutina</b><ul>${changed.flatMap((r) => (r.changes.list || []).map((x) => `<li><b>${esc(r.name)}:</b> ${esc(x)}</li>`)).join("")}</ul></div>` : ""}
+  ${changed.length ? `<div class="card mod"><b>Esta semana hubo modificaciones en tu rutina</b><ul>${changed.flatMap(({ r, l }) => l.map((x) => `<li><b>${esc(r.name)}:</b> ${esc(x)}</li>`)).join("")}</ul></div>` : ""}
   ${plan.rotation ? rotCard(plan, today) : ""}
   <div class="slots">${plan.slots.map((s) => s.rest
     ? `<div class="slot rest ${s.date === today ? "today" : ""}">${day(s.date)}<span class="rest-t">${s.date === today ? "Hoy · " : ""}Descanso${s.freeToday ? " <small>(puedes entrenar si quieres)</small>" : ""}</span>${s.freeToday && plan.next ? `<button class="btn tiny" data-a="startRoutine" data-r="${plan.next.rid}">Empezar</button>` : ""}</div>`
@@ -45,7 +45,7 @@ export async function trainView() {
     ? `<div class="card"><div class="card-t">Mis rutinas</div><p class="muted small">Tu asesoría es de nutrición: tú diseñas tus rutinas con los ejercicios de la biblioteca y sus tips. Elige qué días toca cada una y registra tus entrenamientos aquí.</p>
       ${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${(r.days || []).length ? " · " + r.days.map((d) => D3[d]).join(", ") : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="myRoutine" data-r="${r.id}">Editar</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Aún no tienes rutinas.</p>`}
       <button class="btn primary block mt" data-a="myRoutine">${I.plus} Crear rutina</button></div>`
-    : `<div class="card"><div class="card-t">Todas tus rutinas</div>${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${r.changes?.week === plan.week.key ? ' · <span class="red">modificada</span>' : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${r.id}">Ver</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Tu coach aún no carga tus rutinas.</p>`}</div>`}`;
+    : `<div class="card"><div class="card-t">Todas tus rutinas</div>${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${routineMods(r, plan.week.key).list.length ? ' · <span class="red">modificada</span>' : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${r.id}">Ver</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Tu coach aún no carga tus rutinas.</p>`}</div>`}`;
 }
 // Rotación (ej. Fullbody A/B sin días fijos): qué le toca la próxima vez y la regla de descanso
 function rotCard(plan, today) {
@@ -96,12 +96,12 @@ act("mrRemove", async () => { if (!(await confirmBox("¿Eliminar esta rutina? Tu
 act("viewRoutine", async (el) => {
   const r = (await getRoutines(S.cid)).find((x) => x.id === el.dataset.r); if (!r) return;
   const sessions = await getSessions(S.cid), last = sessions.filter((x) => x.routineId === r.id && x.status === "fin").sort((a, b) => b.startedAt - a.startedAt)[0];
+  const mids = routineMods(r, weekInfo(S.client, ymd()).key).ids;
   sheet(r.name, `${r.note ? `<div class="coachnote rnote"><b>Tu coach:</b> ${esc(r.note)}</div>` : ""}${(r.exercises || []).map((e, k) => {
     const lx = lastEx(sessions, { id: "", startedAt: Infinity }, { exId: e.id, name: e.name })?.ex, done = (lx?.sets || []).filter((x) => x.w !== "" || x.r !== "");
-    return `<div class="rvx" style="--exc:${exColor(k)}"><b>${k + 1}. ${esc(e.name)}</b>${e.changed ? ' <span class="badge r">Modificado</span>' : ""}
+    return `<div class="rvx" style="--exc:${exColor(k)}"><b>${k + 1}. ${esc(e.name)}</b>${mids.has(e.id) ? ' <span class="badge r">Modificado</span>' : ""}
     <div class="small">${(e.sets || []).map((t, j) => `<span class="rvset">S${j + 1}: ${planTxt(t)}</span>`).join("") || '<span class="muted">Series libres</span>'}</div>
     ${e.notes ? `<ul class="tiplist small">${String(e.notes).split(/\n|•/).map((x) => x.trim()).filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-    ${e.weekNote || e.wSug ? `<div class="coachnote small">${e.weekNote ? esc(e.weekNote) : ""}${e.wSug ? ` · Peso sugerido ${esc(e.wSug)} kg` : ""}</div>` : ""}
     ${done.length ? `<div class="muted small">Última vez: ${done.map((x) => `${x.w || "–"}×${x.r || "–"}`).join(" · ")}</div>` : ""}</div>`;
   }).join("") || `<p class="muted">Esta rutina aún no tiene ejercicios.</p>`}
   <button class="btn primary big" data-a="startRoutine" data-r="${r.id}">Empezar esta rutina</button>`);

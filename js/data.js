@@ -202,6 +202,47 @@ export function nextHint(ref, t = {}) {
   return { k: "b", t: "Mantén el peso e intenta sumar 1 rep o hacerla con mejor técnica" };
 }
 
+// ---------- Modificaciones de rutina que ve el cliente (v1.48, regla de Joaquín):
+// SOLO cuentan series, reps, RIR, orden y cambio/alta/baja de ejercicios. NO cuentan peso sugerido, comentarios por ejercicio
+// (esos se ven en la sesión, sobre el ejercicio), tips, descanso, tempo ni el comentario general de la rutina.
+const rirT = (v) => (v === "F" ? "al fallo" : v === "" || v == null ? "sin RIR" : "RIR " + v);
+export function setChanges(a, b) {
+  const out = [];
+  for (let j = 0; j < Math.max(a.length, b.length); j++) {
+    const o = a[j], e = b[j];
+    if (!o) out.push(`se agrega la serie ${j + 1} (${e.reps || "–"} reps, ${rirT(e.rir)})`);
+    else if (!e) out.push(`se quita la serie ${j + 1}`);
+    else { const t = []; if (String(o.reps ?? "") !== String(e.reps ?? "")) t.push(`${o.reps || "–"} → ${e.reps || "–"} reps`); if (String(o.rir ?? "") !== String(e.rir ?? "")) t.push(`${rirT(o.rir)} → ${rirT(e.rir)}`); if (t.length) out.push(`serie ${j + 1}: ${t.join(", ")}`); }
+  }
+  return out;
+}
+const fmtSets = (s) => (s || []).map((x) => String(x.reps ?? "") + "@" + String(x.rir ?? "")).join(",");
+export function modsBetween(old, exercises) {
+  const list = [], ids = new Set();
+  (exercises || []).forEach((e, k) => {
+    const o = old.find((x) => x.id === e.id);
+    if (!o) { list.push(`Nuevo ejercicio: ${e.name}`); ids.add(e.id); return; }
+    if (o.name !== e.name) { list.push(`${o.name} → ${e.name}`); ids.add(e.id); }
+    if (fmtSets(o.sets) !== fmtSets(e.sets)) { setChanges(o.sets || [], e.sets || []).forEach((t) => list.push(`${e.name}: ${t}`)); ids.add(e.id); }
+    if (old.indexOf(o) !== k) { list.push(`${e.name}: cambió de orden`); ids.add(e.id); }
+  });
+  old.filter((o) => !(exercises || []).find((e) => e.id === o.id)).forEach((o) => list.push(`Se quitó: ${o.name}`));
+  return { list, ids };
+}
+// Lo que el cliente ve de una rutina modificada. Con `changes.base` se recalcula con la regla de arriba; los avisos antiguos
+// guardados como texto (`pre`, o `list` sin base) se filtran: fuera peso sugerido, descanso, tempo, comentarios.
+export function routineMods(r, weekKey) {
+  const ch = r?.changes; if (!ch || (weekKey && ch.week !== weekKey)) return { list: [], ids: new Set() };
+  const notes = new Set((r.exercises || []).filter((e) => e.weekNote).map((e) => `${e.name}: ${e.weekNote}`));
+  const okTxt = (t) => !notes.has(t) && !/^Comentario de la rutina:/.test(t) && !/: (descanso|tempo) /.test(t) && !/: peso sugerido [\d.,]+ kg$/.test(t) && !/: serie \d+: peso sugerido [\d.,]+ kg$/.test(t);
+  const strip = (t) => t.replace(/, peso sugerido [\d.,]+ kg/g, "");
+  const pre = (ch.base != null ? ch.pre || [] : ch.list || []).map(strip).filter(okTxt);
+  if (ch.base == null) return { list: pre, ids: new Set((r.exercises || []).filter((e) => e.changed).map((e) => e.id)) };
+  let old = []; try { old = JSON.parse(ch.base); } catch (e) {}
+  const m = modsBetween(old, r.exercises);
+  return { list: [...new Set([...pre, ...m.list])], ids: m.ids };
+}
+
 // Crea una sesión nueva a partir de la rutina
 // Ejercicios unilaterales: cada serie se anota por lado (izquierdo y derecho)
 export const isUniName = (n) => /\buni(lateral)?\b/i.test(n || "");
@@ -209,6 +250,7 @@ export const splitSides = (arr, blank) => arr.flatMap((x) => [{ ...x, side: "I" 
 export const setLabel = (ex, j) => (ex.sides ? `Serie ${Math.floor(j / 2) + 1} ${ex.sets[j]?.side === "D" || j % 2 ? "derecha" : "izquierda"}` : `Serie ${j + 1}`);
 const blankSet = () => ({ w: "", r: "", rir: "", note: "", done: false });
 export function newSession(client, routine, date = ymd()) {
+  const mods = routineMods(routine, weekInfo(client, date).key);
   return {
     id: uid(), routineId: routine.id, routineName: routine.name, date, weekKey: weekInfo(client, date).key,
     startedAt: Date.now(), status: "curso", coachNote: routine.note || "",
@@ -216,7 +258,7 @@ export function newSession(client, routine, date = ymd()) {
       const sides = e.uni ?? isUniName(e.name), tg = e.sets || [];
       return {
         exId: e.id, name: e.name, video: e.video || "", inc: e.inc || 2.5, rest: e.rest || null, notes: e.notes || "", tempo: e.tempo || "", weekNote: e.weekNote || "", wSug: e.wSug || "",
-        target: sides ? splitSides(tg) : tg, alts: e.alts || [], changed: !!e.changed, sides,
+        target: sides ? splitSides(tg) : tg, alts: e.alts || [], changed: mods.ids.has(e.id), sides,
         sets: sides ? splitSides(tg.map(blankSet), blankSet) : tg.map(blankSet), tech: ""
       };
     })

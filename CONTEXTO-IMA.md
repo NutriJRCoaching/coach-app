@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 26-nov-2026, versión **1.47.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 27-nov-2026, versión **1.48.0**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -489,7 +489,12 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 - **Campana** (`alertsFor`, `loadCtx` carga `sretros`): "Anota tu retro de N entrenamientos: Rutina (fecha)…" por cada entrenamiento terminado (no importado, desde `appStart` y máx. 21 días atrás) sin retro; amarillo, rojo si alguno tiene 3+ días. Reemplaza el gris "N entrenamientos nuevos para revisar".
 - **Cliente**: tarjeta en el inicio "💬 Tu coach comentó tu entrenamiento" hasta que la abre (`sretroCard` en client.js → `#resumen/{id}`); en el resumen de la sesión sale arriba "💬 Tu coach: …" y se marca `seen` (no en la vista previa del coach).
 
-## Estado al 26-nov-2026
+## v1.48.0 (27-nov) — "Modificaciones en tu rutina" solo con lo que de verdad cambia (pedido de Joaquín: "es horrible")
+- **Regla:** al cliente solo se le avisan cambios en **series, reps/rango, RIR, orden y cambio/alta/baja de ejercicios**. NO son modificaciones: peso sugerido, comentarios por ejercicio (`weekNote`), tips, descanso, tempo ni el comentario general de la rutina.
+- `modsBetween(old, exercises)` y `setChanges` viven en data.js (los usa `saveRoutine` en coach.js; marca `e.changed`). `routineMods(r, weekKey)` → `{list, ids}`: si hay `changes.base` recalcula con la regla; los textos antiguos (`pre` o `list` sin base) se filtran (fuera "peso sugerido", descanso, tempo, "Comentario de la rutina" y los `Nombre: weekNote`). Lo usan la tarjeta de la semana y "modificada" en Entreno, la insignia "Modificado" de "Ver rutina" y `newSession` (`changed`).
+- Los comentarios del coach por ejercicio (`weekNote`) y el peso sugerido el cliente los ve **solo en la sesión, sobre ese ejercicio** ("Tu coach: …" y el kg sugerido en la serie). Se quitaron de "Ver rutina".
+
+## Estado al 27-nov-2026
 - **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.
 - "Cambios sin guardar" en las rutinas de Marian: resuelto en v1.39.0 (ya no existe el aviso; todo se guarda solo).
 

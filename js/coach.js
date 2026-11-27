@@ -13,7 +13,7 @@ import { DEFAULT_RANGES, adjTxt, payMsg, reviewWindow, monthCal, judge, weightCo
 import "./onboarding.js";
 import { startRecording, uploadToDrive, driveReady, recSupported } from "./recorder.js";
 import { FEATURES, SVC_COLS, loadMatrix, has, defaultOf } from "./features.js";
-import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, prevFor, refSet, setProgress, exProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, PHASE_PCT, phaseAt, hasPlans, CHECKIN, CHECKIN_OLD } from "./data.js";
+import { mealList, getDays, getRoutines, getSessions, getClient, weekPlan, prevSession, prevFor, refSet, modsBetween, setProgress, exProgress, MEASURE_ZONES, PHOTO_TYPES, resetFoodCache, applyStage, stagesBar, phaseColor, PHASES, PHASE_PCT, phaseAt, hasPlans, CHECKIN, CHECKIN_OLD } from "./data.js";
 import { weeksTable } from "./client.js";
 import { GROUPS } from "./foods.js";
 import { menusEditor } from "./menus.js";
@@ -466,18 +466,6 @@ act("exF", async (el) => {
 act("exAdd", () => { RE.r.exercises.push({ id: uid(), name: "", sets: [{ reps: "8-10", rir: 1 }, { reps: "8-10", rir: 1 }], alts: [] }); refresh(); });
 act("exDel", (el) => { RE.r.exercises.splice(+el.dataset.k, 1); refresh(); });
 act("exMove", (el) => { const a = RE.r.exercises, k = +el.dataset.k, n = k + +el.dataset.n; if (n < 0 || n >= a.length) return; [a[k], a[n]] = [a[n], a[k]]; refresh(); });
-// Textos de los cambios que ve el cliente: "serie 1: 8 → 10 reps", "serie 2: RIR 1 → al fallo", "se agrega la serie 3 (8 reps, RIR 1)"
-const rirT = (v) => (v === "F" ? "al fallo" : v === "" || v == null ? "sin RIR" : "RIR " + v);
-function setChanges(a, b) {
-  const out = [];
-  for (let j = 0; j < Math.max(a.length, b.length); j++) {
-    const o = a[j], e = b[j];
-    if (!o) out.push(`se agrega la serie ${j + 1} (${e.reps || "–"} reps, ${rirT(e.rir)})`);
-    else if (!e) out.push(`se quita la serie ${j + 1}`);
-    else { const t = []; if (String(o.reps ?? "") !== String(e.reps ?? "")) t.push(`${o.reps || "–"} → ${e.reps || "–"} reps`); if (String(o.rir ?? "") !== String(e.rir ?? "")) t.push(`${rirT(o.rir)} → ${rirT(e.rir)}`); if (String(o.w ?? "") !== String(e.w ?? "") && e.w) t.push(`peso sugerido ${String(e.w).replace(".", ",")} kg`); if (t.length) out.push(`serie ${j + 1}: ${t.join(", ")}`); }
-  }
-  return out;
-}
 // Guardar la rutina en edición. silent = guardado automático (sin re-dibujar ni avisar).
 // Los cambios que ve el cliente se calculan contra cómo estaba la rutina ANTES de los cambios de esa semana (changes.base),
 // así el guardado automático no apila pasos intermedios ("8 → 9", "9 → 10"): queda "8 → 10". Si deshaces todo, no queda aviso.
@@ -487,22 +475,8 @@ async function saveRoutine(R, silent) {
   const sameWk = r.changes?.week === w.key, hasBase = sameWk && r.changes.base != null;
   const old = JSON.parse(hasBase ? r.changes.base : R.orig), oldNote = hasBase ? r.changes.baseNote || "" : R.origNote || "";
   const pre = hasBase ? r.changes.pre || [] : sameWk ? r.changes.list || [] : []; // avisos guardados con la versión anterior (sin base)
-  const list = [], fmtS = (s) => (s || []).map((x) => x.reps + (x.rir !== "" ? "@" + x.rir : "") + (x.w ? "·" + x.w : "")).join(", ");
-  if (!r.isNew) {
-    r.exercises.forEach((e, k) => {
-      const o = old.find((x) => x.id === e.id); e.changed = false;
-      if (!o) { list.push(`Nuevo ejercicio: ${e.name}`); e.changed = true; return; }
-      if (o.name !== e.name) { list.push(`${o.name} → ${e.name}`); e.changed = true; }
-      if (fmtS(o.sets) !== fmtS(e.sets)) { setChanges(o.sets || [], e.sets || []).forEach((t) => list.push(`${e.name}: ${t}`)); e.changed = true; }
-      if ((o.rest || "") !== (e.rest || "") && e.rest) list.push(`${e.name}: descanso ${o.rest ? mmss(o.rest) : "–"} → ${mmss(e.rest)}`);
-      if ((o.tempo || "") !== (e.tempo || "") && e.tempo) list.push(`${e.name}: tempo ${e.tempo} (bajada-pausa-subida-pausa)`);
-      if (old.indexOf(o) !== k) { list.push(`${e.name}: cambió de orden`); e.changed = true; }
-      if ((o.weekNote || "") !== (e.weekNote || "") && e.weekNote) list.push(`${e.name}: ${e.weekNote}`);
-      if ((o.wSug || "") !== (e.wSug || "") && e.wSug) list.push(`${e.name}: peso sugerido ${e.wSug} kg`);
-    });
-    old.filter((o) => !r.exercises.find((e) => e.id === o.id)).forEach((o) => list.push(`Se quitó: ${o.name}`));
-  }
-  if (oldNote !== (r.note || "") && r.note) list.push(`Comentario de la rutina: ${r.note}`);
+  let list = [];
+  if (!r.isNew) { const m = modsBetween(old, r.exercises); list = m.list; r.exercises.forEach((e) => (e.changed = m.ids.has(e.id))); }
   const all = [...pre, ...list];
   const data = { name: r.name, exercises: r.exercises, note: r.note || "", order: r.order ?? 0, updatedAt: Date.now() };
   if (all.length) data.changes = { week: w.key, list: all, pre, base: JSON.stringify(old), baseNote: oldNote, at: Date.now() };
