@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 27-nov-2026, versión **1.49.0**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 27-nov-2026, versión **1.49.1**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -497,6 +497,10 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.49.0 (27-nov) — Sesión más compacta (pedido de Joaquín: ocupaba mucho, el azul feo)
 - Bajo cada serie: una línea gris "Última vez (fecha): **kg × reps** · RIR · téc." (técnica peor en rojo, mejor en verde); "Hoy: …" al anotar; sugerencia solo si hay algo que cambiar ("→ Te sobró margen: intenta subir el peso", "→ Te faltaron reps…", "→ Técnica peor la última vez…", "→ Llegaste al fallo…"), sin la genérica de "mejor técnica" (la técnica tiene un techo); nota anterior como línea amarilla "Tu nota: …"; "+ nota" como enlace gris chico. Sin recuadros ni azul.
 - "Reemplazos SOS": botón chico en la cabecera del ejercicio, junto a Izq/Der (se quitó la franja amarilla). En Tips también se llama "Reemplazos SOS".
+
+## v1.49.1 (27-nov)
+- "Modificado" con avisos antiguos sin `changes.base`: ahora solo marca los ejercicios que siguen nombrados en la lista ya filtrada (antes usaba `e.changed`, que contaba el peso sugerido: a Felipe le salían todos como modificados).
+- "Ver rutina": insignia amarilla "💬 Comentario de Joacoach" en los ejercicios con `weekNote` (el texto se ve solo en la sesión). En la sesión el comentario dice **"Joacoach:"** (antes "Tu coach:"). `.coachnote` pasó de azul a amarillo.
 
 ## Estado al 27-nov-2026
 - **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.

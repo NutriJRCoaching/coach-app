@@ -689,3 +689,5 @@ body.rec-on #undobar { display: none; }
 .notebtn.on { color: var(--txt); font-weight: 500; }
 .sosb { white-space: nowrap; } .sosb .ic { width: 14px; height: 14px; }
 .ex-h { gap: 8px; align-items: flex-start; }
+.badge.cmt { background: var(--y-s); color: var(--y); text-transform: none; letter-spacing: 0; }
+.coachnote { background: var(--y-s); border-left: 3px solid var(--y); border-radius: 0 10px 10px 0; }

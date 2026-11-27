@@ -237,7 +237,8 @@ export function routineMods(r, weekKey) {
   const okTxt = (t) => !notes.has(t) && !/^Comentario de la rutina:/.test(t) && !/: (descanso|tempo) /.test(t) && !/: peso sugerido [\d.,]+ kg$/.test(t) && !/: serie \d+: peso sugerido [\d.,]+ kg$/.test(t);
   const strip = (t) => t.replace(/, peso sugerido [\d.,]+ kg/g, "");
   const pre = (ch.base != null ? ch.pre || [] : ch.list || []).map(strip).filter(okTxt);
-  if (ch.base == null) return { list: pre, ids: new Set((r.exercises || []).filter((e) => e.changed).map((e) => e.id)) };
+  // Sin base (avisos antiguos): "Modificado" solo para los ejercicios que siguen nombrados en la lista ya filtrada
+  if (ch.base == null) return { list: pre, ids: new Set((r.exercises || []).filter((e) => pre.some((t) => t.startsWith(e.name + ":") || t.endsWith("→ " + e.name) || t === "Nuevo ejercicio: " + e.name)).map((e) => e.id)) };
   let old = []; try { old = JSON.parse(ch.base); } catch (e) {}
   const m = modsBetween(old, r.exercises);
   return { list: [...new Set([...pre, ...m.list])], ids: m.ids };
