@@ -231,8 +231,15 @@ export function modsBetween(old, exercises) {
 }
 // Lo que el cliente ve de una rutina modificada. Con `changes.base` se recalcula con la regla de arriba; los avisos antiguos
 // guardados como texto (`pre`, o `list` sin base) se filtran: fuera peso sugerido, descanso, tempo, comentarios.
-export function routineMods(r, weekKey) {
-  const ch = r?.changes; if (!ch || (weekKey && ch.week !== weekKey)) return { list: [], ids: new Set() };
+// Semana en que aplican los cambios: si cuando el coach los guardó el cliente YA había hecho esa rutina esa semana,
+// son para la semana siguiente (pedido de Joaquín, 27-nov). Corrige también avisos guardados antes de esta regla.
+export function changesWeek(r, sessions) {
+  const ch = r?.changes; if (!ch?.week) return null;
+  const done = (sessions || []).some((s) => s.routineId === r.id && s.status === "fin" && s.weekKey === ch.week && (s.endedAt || s.startedAt || 0) <= (ch.at || 0));
+  return done ? "S" + String(+ch.week.slice(1) + 1).padStart(2, "0") : ch.week;
+}
+export function routineMods(r, weekKey, sessions) {
+  const ch = r?.changes; if (!ch || (weekKey && (sessions ? changesWeek(r, sessions) : ch.week) !== weekKey)) return { list: [], ids: new Set() };
   const notes = new Set((r.exercises || []).filter((e) => e.weekNote).map((e) => `${e.name}: ${e.weekNote}`));
   const okTxt = (t) => !notes.has(t) && !/^Comentario de la rutina:/.test(t) && !/: (descanso|tempo) /.test(t) && !/: peso sugerido [\d.,]+ kg$/.test(t) && !/: serie \d+: peso sugerido [\d.,]+ kg$/.test(t);
   const strip = (t) => t.replace(/, peso sugerido [\d.,]+ kg/g, "");
@@ -250,8 +257,8 @@ export const isUniName = (n) => /\buni(lateral)?\b/i.test(n || "");
 export const splitSides = (arr, blank) => arr.flatMap((x) => [{ ...x, side: "I" }, { ...(blank ? blank() : x), side: "D" }]);
 export const setLabel = (ex, j) => (ex.sides ? `Serie ${Math.floor(j / 2) + 1} ${ex.sets[j]?.side === "D" || j % 2 ? "derecha" : "izquierda"}` : `Serie ${j + 1}`);
 const blankSet = () => ({ w: "", r: "", rir: "", note: "", done: false });
-export function newSession(client, routine, date = ymd()) {
-  const mods = routineMods(routine, weekInfo(client, date).key);
+export function newSession(client, routine, date = ymd(), sessions = null) {
+  const mods = routineMods(routine, weekInfo(client, date).key, sessions);
   return {
     id: uid(), routineId: routine.id, routineName: routine.name, date, weekKey: weekInfo(client, date).key,
     startedAt: Date.now(), status: "curso", coachNote: routine.note || "",
@@ -653,7 +660,7 @@ export function reviewWindow(c, routines, sessions, today = ymd()) {
   // Cada rutina se revisa por separado (r.review = {week, same}); la semana queda revisada si lo están todas (o se marcó todo igual)
   const inUse = isRotation(c) ? c.rotation.order : Object.values(c.schedule || {});
   const scheduled = routines.filter((r) => inUse.includes(r.id));
-  const list = (scheduled.length ? scheduled : routines).map((r) => ({ r, done: r.review?.week === next.key || r.changes?.week === next.key, same: r.review?.week === next.key && r.review.same }));
+  const list = (scheduled.length ? scheduled : routines).map((r) => ({ r, done: r.review?.week === next.key || changesWeek(r, sessions) === next.key, same: r.review?.week === next.key && r.review.same }));
   return { open: today >= lastTrain, next, w, lastTrain, list, done: c.rutReview?.week === next.key || list.every((x) => x.done) };
 }
 

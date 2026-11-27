@@ -28,7 +28,7 @@ export async function trainView() {
   const [routines, sessions] = await Promise.all([getRoutines(S.cid), getSessions(S.cid)]);
   const plan = weekPlan(S.client, routines, sessions);
   const cur = sessions.find((s) => s.status === "curso");
-  const changed = routines.map((r) => ({ r, l: routineMods(r, plan.week.key).list })).filter((x) => x.l.length);
+  const changed = routines.map((r) => ({ r, l: routineMods(r, plan.week.key, sessions).list })).filter((x) => x.l.length);
   const today = ymd();
   const day = (d) => { const dt = parseYmd(d); return `<span class="sd2"><b>${D3[dt.getDay()]}</b>${dt.getDate()}</span>`; };
   return `${head("Entrenamiento")}
@@ -45,7 +45,7 @@ export async function trainView() {
     ? `<div class="card"><div class="card-t">Mis rutinas</div><p class="muted small">Tu asesoría es de nutrición: tú diseñas tus rutinas con los ejercicios de la biblioteca y sus tips. Elige qué días toca cada una y registra tus entrenamientos aquí.</p>
       ${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${(r.days || []).length ? " · " + r.days.map((d) => D3[d]).join(", ") : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="myRoutine" data-r="${r.id}">Editar</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Aún no tienes rutinas.</p>`}
       <button class="btn primary block mt" data-a="myRoutine">${I.plus} Crear rutina</button></div>`
-    : `<div class="card"><div class="card-t">Todas tus rutinas</div>${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${routineMods(r, plan.week.key).list.length ? ' · <span class="red">modificada</span>' : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${r.id}">Ver</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Tu coach aún no carga tus rutinas.</p>`}</div>`}`;
+    : `<div class="card"><div class="card-t">Todas tus rutinas</div>${routines.map((r) => `<div class="li row between"><span><b>${esc(r.name)}</b><small class="muted"> · ${r.exercises?.length || 0} ejercicios${routineMods(r, plan.week.key, sessions).list.length ? ' · <span class="red">modificada</span>' : ""}</small></span><span class="row gap"><button class="btn tiny ghost" data-a="viewRoutine" data-r="${r.id}">Ver</button><button class="btn tiny" data-a="startRoutine" data-r="${r.id}">Empezar</button></span></div>`).join("") || `<p class="muted small">Tu coach aún no carga tus rutinas.</p>`}</div>`}`;
 }
 // Rotación (ej. Fullbody A/B sin días fijos): qué le toca la próxima vez y la regla de descanso
 function rotCard(plan, today) {
@@ -96,7 +96,7 @@ act("mrRemove", async () => { if (!(await confirmBox("¿Eliminar esta rutina? Tu
 act("viewRoutine", async (el) => {
   const r = (await getRoutines(S.cid)).find((x) => x.id === el.dataset.r); if (!r) return;
   const sessions = await getSessions(S.cid), last = sessions.filter((x) => x.routineId === r.id && x.status === "fin").sort((a, b) => b.startedAt - a.startedAt)[0];
-  const mids = routineMods(r, weekInfo(S.client, ymd()).key).ids;
+  const mids = routineMods(r, weekInfo(S.client, ymd()).key, sessions).ids;
   sheet(r.name, `${r.note ? `<div class="coachnote rnote"><b>Tu coach:</b> ${esc(r.note)}</div>` : ""}${(r.exercises || []).map((e, k) => {
     const lx = lastEx(sessions, { id: "", startedAt: Infinity }, { exId: e.id, name: e.name })?.ex, done = (lx?.sets || []).filter((x) => x.w !== "" || x.r !== "");
     return `<div class="rvx" style="--exc:${exColor(k)}"><b>${k + 1}. ${esc(e.name)}</b>${mids.has(e.id) ? ' <span class="badge r">Modificado</span>' : ""}${e.weekNote ? ' <span class="badge cmt">💬 Comentario de Joacoach</span>' : ""}
@@ -112,7 +112,7 @@ act("startRoutine", async (el) => {
   const cur = sessions.find((s) => s.status === "curso");
   if (cur && !(await confirmBox(`Tienes "${cur.routineName}" en curso. ¿Empezar otra igual?`, "Empezar otra"))) return go("sesion/" + cur.id);
   const r = (await getRoutines(S.cid)).find((x) => x.id === el.dataset.r);
-  const s = newSession(S.client, r);
+  const s = newSession(S.client, r, undefined, sessions);
   await db.set(`${P()}/sessions/${s.id}`, s);
   S.session = s; S.exIdx = 0; go("sesion/" + s.id);
 });

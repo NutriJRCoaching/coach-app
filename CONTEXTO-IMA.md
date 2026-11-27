@@ -1,6 +1,6 @@
 # CONTEXTO-IMA — léelo primero
 
-Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 27-nov-2026, versión **1.49.1**.
+Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizado: 27-nov-2026, versión **1.49.2**.
 
 ## Qué es
 **IMA · Inteligencia Muscular Aplicada** (antes "Team JR"). Es la app de coaching de Joaquín Rojas (nutricionista y coach online), inspirada en tracked.gg.
@@ -501,6 +501,10 @@ Resumen para retomar el desarrollo en un chat nuevo sin el historial. Actualizad
 ## v1.49.1 (27-nov)
 - "Modificado" con avisos antiguos sin `changes.base`: ahora solo marca los ejercicios que siguen nombrados en la lista ya filtrada (antes usaba `e.changed`, que contaba el peso sugerido: a Felipe le salían todos como modificados).
 - "Ver rutina": insignia amarilla "💬 Comentario de Joacoach" en los ejercicios con `weekNote` (el texto se ve solo en la sesión). En la sesión el comentario dice **"Joacoach:"** (antes "Tu coach:"). `.coachnote` pasó de azul a amarillo.
+
+## v1.49.2 (27-nov) — Cambios de rutina para la semana que corresponde
+- Regla de Joaquín: si el cliente **ya hizo esa rutina esta semana**, los cambios que guardas son para la **semana siguiente** (antes solo si la revisión semanal estaba abierta). `saveRoutine` lo aplica al guardar; `changesWeek(r, sessions)` en data.js corrige los avisos ya guardados (si había una sesión terminada de esa rutina en `changes.week` antes de `changes.at`, cuenta como semana + 1). Lo usan `routineMods(r, week, sessions)` (tarjeta de Entreno, "modificada", "Ver rutina", `newSession(..., sessions)`) y `reviewWindow`.
+- Ojo (sin cambiar): las rutinas editadas se aplican al tiro a la próxima sesión que empiece el cliente (las metas vienen de la rutina actual), aunque el aviso sea de la semana siguiente.
 
 ## Estado al 27-nov-2026
 - **Hecho:** Marian y Gabriel ya empezaron a usar la app (fichas, rutinas y acceso listos). Datos para transferir llenos en Biblioteca.

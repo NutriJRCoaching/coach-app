@@ -471,7 +471,9 @@ act("exMove", (el) => { const a = RE.r.exercises, k = +el.dataset.k, n = k + +el
 // así el guardado automático no apila pasos intermedios ("8 → 9", "9 → 10"): queda "8 → 10". Si deshaces todo, no queda aviso.
 async function saveRoutine(R, silent) {
   const cid = R.cid, r = R.r;
-  const c = await getClient(cid), rv0 = reviewWindow(c, await getRoutines(cid), await getSessions(cid)), w = rv0?.open ? rv0.next : weekInfo(c, ymd());
+  const ss = await getSessions(cid), c = await getClient(cid), rv0 = reviewWindow(c, await getRoutines(cid), ss), w0 = weekInfo(c, ymd());
+  // Si la revisión semanal está abierta, o el cliente ya hizo esta rutina esta semana, los cambios son para la semana siguiente
+  const w = rv0?.open ? rv0.next : ss.some((x) => x.routineId === r.id && x.status === "fin" && x.weekKey === w0.key) ? weekInfo(c, addDays(w0.last, 1)) : w0;
   const sameWk = r.changes?.week === w.key, hasBase = sameWk && r.changes.base != null;
   const old = JSON.parse(hasBase ? r.changes.base : R.orig), oldNote = hasBase ? r.changes.baseNote || "" : R.origNote || "";
   const pre = hasBase ? r.changes.pre || [] : sameWk ? r.changes.list || [] : []; // avisos guardados con la versión anterior (sin base)
